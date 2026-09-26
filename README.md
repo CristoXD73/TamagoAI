@@ -2,108 +2,119 @@
 
 # TamagoAI
 
-### A living local-AI companion for Apple Watch
+### A little AI that lives on your wrist.
 
-**The character is the interface.** TamagoAI turns an Apple Watch into the face of a small autonomous AI creature, while a Mac at home provides the local brain, tools, and automation.
+Your Watch gives it a face. Your Mac gives it a brain.
 
 ![watchOS](https://img.shields.io/badge/watchOS-27+-black?logo=apple)
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI-orange?logo=swift)
 ![Local AI](https://img.shields.io/badge/AI-local--first-blueviolet)
-![Status](https://img.shields.io/badge/status-active%20development-yellow)
+![Status](https://img.shields.io/badge/status-growing-yellow)
 
 </div>
 
-> **Active development:** the protocol, gateway, Watch/iPhone project, complication, simulator path, signing and automated tests are working. The final octopus artwork and physical-Watch validation are still in progress.
+## Meet TamagoAI
 
-## What is TamagoAI?
+TamagoAI isn't a chatbot squeezed onto a tiny screen. It's a small presence that lives on your Apple Watch.
 
-TamagoAI is a Tamagotchi-inspired AI companion designed around a simple idea: **instead of opening an AI app, the AI appears to live on your wrist.**
+It wanders. It watches. It reacts when you reach for it. Sometimes it swims out of sight and comes back somewhere else. The goal is simple: make interacting with AI feel a little less like opening software and a little more like having something there with you.
 
-The Apple Watch handles the creature's presence — animation, touch, Digital Crown, microphone, speaker, haptics and complications. A Mac mini can provide the heavier local-AI inference, tools and automation without trying to run a full model on the Watch.
+> TamagoAI is still growing. The Watch app, local gateway and core behavior system are already running in development. The final octopus artwork and real-Watch validation are coming next.
+
+## It feels alive
+
+The character is the interface.
+
+There isn't meant to be a dashboard between you and TamagoAI. The creature itself tells you what it's doing through movement, expression, sound and haptics.
+
+It can quietly float around the screen, notice a tap, look somewhere new, disappear beyond the edge of the display and peek back in later. Its behavior is intentionally a little unpredictable — but never random enough to feel broken.
+
+**Right now we're teaching it how to move. Next, we give it its final body.**
+
+## Small Watch. Bigger brain.
+
+The Apple Watch handles the part you see and touch: the character, microphone, speaker, Digital Crown, haptics and complication.
+
+A Mac at home can handle the heavier work: local AI, memory, tools and automations.
 
 ```text
-                  ┌──────────────────────────────┐
-                  │          Mac mini            │
-                  │  Local AI · tools · gateway  │
-                  └──────────────┬───────────────┘
-                                 │
-                          Protocol V1
-                                 │
-                  ┌──────────────▼───────────────┐
-                  │        Apple Watch           │
-                  │   TamagoAI's face + senses   │
-                  └──────────────────────────────┘
+      Apple Watch                         Mac
 
- idle → listening → thinking → speaking → reaction → idle
+   TamagoAI's face   ←────────→   TamagoAI's brain
+   touch · voice                  local AI · tools
+   motion · haptics               memory · automation
 ```
 
-## The creature
+That split lets the Watch stay lightweight while giving the companion room to become much more capable over time.
 
-TamagoAI is being designed as an octopus-like AI companion with organic, slightly alien behavior rather than a static mascot. The character system is being separated into behavior, world movement, expression and rendering so final artwork can evolve without rewriting its brain.
+## TamagoAI in motion
 
-Planned/active character behaviors include:
+**Visuals are coming next.** This section will become the living part of the project page: short simulator clips, GIFs of TamagoAI wandering and peeking, the final octopus artwork, and eventually the companion running on a real Apple Watch.
 
-- autonomous wandering and quiet idle life
-- blinking, looking, breathing and subtle organic motion
-- reacting to touch without abandoning autonomous behavior
-- swimming/crawling beyond the Watch display
-- disappearing offscreen and returning later
-- peeking through any edge of the display
-- state-driven expressions for listening, thinking, speaking and reactions
+<!-- Stable media paths live under docs/media/. -->
 
-## Visual preview
+### Wander
 
-> **Coming next:** simulator captures, final octopus renders and short GIFs of TamagoAI wandering, peeking and reacting. These will be updated as the character art evolves.
+TamagoAI doesn't have to sit politely in the center of the screen. It has a world position and can explore the entire display.
 
-<!-- Future media lives under docs/media/ so README links remain stable. -->
+### Disappear
 
-## Architecture
+It can swim or crawl completely out of view, stay away for a moment, then return from another edge.
 
-| Layer | Responsibility |
-| --- | --- |
-| **TamagoWatch** | watchOS UI, character, interaction, haptics and device experience |
-| **TamagoComplication** | WidgetKit complication surface |
-| **TamagoPhone** | iPhone companion and Watch integration |
-| **TamagoShared** | Swift protocol models, character state and reusable logic |
-| **Gateway** | Small Node.js bridge between the Apple clients and AI provider |
-| **Local AI** | Mac-hosted model/provider and future tool execution |
+### Notice you
 
-The wire protocol is intentionally independent of the character renderer. A provider failure, timeout or duplicate request is handled by the gateway rather than leaking provider internals into the Watch experience.
+Touch interrupts its little routine without wiping its personality. Repeated interaction can get a stronger response before it settles back into whatever it was doing.
 
-## Repository layout
+### Think
+
+Listening, thinking, speaking and reacting are character states — not loading screens.
+
+## Built local-first
+
+TamagoAI is designed so the heavier intelligence can live on hardware you control rather than forcing the Watch to behave like a tiny AI server.
+
+The current architecture keeps the Watch experience separate from the AI provider. That means the character can keep evolving while the model, tools and local gateway evolve independently.
 
 ```text
-AGENTS.md / CLAUDE.md       agent/development rules
-docs/                       architecture, protocol, decisions and handoff log
+Apple Watch
+    │
+    │  Tamago protocol
+    ▼
+Local gateway
+    │
+    ├── local AI
+    ├── memory
+    ├── tools
+    └── automations
+```
+
+## Where it is today
+
+TamagoAI is under active development, not a finished release.
+
+The project currently has a working watchOS/iPhone Xcode project, Watch complication, shared Swift package, local Node gateway, protocol fixtures and automated tests. The development line has passed **93 Swift tests** and **66 gateway tests**, and the Watch target builds and runs through the Apple Watch SE 3 simulator workflow.
+
+Physical Apple Watch testing is tracked separately so simulator success is never presented as real-device proof.
+
+## For developers
+
+The friendly face sits on top of a deliberately boring foundation. Behavior is separated from rendering, protocol behavior is deterministic, provider failures are contained by the gateway, and the final character artwork can be replaced without rebuilding its movement brain.
+
+```text
 Apple/
-  AppleTamago.xcodeproj     Watch app, complication, iPhone companion + tests
-  Shared/                   TamagoShared Swift package + tests
-  WatchApp/                 Watch experience and character renderer
-  iPhoneApp/                iPhone companion
-  Complication/             WidgetKit complication
-  Config/                   project configuration
-Gateway/                    Node.js local gateway
-Tests/Fixtures/protocol-v1/ shared protocol fixtures
-scripts/                    smoke/integration helpers
+  AppleTamago.xcodeproj     Watch + iPhone project
+  WatchApp/                 the creature you see
+  Shared/                   state, protocol and reusable logic
+  Complication/             glanceable Watch presence
+
+Gateway/                    local Mac bridge
+Tests/                      shared protocol fixtures
+docs/                       architecture, decisions and engineering log
 ```
 
-## Current verification
+### Run the local gateway
 
-The current development line has been verified with:
-
-- **93/93 Swift tests passing** on the host and Apple Watch SE 3 40 mm simulator
-- **66/66 Gateway tests passing**
-- successful generic signed builds for the Watch and iPhone targets
-- simulator build/install path for watchOS 27
-- deterministic protocol fixtures shared between Swift and the gateway
-- request IDs, timeout handling, duplicate-request suppression and sanitized errors
-- logs designed not to contain the user's text
-
-Physical Apple Watch validation remains intentionally separate from simulator/build verification.
-
-## Local gateway quick start
-
-Requires Node.js 22 or newer.
+Node.js 22 or newer:
 
 ```sh
 cd Gateway
@@ -111,57 +122,51 @@ npm test
 TAMAGO_ALLOW_NO_AUTH=1 npm start
 ```
 
-Then, from another shell:
+Then:
 
 ```sh
 curl -s localhost:8787/v1/health
 ```
 
-The no-auth mode is deliberately restricted to local development. Normal gateway startup requires authentication.
+The no-auth mode is for local development only. Normal startup requires authentication.
 
-## Development philosophy
+## Under the hood
 
-- **Local-first AI.** Keep the expensive intelligence at home when practical.
-- **Character-first UX.** The companion itself is the interface, not decoration around conventional app chrome.
-- **Watch-aware engineering.** Battery, GPU/CPU cost and lifecycle constraints matter.
-- **Deterministic foundations.** Protocol behavior and character logic should be testable even when the visible behavior feels spontaneous.
-- **No private-API tricks.** Work with watchOS rather than pretending its lifecycle limitations do not exist.
-- **No secrets in Git.** Credentials stay out of the repository and logs.
-- **Evidence over assumptions.** Simulator, signed-build and physical-device results are labeled separately.
+If you want the engineering details rather than the tour:
 
-## Documentation
-
-Start here if you are exploring or contributing:
-
-- `docs/MASTER_BRIEF.md` — product and architecture brief
+- `docs/MASTER_BRIEF.md` — the product and architecture
 - `docs/PROTOCOL_V1.md` — Watch ↔ gateway protocol
-- `docs/DECISIONS.md` — architectural decisions and trade-offs
-- `docs/UPSTREAM_REUSE.md` — upstream review/reuse record
-- `docs/HANDOFF_LOG.md` — chronological engineering handoffs and verification
-- `THIRD_PARTY_NOTICES.md` — third-party attribution and licenses
+- `docs/DECISIONS.md` — decisions and trade-offs
+- `docs/HANDOFF_LOG.md` — what has actually been built and verified
+- `docs/UPSTREAM_REUSE.md` — upstream review and reuse
+- `THIRD_PARTY_NOTICES.md` — attribution and licenses
 
-## Roadmap
+## What's next
 
-**Now:** living-character behavior, simulator iteration, final octopus asset pipeline and physical Apple Watch pairing/validation.
+**Give it life.** Finish autonomous movement, touch reactions, offscreen behavior and the final octopus animation pipeline.
 
-**Next:** richer touch/voice interaction, WatchConnectivity, local provider integration, TTS/haptics, complication behavior and real-device performance/battery tuning.
+**Put it on the Watch.** Complete physical-device pairing and tune performance, battery use and haptics on real hardware.
 
-**Later:** deeper local tools and automations while preserving a lightweight Watch client.
+**Give it a voice.** Connect richer voice interaction, local models, memory and tools.
 
-## Media & project page
+**Let it grow.** Keep expanding what TamagoAI can do without turning the Watch experience into another menu-filled app.
 
-The README is intentionally designed to evolve with the product. Screenshots, GIFs, architecture visuals and final character artwork will live under a stable `docs/media/` structure so the project page can be refreshed continuously without turning documentation into a one-off launch artifact.
+## Made to keep changing
+
+TamagoAI's look isn't locked. Screenshots, GIFs, character art and this page will change with the companion itself. Public media lives under `docs/media/` with stable filenames so we can keep replacing the visuals without rebuilding the documentation around them.
 
 ## Credits
 
-TamagoAI contains adapted sprite frame-timing work from **WatchPet** under the MIT License. See `THIRD_PARTY_NOTICES.md` and `docs/UPSTREAM_REUSE.md` for exact provenance. No WatchPet or Codex artwork is included.
+TamagoAI contains adapted sprite frame-timing work from **WatchPet** under the MIT License. Exact provenance is documented in `THIRD_PARTY_NOTICES.md` and `docs/UPSTREAM_REUSE.md`. No WatchPet or Codex artwork is included.
 
 ---
 
 <div align="center">
 
-**TamagoAI — a tiny AI presence that lives on your wrist.**
+### TamagoAI
 
-`Apple Watch` · `watchOS` · `SwiftUI` · `local AI` · `AI companion` · `Tamagotchi` · `Ollama-ready architecture`
+**A tiny presence with somewhere much bigger to grow.**
+
+Apple Watch · watchOS · SwiftUI · local AI · AI companion · Tamagotchi
 
 </div>
