@@ -112,16 +112,71 @@ safe to drop once the owner confirms the merge above is correct.
 measurement was fully reverted; `git diff` shows no changes to that file.
 
 **Hero image / README task (separate request, received mid-batch):**
-**NOT COMPLETED — blocked.** The owner supplied an approved hero photo
-(Apple Watch held in hand, white octopus character on-screen) inline in the
-chat. This agent has no tool that extracts a pasted chat image's original
-file bytes to disk pixel-for-pixel; the only available fallback (screenshotting
-the rendered chat) would recompress/crop the image, which the task's own
-instructions explicitly prohibit ("do not crop," "do not compress it
-aggressively," "use the supplied image exactly as provided"). No image file
-was written, `README.md` was not modified, and nothing hero-related is part
-of this commit. Needs the owner to place the original file on disk (or give a
-path to it) before this can proceed. GitHub rendering was consequently never
-attempted and is **NOT VERIFIED**.
+initially blocked (see prior revision of this entry) because a pasted chat
+image cannot be extracted to disk pixel-for-pixel with this agent's tools.
+The owner then supplied the file at a concrete filesystem path
+(`/private/tmp/claude-502/.../images/1.webp`), which resolved the blocker.
+
+**Signed-by:** Claude Code
+
+---
+
+### 2026-09-26: Claude Code — README hero image
+
+**Agent:** Claude Code
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `bd1a17c`
+**Ending commit SHA:** (recorded in a follow-up once committed)
+**Files changed:**
+- `docs/assets/tamagoai-hero.webp` (new — the supplied hero image, copied verbatim)
+- `README.md` (restructured: hero image promoted near the top; existing content
+  preserved and reorganized below it, plus a new Documentation section)
+- `docs/AGENT_WORKLOG.md` (this entry)
+
+**What was done:** the owner supplied an approved hero photo (an Apple Watch
+held in hand, white octopus character on its screen) at
+`/private/tmp/claude-502/-Volumes-Storage-Projects-TamaWatch/eca2bdf3-af21-4ef3-aef1-cb68198cb091/images/1.webp`.
+- **Image was NOT modified.** Copied with `cp -p` (no format conversion, no
+  recompression, no crop, no resize). Verified byte-identical via
+  `shasum -a 256` on source and destination (both
+  `8e67a177a85c95033f38659b08b0d2e86fd4ce3bc98eff472c95259c7a4fb9d6`).
+- Original format was WebP (confirmed via `file` and `sips`: 1254×1254 px,
+  130,416 bytes) — kept as `.webp` per the task's own instruction to preserve
+  original format rather than force a PNG conversion.
+- Stored at `docs/assets/tamagoai-hero.webp` (durable repo location, not a
+  temp path).
+- `README.md`: hero image inserted near the top via `<p align="center"><img
+  src="docs/assets/tamagoai-hero.webp" ...></p>`, using a relative repo path
+  (survives forks/clones) with alt text "TamagoAI white octopus companion
+  inhabiting an Apple Watch". Opening is restrained (title + one line + hero +
+  one line) before the pre-existing status callout and documentation. No
+  installation instructions, architecture diagrams, badge walls, or AI
+  marketing copy were placed above the hero. All pre-existing README content
+  (status line, "how it works" flow diagram, layout tree, gateway quick start,
+  principles) was preserved verbatim, just moved below the hero under
+  headings. Added a new "Documentation" section linking `CREATURE_SPEC.md`,
+  `ARCHITECTURE.md` (+ `TAMAGO_ARCHITECTURE.md` diagram), `DECISIONS.md`,
+  `VISUAL_APPROVAL_GATE.md`, `DEVELOPMENT.md`, `HANDOFF_LOG.md`, and
+  `PROTOCOL_V1.md` — none of these were linked from the README before.
+- Confirmed `docs/assets/tamagoai-hero.webp` exists on disk and that
+  `README.md`'s reference matches its filename and case exactly
+  (`grep`/`find -iname` cross-check).
+
+**Verification performed:** `git diff --check` (clean, see below). File
+existence and case-sensitive path match confirmed by direct filesystem check
+(above). **GitHub's actual rendered page was NOT viewed — this agent has no
+browser access to a pushed GitHub page in this session — so visual rendering
+of the hero (centering, sizing, mobile behavior) is explicitly NOT VERIFIED.**
+The markdown/HTML used (`<p align="center"><img ... width="640"></p>`) is a
+standard, widely-used GitHub-README pattern, but that is not a substitute for
+having looked at the rendered result.
+
+**Known issues:** none identified in the change itself. Rendering on
+GitHub.com is unverified per above; the owner should sanity-check it after
+push.
+
+**Cross-agent impact:** none — only `docs/assets/`, `README.md`, and this
+worklog were touched; no shared files from other agents' in-flight work were
+involved in this batch.
 
 **Signed-by:** Claude Code

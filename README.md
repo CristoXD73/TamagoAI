@@ -1,18 +1,39 @@
-# Apple Tamago
+# TamagoAI
 
-A Tamagotchi-style AI companion for Apple Watch. **The animated character is the
-interface.** The Watch is the face (animation, touch, Digital Crown, mic,
-speaker, haptics, complication). A Mac mini at home is the brain (local AI,
-tools, automation).
+A Tamagotchi-style AI companion that lives on your Apple Watch.
+
+<p align="center">
+  <img src="docs/assets/tamagoai-hero.webp" alt="TamagoAI white octopus companion inhabiting an Apple Watch" width="640">
+</p>
+
+<p align="center"><strong>A living AI companion for Apple Watch.</strong></p>
+
+---
+
+> Status: **Phase 3 foundation.** Protocol, mock gateway, fixtures, docs, and a
+> compiled Xcode project (placeholder Watch app, complication, iPhone companion,
+> shared Swift package with passing tests) exist. Nothing has run on a physical
+> Apple Watch. See [`docs/HANDOFF_LOG.md`](docs/HANDOFF_LOG.md).
+
+## How it works
+
+**The animated character is the interface.** The Watch is the face (animation,
+touch, Digital Crown, mic, speaker, haptics, complication). A Mac mini at home
+is the brain (local AI, tools, automation).
 
 ```text
  idle ─tap─▶ listening ─▶ thinking ─▶ (Mac gateway → local AI → tools) ─▶ speaking ─▶ reaction ─▶ idle
 ```
 
-> Status: **Phase 3 foundation.** Protocol, mock gateway, fixtures, docs, and a
-> compiled Xcode project (placeholder Watch app, complication, iPhone companion,
-> shared Swift package with 43 passing tests) exist. Nothing has run on a physical
-> Apple Watch. See `docs/HANDOFF_LOG.md`.
+## Documentation
+
+- [Creature specification](docs/CREATURE_SPEC.md) — behavior, personality, mood
+- [Architecture](docs/ARCHITECTURE.md) ([diagram](docs/TAMAGO_ARCHITECTURE.md))
+- [Decisions](docs/DECISIONS.md) — the running architecture decision log
+- [Visual approval gate](docs/VISUAL_APPROVAL_GATE.md) — how character motion gets approved
+- [Development guide](docs/DEVELOPMENT.md) — environment setup, commands
+- [Handoff log](docs/HANDOFF_LOG.md) — latest task-by-task status
+- [Protocol v1](docs/PROTOCOL_V1.md) — the Watch ⇄ Mac contract
 
 ## Layout
 
