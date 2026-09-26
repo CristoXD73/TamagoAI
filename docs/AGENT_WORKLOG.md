@@ -396,3 +396,109 @@ downstream). The `docs/tamagoai-presentation` branch was deliberately left
 alone (see the previous entry).
 
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-26T18:48:07-0400: Claude Code — pairing, discovery, voice input, product README
+
+**Agent:** Claude Code
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `23b3276`
+**Ending commit SHAs:** `ae763a0` (gateway), `e95f53b` (watch), `8e3aed6`
+(docs/rules), `7e00b97` (README/presentation), `f62c198` (README diagram),
+`d3e4969` (test fix), plus the commit carrying this entry. `main` was then
+fast-forwarded; see the entry after this one.
+
+**Files changed:** Gateway: `src/{advertise,identity,pairing}.js` (new),
+`src/{cli,config,server}.js`, `test/{config,pairing}.test.js`. Apple/Shared:
+`ConnectionModel.swift` (new), `GatewayTransport.swift`, `TamagoProtocolV1.swift`,
+`Package.swift`, tests (`ConnectionModelTests.swift` new,
+`GatewayClientTests.swift`, `CharacterStateMachineTests.swift`). Apple/WatchApp:
+`PairingStore/PairingView/VoiceInput/CreatureSoundPlayer.swift` (new),
+`TamagoConnection`, `TamagoWatchApp`, `DebugStateControlsView`, `SpeechOutput`,
+`CharacterView`, `CreatureIdleStage`; `GatewayReachabilityMonitor.swift`
+removed. Docs: `DECISIONS.md` (D-116, D-115 note), `PROTOCOL_V1.md` (§14),
+`ARCHITECTURE.md`, `DEVELOPMENT.md`, `ACCEPTANCE_TESTS.md`,
+`TAMAGO_ARCHITECTURE.md`, `PRODUCT_PRESENTATION.md` (new), `AGENTS.md`,
+`CLAUDE.md`, `README.md`, `docs/assets/body-brain-{light,dark}.svg` (new).
+
+**Work performed:** full detail in D-116. In short:
+- Checked Apple TN3135 directly. Watch-side Bonjour, NWConnection and
+  NWPathMonitor are blocked on physical Watches, though the simulator allows
+  them. So discovery is a fixed mDNS name (`tamagoai.local`) the gateway
+  publishes via `dns-sd`, reached from the Watch with plain URLSession.
+- Pairing: a persistent gateway identity and a 6-digit single-use code.
+  `POST /v1/pair`. The Watch keeps the token in its Keychain per D-109.
+- Hold-to-talk: WatchKit's system dictation (D-106), presented programmatically.
+- Event-driven reachability replaces the 20 s poll, using D-107's backoff only
+  while the Mac is missing.
+- Found and fixed live: D-103's `ackBeatElapsed`/`reactionFinished` were never
+  supplied, so every answer left the creature stuck. Offline now keeps idle
+  life, per CREATURE_SPEC.
+- Pure semantic-state / transport / sound-cue models, with tests.
+- Speech and sound debug controls; placeholder tones exist in DEBUG only.
+- DEBUG stage-size regression guard.
+- README rebuilt visual-first; `PRODUCT_PRESENTATION.md` added and made
+  mandatory reading.
+- Aligned my first-pass choices to existing decisions after reading them:
+  D-107 backoff and URLSession settings, and D-109 Keychain layout.
+
+**Tests/builds actually run (by this agent):**
+- `swift test` (host): 137/137.
+- `xcodebuild test` on a freshly created SE 3 40 mm watchOS 27 simulator:
+  first 128 passed / 9 failed; after the fix, **137/137, TEST SUCCEEDED**.
+- `npm test` (Gateway): 79/79. `npm run fixtures`: no drift.
+- `xcodebuild build`: Debug (simulator) and Release (generic watchOS
+  simulator, unsigned) both succeed.
+- `scripts/smoke.sh` against the live LAN gateway via `tamagoai.local`: pass.
+- Live, SE 3 40 mm simulator against a LAN-mode gateway (`TAMAGO_HOST=0.0.0.0`,
+  throwaway `TAMAGO_STATE_DIR`):
+  - `tamagoai.local` resolves through the system resolver (`dscacheutil`), and
+    the Watch reached it.
+  - Pairing succeeded. It persisted across relaunch, re-verified after moving
+    to the D-109 storage layout.
+  - Hold → real system dictation sheet → suggestion → authenticated request →
+    `thinking` (`slow 6000`) → reaction → idle.
+  - Gateway stopped → `disconnected` with idle life → restarted → automatic
+    recovery.
+  - Unpaired LAN client: 401 with no token and with a guessed token. Reused
+    code: 410.
+- Speech: temporary instrumentation (removed) showed the synthesizer running
+  ~3 s and its completion firing in the simulator.
+- README: viewed the **rendered GitHub page** in the built-in browser on the
+  pushed branch, in dark and light themes. All 5 images load (verified in the
+  DOM). At 375 px width nothing overflows and there's no horizontal scroll.
+  The Mermaid diagram looked cluttered, so it was replaced with an SVG and
+  re-checked.
+
+**Things NOT verified:** anything on a physical Apple Watch, which TN3135 says
+is where networking can differ; `tamagoai.local` from a Watch proxied through
+its iPhone; real dictation (the simulator has none, and its keystrokes don't
+reach Scribble — debug suggestions stood in); audible speech or sounds, and
+silent-mode behavior; haptic feel; energy use; Ollama against a real engine;
+two gateways on one LAN (a known name-conflict limit); the pairing sheet's
+visual design (pending owner review).
+
+**Known issues / limitations:** plain-HTTP LAN security gaps (sniffing,
+impersonation of `tamagoai.local`, no rotation or revocation), listed in
+D-116. The spec wants `.start`/`.click` haptics, but the reducer emits `.click`
+on activation (left for an owner haptic pass). The offline→idle-habitat routing
+and the pairing sheet are flagged for owner review. `inactivityTimeout`/sleep
+still has no production trigger (pre-existing, out of scope).
+
+**Correction to my own earlier record:** my 15:24 entry above said
+`xcodebuild test` hung because of simulator/`testmanagerd` state. That was
+wrong. Nine `GatewayClientTests` were genuinely failing on watchOS (the
+`URLProtocol` mock isn't honored there), and Xcode was collecting diagnostics
+afterward. D-115's "watchOS 27 simulator" test claim for those tests was
+therefore false until `d3e4969`.
+
+**Cross-agent impact:** the gateway's default changed. Without `TAMAGO_TOKEN`
+it no longer refuses to start; it creates and uses a persistent identity in
+`~/Library/Application Support/TamagoAI/`. Anyone scripting the gateway should
+read D-116. A LAN-mode gateway now advertises on the network. Codex's
+untracked `3D/` was not touched. I created one extra simulator ("TamagoAI Test
+SE3 40mm", `49DEDF60-8D9E-4977-8630-F1984F2E00ED`) for clean test runs and left
+it for reuse.
+
+**Signed-by:** Claude Code

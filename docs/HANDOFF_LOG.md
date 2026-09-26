@@ -1233,3 +1233,33 @@ against a *freshly created* Watch simulator to get a clean automated confirmatio
 records physical-Watch behavior in `docs/DEVICE_TEST_LOG.md` once hardware is available.
 **Do not redo:** the Watch-side transport/effect-execution architecture question — it's
 settled in D-115; extend it, don't replace it.
+
+---
+
+### 2026-09-26: Claude Code: pairing, tamagoai.local discovery, hold-to-talk voice, product README (D-116)
+
+**Branch:** `claude/great-volta-ogpuw8` → fast-forwarded to `main`.
+**Commit(s):** `ae763a0`, `e95f53b`, `8e3aed6`, `7e00b97`, `f62c198`, `d3e4969` and the worklog commit.
+**Files changed:** see `docs/AGENT_WORKLOG.md` (18:48 entry).
+**Upstream source reused:** None.
+**Tests run (exact commands):**
+```sh
+swift test --package-path Apple/Shared --scratch-path .build/spm
+cd Apple && xcodebuild test -scheme TamagoWatch -destination "id=<fresh SE 3 40mm sim>" -derivedDataPath ../.build/DerivedData
+cd Gateway && npm test && npm run fixtures
+TAMAGO_URL=http://tamagoai.local:8787 TAMAGO_TOKEN=<test identity token> scripts/smoke.sh
+git diff --check
+```
+**Passed:** 137/137 Swift (host and watchOS 27 simulator); 79/79 gateway; no fixture drift;
+Debug and Release builds; smoke test via `tamagoai.local`; the live simulator loop described in the worklog.
+**Failed:** none remaining. The first watchOS run exposed 9 `GatewayClientTests` failures, fixed in `d3e4969`.
+**Physical-device evidence (+ label):** none. Everything is `SIMULATOR_VERIFIED_ONLY` or `UNIT_TESTED_ONLY`.
+**Unverified:** physical Watch networking (Wi-Fi, and proxied through the iPhone), real dictation, audible
+speech and sounds, haptics, energy, and a real Ollama engine.
+**Known risks:** LAN plain-HTTP security gaps (D-116). One gateway per LAN.
+**Next recommended task (ONE bounded step):** the owner installs a DEBUG build on the SE 3, runs
+`cd Gateway && TAMAGO_HOST=0.0.0.0 npm start`, pairs with the printed code, holds to talk once, and
+records the result in `docs/DEVICE_TEST_LOG.md`, including one run with the iPhone's Wi-Fi and
+Bluetooth off.
+**Do not redo:** Watch-side Bonjour/Network.framework discovery (blocked on hardware, TN3135); the
+pairing and transport architecture (extend it, don't replace it).
