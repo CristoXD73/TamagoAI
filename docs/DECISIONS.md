@@ -48,6 +48,20 @@ in Xcode (Phase 3). Physical-device results can overturn any entry.
 - The sprites come from the Codex app bundle and aren't covered by WatchPet's MIT license.
   Stage A uses original placeholder art.
 
+### D-009 Product is "TamagoAI"; the creature is a white octopus; behavior per CREATURE_SPEC
+- **Decision (owner):** product name **TamagoAI**; character = small white octopus-like creature,
+  cute but slightly alien. Full behavior/personality design: `docs/CREATURE_SPEC.md`.
+- **Implications:** procedural arms (spec §8.1, consistent with D-114's procedural octopus); mood
+  variables, idle scheduler and offscreen catalog as engine content (§2–3); tiny App Group
+  persistence (spec Appendix A). No creature-initiated notifications or unsolicited haptics (spec §9–10).
+- **Relationship to D-101…D-114:** the spec is the behavior *content* for the existing D-114 engine and
+  D-102 renderer, and it respects D-103/D-104/D-106. Four items are **proposals** for Opus to accept or
+  reject here (spec §0.1): (1) `lifeState(at:)` for long gaps instead of D-114's calm reset; (2) a
+  day-long pose timeline extending D-105; (3) an optional higher fps cap during interaction only
+  (D-102); (4) the talk trigger as hold-anywhere if dictation can be gesture-presented, else an
+  in-scene shell control (D-106).
+- **Device verification:** everything in spec §7 (Always-On rest, complication continuity, frame budget).
+
 ---
 
 

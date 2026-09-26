@@ -999,3 +999,25 @@ current-bundle app on the SE 3 simulator, and verify normal autonomous launch pl
 the repaired lifecycle/offscreen cases before declaring the checkpoint verified.
 **Do not redo:** Claude's character design, procedural art, signing repair,
 parallel media/docs work, protocol, or deferred final-art integration.
+
+---
+
+### 2026-09-26: Claude (product/interaction design lead): creature behavior & personality spec
+
+**Branch:** `claude/great-volta-ogpuw8`
+**Commit(s):** see `git log` (the commit that adds `docs/CREATURE_SPEC.md`)
+**Files changed:** `docs/CREATURE_SPEC.md` (new), `docs/DECISIONS.md` (D-009), `CLAUDE.md` (map/reading order), this log.
+**Upstream source reused:** None (design research only; Meta Muse/Jolly studied, nothing copied).
+**Tests run:** none (documentation only; gateway untouched).
+**Physical-device evidence:** none. All watchOS-dependent behavior in the spec is `UNVERIFIED`.
+**Known risks:** frame budget of procedural arms on SE 3; Always-On availability/behavior on SE 3;
+complication reload budget; double-tap gesture availability — all flagged in the spec.
+**Reconciled with Phase 3/4 work (D-101…D-114)** that landed on the branch while this spec was written:
+the V1 listening flow follows system dictation (D-106), motion is designed for the 12 fps cap (D-102),
+and the spec is framed as behavior content for the existing D-114 engine. Four deltas are *proposals*
+for Opus, listed in D-009 and spec §0.1.
+**Next recommended task:** Claude Opus accepts or rejects the four D-009 proposals in `docs/DECISIONS.md`;
+then Sonnet implements spec §13 MUST items 2–5 (life layer, mood variables, idle scheduler content,
+protocol-state embodiment) on top of the D-114 engine and `CharacterFace`.
+**Do not redo:** creature personality, behavior catalogs, emotional language, familiarity system,
+anti-patterns, storyboard, priority list.
