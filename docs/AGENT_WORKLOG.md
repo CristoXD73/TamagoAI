@@ -188,8 +188,7 @@ involved in this batch.
 **Agent:** Claude Code
 **Branch:** `claude/great-volta-ogpuw8`
 **Starting commit SHA:** `581f9f5`
-**Ending commit SHA:** recorded in a follow-up once committed (this batch
-lands as two commits — see "Checkpoint strategy" below)
+**Ending commit SHA:** `9d80098` (engineering), `11f0e53` (branding/hygiene)
 
 **Scope:** a large, multi-part owner request covering engineering
 (Watch↔Mac connectivity, haptics, speech), security/branding/repo hygiene,
