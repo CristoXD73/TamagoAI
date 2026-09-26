@@ -1,144 +1,185 @@
-# TamagoAI
-
-A Tamagotchi-style AI companion that lives on your Apple Watch.
+<h1 align="center">TamagoAI</h1>
 
 <p align="center">
-  <img src="docs/assets/tamagoai-hero.webp" alt="TamagoAI white octopus companion inhabiting an Apple Watch" width="640">
+  <img src="docs/assets/tamagoai-hero.webp" alt="TamagoAI white octopus companion inhabiting an Apple Watch" width="720">
 </p>
 
-<p align="center"><strong>A living AI companion for Apple Watch.</strong></p>
+<p align="center"><em>A little intelligence with a life of its own.</em></p>
+
+<br>
+<br>
+
+<p align="center">
+  <img src="Assets/CharacterReference/octopus-v001/ref_hero_q34.jpg" alt="TamagoAI, a small porcelain-white octopus with glossy dark eyes, seen at three-quarter view" width="300">
+</p>
+
+<p align="center">
+TamagoAI is a living AI companion for Apple Watch.<br>
+The Watch is its body. Your Mac is its brain.
+</p>
+
+<br>
+<br>
+
+<h3 align="center">IT DOESN'T WAIT FOR YOU TO OPEN IT.<br>IT LIVES THERE.</h3>
+
+<p align="center">
+  <img src="docs/prototypes/animation-v1/05_edge_inspection/05_edge_inspection_native_12fps_production_cap.gif" alt="Motion prototype: the octopus drifting toward the edge of a Watch screen to inspect it" width="260">
+</p>
+
+<p align="center"><sub>Motion prototype, awaiting owner review. Not final behavior.</sub></p>
+
+<p align="center">
+It drifts. It watches. It notices when you reach for it.<br>
+Sometimes it slips past the edge of the screen and comes back somewhere else.
+</p>
+
+<br>
+<br>
+
+<h3 align="center">THE WATCH IS THE BODY.<br>THE MAC IS THE BRAIN.</h3>
+
+<p align="center">
+Hold anywhere and speak. Your words travel to a Mac at home,<br>
+where the thinking happens on your own machine. Then Tamago answers.
+</p>
+
+```mermaid
+flowchart LR
+    W["Apple Watch<br/>body · face · voice"] -- "your words" --> M["Your Mac<br/>brain · local AI"]
+    M -- "its answer" --> W
+```
+
+<br>
+
+<h3 align="center">MEET TAMAGO.</h3>
+
+<p align="center"><em>Curious. Quiet. Occasionally somewhere else.</em></p>
+
+<p align="center">
+  <img src="Assets/CharacterReference/octopus-v001/ref_turnaround_4view.webp" alt="TamagoAI character turnaround: front, three-quarter, profile and back views of the white octopus" width="760">
+</p>
+
+<p align="center">
+Not a chatbot on a tiny screen. Not a voice assistant in costume.<br>
+No chat bubbles, no spinners, no status bars. The creature is the interface.
+</p>
+
+<br>
+<br>
 
 ---
 
-## What it is
+## Building it
 
-TamagoAI isn't a chatbot squeezed onto a tiny screen. A small white
-octopus-like creature lives on the watch face — it wanders, notices a tap,
-glances around, and sometimes drifts off the edge of the display before
-peeking back in. The character *is* the interface: no chat bubbles, no
-loading spinners, no status bar. Talking to the AI behind it is meant to feel
-like reaching for something that's already there, not opening an app.
+TamagoAI is experimental and not yet on a physical Apple Watch. What follows is
+the engineering behind it, with every claim labeled by how it was verified
+([`AGENTS.md`](AGENTS.md) §3).
 
-## How it works
+### Current status
 
-The Watch is the face; a Mac at home is the brain.
+- **The Watch ↔ Mac loop works end to end in the simulator.** Hold on the
+  creature, speak through system dictation, the request travels to the Mac,
+  the answer comes back, and the creature reacts, then returns to its idle life.
+  `SIMULATOR_VERIFIED_ONLY`.
+- **Pairing, not addresses.** The Mac gateway shows a one-time 6-digit code.
+  The Watch keeps the resulting credential in its Keychain and finds the Mac at
+  `tamagoai.local`. Nobody types an IP address. `SIMULATOR_VERIFIED_ONLY`.
+- **When the Mac is away, the creature keeps living.** It carries on its idle
+  life offline and reconnects by itself when the Mac returns.
+  `SIMULATOR_VERIFIED_ONLY`.
+- **Speech and creature sounds** are built, off by default, and not yet heard
+  on hardware. No approved sound assets exist yet.
+- **Character art:** the approved reference art above is the visual ground
+  truth. The app currently draws a procedural placeholder until final art
+  passes the [Visual Approval Gate](docs/VISUAL_APPROVAL_GATE.md).
+- **Nothing has been verified on a physical Apple Watch.** Apple's own guidance
+  (TN3135) says Watch networking can behave differently on hardware than in the
+  simulator, so this matters.
+
+### How it works
 
 ```text
- idle ─tap─▶ listening ─▶ thinking ─▶ (Mac gateway → local AI → tools) ─▶ speaking ─▶ reaction ─▶ idle
+ idle ─hold─▶ listening ─▶ acknowledging ─▶ thinking ─▶ (Mac gateway → local AI) ─▶ speaking ─▶ reaction ─▶ idle
 ```
 
-The Apple Watch owns the character, touch, Digital Crown, mic, speaker,
-haptics and complication. A Mac on the same network runs a small local
-gateway that talks to a local AI provider — nothing is sent to a third-party
-cloud AI service.
+A pure Swift state machine owns what the creature is doing, and a separate
+engine drives its autonomous idle life. Neither touches the network. They emit
+effects that a thin platform layer executes: an HTTP request, a haptic, speech
+or a sound. The Mac side is a dependency-free Node gateway with pairing, request
+IDs, timeouts, duplicate protection and a swappable AI provider: a deterministic
+mock, or Ollama for local models (not yet run against a real engine).
 
-## Current status
+### Architecture
 
-**Experimental, pre-hardware.** What's real today:
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
+[diagram](docs/TAMAGO_ARCHITECTURE.md) ·
+[decisions](docs/DECISIONS.md) (D-115 transport, D-116 pairing, discovery and voice) ·
+[protocol v1](docs/PROTOCOL_V1.md)
 
-- **Mac gateway** — request/response protocol, request IDs, timeouts,
-  duplicate-request protection, bearer-token auth, and a provider abstraction
-  (deterministic mock + an Ollama adapter for local models). 66 passing tests.
-- **Watch app** — the character's state machine, its autonomous idle
-  behavior (wandering, edge peeks, blinking, touch reactions), and a real
-  HTTP client wired to that state machine's existing effect contract. 122
-  passing Swift tests (host + watchOS simulator).
-- **The Watch ↔ Mac loop is real**, not just documented: a debug-only
-  harness drives an actual request through to the gateway's mock provider and
-  back, observed round-trip in the simulator. There is no production
-  voice-input trigger yet — see [Roadmap](#roadmap).
-- **Full-bleed display** — the creature's stage correctly spans the entire
-  Apple Watch SE 3 (40 mm) display (162×197 pt), not a smaller inset region.
-
-**Nothing here has been verified on a physical Apple Watch.** Every claim
-above is `SIMULATOR_VERIFIED_ONLY` or `UNIT_TESTED_ONLY` — see
-[`AGENTS.md`](AGENTS.md) for what those labels mean and
-[`docs/HANDOFF_LOG.md`](docs/HANDOFF_LOG.md) for the latest task-by-task
-detail.
-
-## Architecture
-
-A pure Swift state machine (`CharacterStateMachine`) owns what the character
-is doing; a separate, independent engine drives its autonomous idle-life
-movement. Neither talks to the network directly — they emit effects that a
-thin platform layer executes (HTTP request, haptic, speech). The Mac gateway
-is a dependency-free Node service in front of a swappable AI provider. See
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the
-[visual diagram](docs/TAMAGO_ARCHITECTURE.md) for the full picture, and
-[`docs/DECISIONS.md`](docs/DECISIONS.md) for why it's built this way.
-
-## Character & interaction philosophy
-
-TamagoAI is not Siri with an octopus skin, and it is not a virtual pet with
-stats to manage. Its behavior — how it moves, when it reacts, what it sounds
-like — follows a written spec ([`docs/CREATURE_SPEC.md`](docs/CREATURE_SPEC.md))
-and an approval process: no new user-visible animation or interaction ships
-without an approved visual prototype first
-([Visual Approval Gate](docs/VISUAL_APPROVAL_GATE.md)). The approved
-character reference art is the visual ground truth for everything the
-creature looks like.
-
-## Development
+### Development
 
 ```sh
-# Mac gateway — no dependencies, mock AI provider built in
+# Mac gateway: no dependencies, mock AI provider built in
 cd Gateway && npm test
-TAMAGO_ALLOW_NO_AUTH=1 npm start      # http://127.0.0.1:8787
+TAMAGO_HOST=0.0.0.0 npm start          # LAN: prints a pairing code, publishes tamagoai.local
+TAMAGO_ALLOW_NO_AUTH=1 npm start       # loopback-only dev mode, no auth
 
-# Shared Swift package — pure logic, runs on the host, no simulator needed
+# Shared Swift logic: runs on the Mac, no simulator needed
 swift test --package-path Apple/Shared --scratch-path .build/spm
 ```
 
-Full Xcode/watchOS setup, building the Watch target, and testing the live
-Watch ↔ Mac loop end-to-end are in
-[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md). Mock provider commands are
-listed in [`Gateway/mock/README.md`](Gateway/mock/README.md).
+Building the Watch app, pairing a simulator and driving the full loop are in
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md). Mock provider commands are in
+[`Gateway/mock/README.md`](Gateway/mock/README.md).
 
-## Documentation
+### Tests
 
-- [Creature specification](docs/CREATURE_SPEC.md) — behavior, personality, mood
-- [Architecture](docs/ARCHITECTURE.md) ([diagram](docs/TAMAGO_ARCHITECTURE.md))
-- [Decisions](docs/DECISIONS.md) — the running architecture decision log
-- [Visual approval gate](docs/VISUAL_APPROVAL_GATE.md) — how character motion gets approved
-- [Development guide](docs/DEVELOPMENT.md) — environment setup, commands
-- [Handoff log](docs/HANDOFF_LOG.md) — latest task-by-task status
-- [Agent worklog](docs/AGENT_WORKLOG.md) — cross-agent audit trail
-- [Protocol v1](docs/PROTOCOL_V1.md) — the Watch ⇄ Mac contract
+| Suite | Count | Where |
+|---|---|---|
+| Swift (`Apple/Shared`) | 137 | host (`swift test`) |
+| Gateway (`Gateway/test`) | 79 | Node test runner |
 
-## Roadmap
+`UNIT_TESTED_ONLY` means the tests passed, not that the feature was seen
+working. Simulator and device evidence is recorded separately in
+[`docs/HANDOFF_LOG.md`](docs/HANDOFF_LOG.md) and [`docs/DEVICE_TEST_LOG.md`](docs/DEVICE_TEST_LOG.md).
 
-Roughly in order: verification on a physical Apple Watch; a real voice-input
-trigger for the character (behind the Visual Approval Gate); owner-approved
-speech and creature-sound output; final character artwork replacing the
-current procedural placeholder; Bonjour/local-network discovery so the Watch
-doesn't need a manually configured Mac address.
+### Documentation
 
-## Contributing & experimental status
+- [Creature specification](docs/CREATURE_SPEC.md): behavior, personality, mood
+- [Visual approval gate](docs/VISUAL_APPROVAL_GATE.md): how character motion gets approved
+- [Product presentation](docs/PRODUCT_PRESENTATION.md): how TamagoAI presents itself
+- [Development guide](docs/DEVELOPMENT.md): setup, commands, simulator hooks
+- [Handoff log](docs/HANDOFF_LOG.md) and [agent worklog](docs/AGENT_WORKLOG.md): who did what, and how it was verified
 
-TamagoAI is a personal, experimental project built openly with AI coding
-agents under the owner's direction — see [`AGENTS.md`](AGENTS.md) for the
-rules every agent (human or AI) follows here. It isn't accepting outside
-contributions yet.
+### Roadmap
 
-## Layout
+Verification on a physical Apple Watch. The owner hears speech and sounds and
+chooses a voice. Final character art and approved motion replace the
+placeholder. An iPhone relay if direct Watch-to-Mac networking proves unreliable
+on hardware. Stronger LAN security (TLS or request signing).
+
+### Contributing and experimental status
+
+TamagoAI is a personal, experimental project built in the open by its owner
+with AI coding agents. Every agent follows [`AGENTS.md`](AGENTS.md). It isn't
+accepting outside contributions yet.
+
+### Layout
 
 ```text
 AGENTS.md / CLAUDE.md     rules for every coding agent (read first)
-THIRD_PARTY_NOTICES.md    MIT notices for adapted upstream code
-docs/                     brief, architecture, decisions, protocol, reuse, tests, logs
-  handoff/                original multi-agent handoff pack (historical, "TamaWatch")
+docs/                     spec, decisions, protocol, presentation, logs, prototypes
 Apple/
-  AppleTamago.xcodeproj   Watch app, complication, iPhone companion, tests (D-101)
-  Shared/                 local Swift package TamagoShared (protocol, sprite timing, transport) + tests
-  WatchApp/ iPhoneApp/ Complication/   placeholder sources
-  Config/                 Tamago.xcconfig (placeholder identity)
+  AppleTamago.xcodeproj   Watch app, complication, iPhone companion, tests
+  Shared/                 TamagoShared: protocol, state machine, transport, connection model + tests
+  WatchApp/               the creature, TamagoConnection, pairing, voice, speech, sound
+Assets/CharacterReference/  owner-approved character art
 Gateway/                  Mac gateway (Node ≥22, no dependencies)
-  src/ test/ mock/ scripts/
 Tests/Fixtures/protocol-v1/   JSON fixtures shared by gateway + Swift tests
-scripts/smoke.sh          curl smoke test
 ```
 
-## Principles
+### Principles
 
 Local AI first. No private APIs. No fake background modes. No secrets in Git.
 No passcode bypass or wrist spoofing. Physical-device evidence beats assumptions.
