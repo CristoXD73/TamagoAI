@@ -44,11 +44,12 @@ Hold anywhere and speak. Your words travel to a Mac at home,<br>
 where the thinking happens on your own machine. Then Tamago answers.
 </p>
 
-```mermaid
-flowchart LR
-    W["Apple Watch<br/>body · face · voice"] -- "your words" --> M["Your Mac<br/>brain · local AI"]
-    M -- "its answer" --> W
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/body-brain-dark.svg">
+    <img src="docs/assets/body-brain-light.svg" alt="Apple Watch, the body, sends your words to your Mac, the brain; the Mac sends its answer back" width="560">
+  </picture>
+</p>
 
 <br>
 
