@@ -31,8 +31,14 @@ const silentLogger = { info() {}, warn() {}, error() {} };
  * @param {number} [opts.timeoutMs]      provider timeout, default 20000
  * @param {object} [opts.logger]         { info, warn, error } taking one object
  * @param {() => number} [opts.now]      clock, injectable for tests
+ * @param {string|null} [opts.gatewayId] public, stable identity (identity.js)
+ * @param {string} [opts.gatewayName]    human-readable name shown at pairing
+ * @param {object|null} [opts.pairing]   a pairing window (pairing.js); null disables POST /v1/pair
  */
-export function createGateway({ provider, authToken, timeoutMs = 20000, logger = silentLogger, now = Date.now }) {
+export function createGateway({
+  provider, authToken, timeoutMs = 20000, logger = silentLogger, now = Date.now,
+  gatewayId = null, gatewayName = 'TamagoAI', pairing = null,
+}) {
   if (!provider || typeof provider.generate !== 'function') {
     throw new Error('createGateway requires a provider with generate().');
   }
@@ -67,7 +73,13 @@ export function createGateway({ provider, authToken, timeoutMs = 20000, logger =
         protocolVersion: PROTOCOL_VERSION,
         gatewayVersion: GATEWAY_VERSION,
         uptimeSeconds: Math.floor((now() - startedAt) / 1000),
+        ...(gatewayId ? { gatewayId } : {}),
       });
+    }
+
+    if (url.pathname === '/v1/pair') {
+      if (req.method !== 'POST') return sendError(res, null, 'method_not_allowed');
+      return handlePair(req, res);
     }
 
     if (url.pathname === '/v1/protocol') {
@@ -84,6 +96,7 @@ export function createGateway({ provider, authToken, timeoutMs = 20000, logger =
         haptics: HAPTICS,
         errorCodes: Object.keys(ERRORS),
         limits: LIMITS,
+        ...(gatewayId ? { gatewayId } : {}),
       });
     }
 
@@ -152,6 +165,33 @@ export function createGateway({ provider, authToken, timeoutMs = 20000, logger =
       ms: now() - started,
     });
     return send(res, httpStatus, body);
+  }
+
+  // PROTOCOL_V1 §14. Unauthenticated by necessity (it's how a Watch gets
+  // the token); the pairing window's single use, expiry and failure cap are
+  // the protection. Never logs the code or the token.
+  async function handlePair(req, res) {
+    const fail = (status, code, message) =>
+      send(res, status, { protocolVersion: PROTOCOL_VERSION, error: { code, message } });
+
+    if (!pairing || authToken === null) {
+      req.resume();
+      return fail(404, 'pairing_unavailable', 'This gateway is not accepting pairing.');
+    }
+    let body;
+    try {
+      body = JSON.parse(await readBody(req, LIMITS.maxBodyBytes));
+    } catch {
+      return fail(400, 'invalid_request', 'Body must be JSON: {"pairingCode": "123456"}.');
+    }
+    const outcome = pairing.attempt(body?.pairingCode);
+    const deviceName = typeof body?.deviceName === 'string' ? body.deviceName.slice(0, 64) : undefined;
+    logger.info({ event: 'pair', outcome, deviceName });
+    if (outcome === 'closed') {
+      return fail(410, 'pairing_closed', 'No pairing window is open. Restart the gateway to get a new code.');
+    }
+    if (outcome !== 'ok') return fail(401, 'pairing_failed', 'Wrong pairing code.');
+    return send(res, 200, { protocolVersion: PROTOCOL_VERSION, gatewayId, gatewayName, token: authToken });
   }
 
   async function runProvider(request) {

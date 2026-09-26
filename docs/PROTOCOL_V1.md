@@ -17,11 +17,14 @@ Sources of truth that must agree:
 
 - HTTP/1.1 + JSON (UTF-8). Plain HTTP on the trusted home LAN for V1.
   **TLS is required before any off-LAN/cellular exposure** (not in V1).
-- Base URL is configured on the client, e.g. `http://mac-mini.local:8787`.
-- Auth: `Authorization: Bearer <token>` on `POST /v1/request`. The token comes
-  from the gateway's `TAMAGO_TOKEN` environment variable and is stored in the
-  Keychain on Apple devices. `GET` endpoints need no auth and reveal nothing
-  sensitive.
+- Base URL: `http://tamagoai.local:8787` by default. A LAN-bound gateway
+  publishes that mDNS name itself (§14, D-116); a client may be configured with
+  another base URL for development.
+- Auth: `Authorization: Bearer <token>` on `POST /v1/request`. The token is the
+  gateway's persistent identity token (or `TAMAGO_TOKEN` if set), obtained by a
+  client through pairing (§14), and stored in the Keychain on Apple devices.
+  `GET` endpoints need no auth and reveal nothing sensitive (`gatewayId` is
+  public).
 - Every JSON response to a request that had a readable `requestId` also carries
   an `X-Request-Id` header with the same value.
 
@@ -30,18 +33,23 @@ Sources of truth that must agree:
 | `GET` | `/v1/health` | no | liveness |
 | `GET` | `/v1/protocol` | no | version negotiation + enum discovery |
 | `POST` | `/v1/request` | yes | one user utterance → one answer |
+| `POST` | `/v1/pair` | no (pairing code) | exchange a one-time code for the token (§14) |
 
 ## 2. `GET /v1/health`
 
 ```json
-{ "status": "ok", "protocolVersion": 1, "gatewayVersion": "0.1.0", "uptimeSeconds": 42 }
+{ "status": "ok", "protocolVersion": 1, "gatewayVersion": "0.1.0", "uptimeSeconds": 42, "gatewayId": "ea42e280-…" }
 ```
+
+`gatewayId` is optional (absent on a loopback no-auth dev gateway). A paired
+client compares it with the id it paired with, to notice a *different* gateway
+answering the same name. This is a correctness check, not authentication.
 
 ## 3. `GET /v1/protocol`
 
 See `Tests/Fixtures/protocol-v1/responses/protocol-info.json`. Clients need
 only `supportedProtocolVersions` (must contain `1`) and `authRequired`. Other
-fields (`gatewayVersion`, `provider`, enum lists, `limits`) are for diagnostics.
+fields (`gatewayVersion`, `provider`, `gatewayId`, enum lists, `limits`) are for diagnostics.
 The client should call this once when the gateway configuration changes, not
 before every request.
 
@@ -212,3 +220,31 @@ hostnames).
 Audio upload, streaming or partial responses, polling for `accepted` results,
 conversation history or memory, multiple providers chosen by the client, a tool
 catalog, server push, cellular or remote access.
+
+## 14. Pairing and discovery (added in D-116; backward compatible)
+
+**Discovery.** A gateway bound to a LAN interface publishes a `_tamagoai._tcp`
+Bonjour service (TXT `id=<gatewayId>`, `proto=1`) and the mDNS hostname
+`tamagoai.local` → its LAN IPv4. A Watch reaches it with ordinary HTTP to
+`http://tamagoai.local:8787`. It doesn't browse Bonjour, which is blocked for
+ordinary watchOS apps (Apple TN3135).
+
+**Pairing.** On startup the gateway shows its owner a 6-digit code. The window
+is valid 10 minutes, single use, and closes after 5 wrong codes.
+
+```http
+POST /v1/pair
+{ "pairingCode": "394879", "deviceName": "Apple Watch SE 3 (40mm)" }
+```
+
+| Outcome | HTTP | Body |
+|---|---|---|
+| paired | 200 | `{ "protocolVersion": 1, "gatewayId": "…", "gatewayName": "Mac-mini", "token": "…" }` |
+| wrong code | 401 | `{ "protocolVersion": 1, "error": { "code": "pairing_failed", "message": "…" } }` |
+| window closed (used, expired, too many failures) | 410 | `error.code = "pairing_closed"` |
+| gateway doesn't pair (loopback no-auth dev mode) | 404 | `error.code = "pairing_unavailable"` |
+
+Whitespace in the code is ignored. The gateway never logs the code or the
+token. These bodies are pairing-only and are **not** §5 response envelopes.
+Security properties and known gaps are in D-116: plain HTTP means the token is
+readable on the LAN, and nothing authenticates the gateway to the Watch.
