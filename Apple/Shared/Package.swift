@@ -28,6 +28,8 @@ let package = Package(
                 "SpriteAnimationClock.swift",
                 "CharacterStateMachine.swift",
                 "CharacterInteractionController.swift",
+                "CreatureBehaviorEngine.swift",
+                "CreatureBehaviorController.swift",
             ]
         ),
         .testTarget(

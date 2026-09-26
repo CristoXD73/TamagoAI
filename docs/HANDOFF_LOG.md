@@ -780,3 +780,222 @@ Developer Mode on the iPhone; Watch paired and visible to
 `xcrun devicectl list devices`), then a device-targeted (not generic) signed
 install of `TamagoPhone`/`TamagoWatch` and the owner-led Stage A acceptance
 pass in `docs/DEVICE_TEST_LOG.md`.
+
+---
+
+### 2026-09-26 12:26: Codex: Parallel art/media/documentation support pass
+
+**Branch:** `claude/great-volta-ogpuw8`.
+**Commit(s):** none created; starting HEAD `5a77615`. Concurrent working tree.
+**Files changed:** `.gitignore`, this log; created
+`docs/CHARACTER_ASSET_PIPELINE.md`, `docs/MEDIA_CAPTURE_GUIDE.md`,
+`docs/TAMAGO_ARCHITECTURE.md`, `docs/DEVELOPMENT.md`, `docs/media/README.md`,
+and `Assets/{CharacterSource,CharacterProcessed,Reference}/README.md`.
+**Upstream source reused:** None. Apple image-scale guidance and FFmpeg filter
+reference linked; no artwork or source code copied.
+
+**Scope:** proposed 21-pose octopus export contract, fixed canvas/pivot and
+memory guidance, future per-frame catalog import, capture recipes and pending
+media inventory, Mermaid architecture and contributor onboarding. New ignores
+are scoped scratch directories; existing DerivedData/.build rules retained.
+No artwork generated, no final media fabricated, no production code changed,
+no target/signing/protocol change, no software installed, no merge or commit.
+
+**Concurrent work preserved:** at initial inspection, `Apple/Shared/Package.swift`
+was modified and new `CreatureBehaviorController.swift`,
+`CreatureBehaviorEngine.swift`, and `CreatureBehaviorEngineTests.swift` were
+untracked. During this pass the other agent also changed `CharacterView.swift`,
+`DebugStateControlsView.swift`, `TamagoWatchApp.swift` and added
+`CreatureExpression.swift` / `CreatureIdleStage.swift`. This support pass did
+not write any Apple file or test file.
+
+**Tests run (exact commands, repository root):**
+
+```sh
+npm test --prefix Gateway
+npm test --prefix Gateway -- --test-timeout=15000
+node --test Gateway/test/config.test.js Gateway/test/protocol.test.js Gateway/test/mock.test.js Gateway/test/ollama.test.js
+swift test --package-path Apple/Shared --scratch-path .build/support-spm -Xswiftc -warnings-as-errors
+CLANG_MODULE_CACHE_PATH="$PWD/.build/support-module-cache" swift test --package-path Apple/Shared --scratch-path .build/support-spm -Xswiftc -warnings-as-errors
+CLANG_MODULE_CACHE_PATH="$PWD/.build/support-module-cache" swift test --disable-sandbox --package-path Apple/Shared --scratch-path .build/support-spm -Xswiftc -warnings-as-errors
+CLANG_MODULE_CACHE_PATH="$PWD/.build/support-module-cache" swift test --disable-sandbox --build-system native --package-path Apple/Shared --scratch-path .build/support-native -Xswiftc -warnings-as-errors
+CLANG_MODULE_CACHE_PATH=/tmp/tamago-support-module-cache swift test --disable-sandbox --build-system native --package-path Apple/Shared --scratch-path /tmp/tamago-support-spm -Xswiftc -warnings-as-errors
+CLANG_MODULE_CACHE_PATH=/tmp/tamago-support-module-cache swift test --disable-sandbox --build-system native --package-path Apple/Shared --scratch-path /tmp/tamago-support-spm
+xcodebuild -version
+xcrun simctl io help
+command -v ffmpeg
+node --version
+node -e 'const s=require("node:net").createServer(); s.on("error",e=>{console.error(e.code,e.syscall);process.exitCode=1});s.listen(0,"127.0.0.1",()=>s.close())'
+git diff --check
+git check-ignore docs/media/raw/idle.mov docs/media/_work/idle-palette.png Assets/CharacterProcessed/_work/frame.png .build/DerivedData/test
+git check-ignore docs/media/hero.png docs/media/character-idle.gif docs/media/character-idle.mp4 Assets/CharacterProcessed/octopus-v001/tamago_octopus_idle-neutral_f000@2x.png
+git status --short --untracked-files=all
+```
+
+**Passed:** **UNIT_TESTED_ONLY**: ordinary Swift run 110 tests in four suites;
+Gateway isolated config/protocol/mock/Ollama-adapter tests 27/27. Adapter tests
+use mocks, not a real provider. Markdown relative-link existence check passed
+for all eight new documents. `git diff --check` passed. Scratch paths ignored;
+final exports not ignored (second check-ignore exit 1 is expected).
+
+**Failed / limited:** initial unbounded Gateway run stalled and was interrupted
+with Control-C. Bounded full run reported 66 tests: 29 pass, 37 fail due to
+before-hook timeouts after `listen EPERM` on loopback; the isolated listen
+probe confirmed the sandbox restriction. No Gateway test/code repair attempted.
+Swift first hit user module-cache permissions, then nested sandbox denial,
+then external-volume build-manifest/output-file-map write errors. Using a
+`/tmp` scratch path and the native build backend reached compilation. Strict
+warnings-as-errors then failed on unmutated `var now` in concurrent
+`CreatureBehaviorEngineTests.swift` lines 155 and 183. Ordinary tests passed;
+those warnings were left for the owning agent. Native backend emitted a
+deprecation warning; this is a session workaround, not a new project default.
+Swift user-cache warnings also remain. Xcode version: 27.0 (27A266a); Node:
+v26.9.0. Simulator help could not connect to CoreSimulator under the sandbox;
+no simulator build, launch or capture attempted afterward. `ffmpeg` is present
+but no conversion executed because no source recording was supplied.
+
+Test transcripts are local `/tmp/tamago-support-{gateway,gateway-bounded,
+gateway-unit,swift,swift-retry,swift-final,swift-native,swift-tmp,swift-tests}.log`
+(not committed). SwiftPM's `--disable-sandbox` disables its nested manifest
+sandbox only; the session filesystem restrictions remained in force.
+
+**Physical-device evidence (+ label):** none. **UNVERIFIED** for all new capture,
+art-import and diagram-export recipes; no new SIMULATOR_VERIFIED_ONLY or
+DEVICE_VERIFIED claims. Real local provider remains **UNVERIFIED_LOCAL_PROVIDER**.
+**Unverified:** final octopus art, asset catalog import, UI integration, GIF/MP4
+quality, simulator capture workflow, physical deployment, battery/memory limits.
+**Known risks / UI-agent note:** proposed pose keys must map into existing
+canonical states; do not add protocol cases. `sleep` is art for `sleeping`, not
+reduced luminance. Additional existing states need approved reuse mappings.
+Fixed pivot/canvas and renderer-owned movement prevent accidental frame jumps.
+Older ARCHITECTURE/Apple README status descriptions are stale; new docs link to
+DECISIONS and latest handoffs without rewriting those historical files.
+**Next recommended task (ONE bounded step):** after the behavior handoff,
+validate one owner-approved original neutral octopus export against the asset
+contract (alpha, eight tentacles, scale and fixed pivot), without UI integration.
+**Do not redo:** active character implementation, signing repair, protocol or
+historical evidence; no final media should be claimed until actually captured.
+
+---
+
+### 2026-09-26: Codex: interrupted Claude character pass audit and documentation
+
+**Branch:** `claude/great-volta-ogpuw8`. **Commit(s):** none; HEAD `5a77615`.
+**Origin:** Claude Sonnet implemented autonomous behavior, world position,
+wandering/exits/peeks/returns, idle expressions, touch reactions, DEBUG controls,
+deterministic tests and the procedural octopus. The owner supplied Claude's
+last status: “the octopus silhouette reads clearly and non-idle states still
+work correctly.” This is Claude's reported **SIMULATOR_VERIFIED_ONLY** visual
+verification, not an implementation failure or new Codex observation. Claude
+stopped at its session limit before writing D-114.
+
+**Codex completed:** source audit, bounded repairs, host verification and D-114 /
+this handoff. The requested fresh simulator verification/deployment remains
+blocked by this session's sandbox; the whole acceptance pass is NOT complete.
+All pre-existing character and parallel documentation/media work was preserved.
+No signing/bundle-ID/project/protocol/art-pipeline changes; no staging, commit,
+merge, reset, stash or checkout.
+
+**Character files inherited from Claude:**
+- Modified `Apple/Shared/Package.swift`.
+- New `Apple/Shared/CreatureBehaviorEngine.swift`,
+  `Apple/Shared/CreatureBehaviorController.swift`,
+  `Apple/Shared/Tests/TamagoSharedTests/CreatureBehaviorEngineTests.swift`.
+- Modified `Apple/WatchApp/CharacterView.swift`,
+  `Apple/WatchApp/DebugStateControlsView.swift`,
+  `Apple/WatchApp/TamagoWatchApp.swift`.
+- New `Apple/WatchApp/CreatureExpression.swift`,
+  `Apple/WatchApp/CreatureIdleStage.swift`.
+
+**Codex changes:** `CreatureBehaviorEngine.swift` increases hidden clearance
+from 0.34 to 0.45 (old 55-point clearance was smaller than the transformed
+placeholder's conservative ~67-point radius on a 162-point viewport).
+`CreatureBehaviorController.swift` skips unchanged observable assignments.
+`CharacterView.swift` moves state mutation out of body evaluation into the
+existing timeline's change callback and restores the existing static low-power
+idle pose for non-live rendering. Removes an unsupported “on-device” comment.
+`DebugStateControlsView.swift` removes an unused `let` pattern.
+`CreatureBehaviorEngineTests.swift` changes two unmutated variables to constants
+and adds hidden-footprint and long-suspension regression checks.
+Documentation changes: `docs/DECISIONS.md` and this appended entry.
+
+**Parallel support files preserved untouched by this pass:** `.gitignore`,
+`Assets/CharacterSource/README.md`, `Assets/CharacterProcessed/README.md`,
+`Assets/Reference/README.md`, `docs/CHARACTER_ASSET_PIPELINE.md`,
+`docs/DEVELOPMENT.md`, `docs/MEDIA_CAPTURE_GUIDE.md`,
+`docs/TAMAGO_ARCHITECTURE.md`, `docs/media/README.md`, and the prior handoff entry.
+**Upstream source reused:** None.
+
+**Tests/build attempts (exact commands from repository root):**
+
+```sh
+swift test --package-path Apple/Shared --scratch-path .build/spm -Xswiftc -warnings-as-errors
+xcodebuild test -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' -derivedDataPath .build/DerivedData
+npm test --prefix Gateway
+npm test --prefix Gateway -- --test-timeout=15000
+node --test Gateway/test/config.test.js Gateway/test/protocol.test.js Gateway/test/mock.test.js Gateway/test/ollama.test.js
+CLANG_MODULE_CACHE_PATH=/tmp/tamago-finish-module-cache swift test --disable-sandbox --build-system native --package-path Apple/Shared --scratch-path /tmp/tamago-finish-spm -Xswiftc -warnings-as-errors
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' -derivedDataPath .build/DerivedData
+xcrun simctl list devices
+node -e 'const s=require("node:net").createServer();s.on("error",e=>{console.error(e.code,e.syscall);process.exitCode=1});s.listen(0,"127.0.0.1",()=>s.close())'
+git diff --check
+```
+
+**Passed:** **UNIT_TESTED_ONLY**: final host suite **112/112 tests, four suites**
+(inherited suite was 110; two regression tests added), using temporary cache /
+native-backend workaround, with Swift compiler warnings treated as errors.
+Isolated Gateway tests **27/27** (mock provider adapters, no real local engine).
+`git diff --check` passed.
+
+**Additional compile checks (not an Xcode build or simulator observation):**
+
+```sh
+mkdir -p /tmp/tamago-finish-watch-module
+xcrun swiftc -emit-module -parse-as-library -module-name TamagoShared -swift-version 6 -target arm64-apple-watchos27.0-simulator -sdk /Applications/Xcode.app/Contents/Developer/Platforms/WatchSimulator.platform/Developer/SDKs/WatchSimulator27.0.sdk -module-cache-path /tmp/tamago-finish-watch-cache -Xfrontend -disable-sandbox -D DEBUG -warnings-as-errors Apple/Shared/TamagoProtocolV1.swift Apple/Shared/SpriteAnimationClock.swift Apple/Shared/CharacterStateMachine.swift Apple/Shared/CharacterInteractionController.swift Apple/Shared/CreatureBehaviorEngine.swift Apple/Shared/CreatureBehaviorController.swift -emit-module-path /tmp/tamago-finish-watch-module/TamagoShared.swiftmodule
+xcrun swiftc -typecheck -parse-as-library -module-name Tamago -swift-version 6 -default-isolation MainActor -target arm64-apple-watchos27.0-simulator -sdk /Applications/Xcode.app/Contents/Developer/Platforms/WatchSimulator.platform/Developer/SDKs/WatchSimulator27.0.sdk -module-cache-path /tmp/tamago-finish-watch-cache -Xfrontend -disable-sandbox -I /tmp/tamago-finish-watch-module -D DEBUG -warnings-as-errors Apple/WatchApp/*.swift
+xcrun swiftc -typecheck -parse-as-library -module-name Tamago -swift-version 6 -default-isolation MainActor -target arm64-apple-watchos27.0-simulator -sdk /Applications/Xcode.app/Contents/Developer/Platforms/WatchSimulator.platform/Developer/SDKs/WatchSimulator27.0.sdk -module-cache-path /tmp/tamago-finish-watch-cache -Xfrontend -disable-sandbox -I /tmp/tamago-finish-watch-module -warnings-as-errors Apple/WatchApp/*.swift
+```
+
+All three passed with no compiler diagnostics. First module attempt without
+`-Xfrontend -disable-sandbox` failed because nested macro sandbox creation was
+denied. Disabling the tools' nested sandboxes did not remove session access
+restrictions. Release-conditional Watch source typechecks; no Release binary
+inspection/launch was possible. UI changes remain **UNVERIFIED** at runtime.
+
+**Failed / blocked:** the exact requested host invocation failed before tests
+on default cache permissions. Xcode test and build both exited 74 during package
+resolution (cache permission errors); CoreSimulator also refused the connection.
+**Watch tests executed: 0.** `simctl list devices` could not reach the device set.
+No newly built Tamago.app exists from this pass, so there is no newly built path
+to report and no install/uninstall/launch/crash check/default-state observation
+was performed. No stale binary was substituted. The only permitted launch target
+for the follow-up is `com.cristoxd73.tamawatch.c73x926.watchkitapp`, on
+`8B5287E9-BD6A-422A-B353-B8E3499AE31D`, with no preview environment variable.
+Never launch the old `com.example.appletamago.watchkitapp`.
+
+The ordinary Gateway run stalled and was interrupted. The bounded full run
+reported **66 tests: 29 passed, 37 failed, 0 cancelled/skipped** through hook
+timeouts; the standalone loopback probe returned `EPERM listen`. Do not treat
+this as a passing full suite or as a demonstrated Gateway code regression.
+SwiftPM emitted inaccessible user-cache/readonly manifest-cache warnings and a
+native-backend deprecation warning; source compiler diagnostics were clean.
+Local transcripts: `/tmp/tamago-finish-{swift,swift-fallback,swift-final,watch,
+build,simctl,gateway,gateway-bounded,gateway-unit,watch-module,
+watch-module-retry,watch-typecheck-debug,watch-typecheck-release}.log`.
+
+**Physical-device evidence (+ label):** none; `DEVICE_TEST_LOG.md` unchanged.
+No new `DEVICE_VERIFIED` claim. Real local provider remains
+**UNVERIFIED_LOCAL_PROVIDER**. Claude's prior visual result remains
+**SIMULATOR_VERIFIED_ONLY**; it does not verify Codex's subsequent repairs.
+**Unverified / risks:** final UI callback behavior, visual hidden-edge clearance,
+static-pose transitions, tap handling, release runtime, default-state relaunch,
+crash logs, hardware wrist/Always-On behavior, battery/heat and physical install.
+No extra timers/tasks or production debug views found in the source audit.
+**Checkpoint:** suitable for an explicitly incomplete work-in-progress source
+checkpoint; NOT an unconditional verified Stage A acceptance/commit endorsement.
+**Next recommended task (ONE bounded step):** in a session with simulator and
+loopback access, rerun the full required suites, build/install the newly produced
+current-bundle app on the SE 3 simulator, and verify normal autonomous launch plus
+the repaired lifecycle/offscreen cases before declaring the checkpoint verified.
+**Do not redo:** Claude's character design, procedural art, signing repair,
+parallel media/docs work, protocol, or deferred final-art integration.

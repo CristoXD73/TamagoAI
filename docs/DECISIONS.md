@@ -520,3 +520,51 @@ off-LAN exposure).
   (signed install on the SE 3). This is a provisioning-identifier fix, not a
   behavior change.
 - **Fallback:** none needed; this is the fix.
+
+### D-114 Stage A autonomous creature world and procedural octopus
+
+- **Decision:** record Claude Sonnet's existing character pass, completed by
+  Codex's interrupted-work audit. Keep `CharacterStateMachine` canonical for
+  interaction state (D-103). An orthogonal, pure `CreatureBehaviorEngine`
+  owns normalized world position and `resting`, `moving`, `peeking`, and
+  `offscreen` phases; it drives the habitat only during interaction `idle`.
+  This is not a second owner of interaction/request state or a protocol change.
+- **Behavior:** seeded randomness, caller-supplied time, interpolated movement,
+  four exit/return edges, separate blink/glance schedules, bounded hidden holds
+  (2–5.5 seconds), and bounded catch-up after suspension. Visible taps approach
+  the tapped territory; hidden taps shorten the return delay. Repeated attention
+  is capped and decays. These engine rules are **UNIT_TESTED_ONLY**.
+- **Ownership and rendering:** one `@MainActor @Observable`
+  `CreatureBehaviorController`; no added timer, task, networking or keep-alive.
+  The existing 12-fps-cap `TimelineView` triggers world advancement through
+  `onChange`, outside body evaluation, only while idle and the environment is
+  active/visible without reduced luminance or Reduce Motion. Unchanged world
+  checkpoints are not republished. Cadence gates live drawing; non-live drawing
+  uses the existing static idle low-power pose (D-104). Resuming may catch up
+  elapsed logical time; long gaps reset calmly rather than replay indefinitely.
+- **Art separation:** `CreatureIdleStage` maps world coordinates and clips to
+  its viewport; `CreatureExpression` derives draw parameters; `CharacterFace`
+  draws the intentional original procedural octopus silhouette. Other states
+  retain their existing expression sequences using that silhouette. Final art
+  remains deferred and can replace drawing without owning behavior. The hide
+  margin is 0.45 viewport units, clearing the transformed 108-point placeholder
+  on a 162-point viewport; this geometric bound is **UNIT_TESTED_ONLY**.
+- **Debug:** forced behavior buttons, interaction previews, state label and
+  launch-preview environment hook are behind `#if DEBUG` in the Watch UI.
+  Forced commands are one-shot inputs to the same engine, not persistent modes.
+- **Reason:** preserve the implemented autonomous character and its testable
+  separation from future artwork while honoring lifecycle and battery limits.
+- **Alternatives:** scripted animation sequences, per-behavior timers, a new
+  rendering engine, or final-art integration are outside this pass.
+- **Risks:** **UNVERIFIED** for post-audit UI runtime behavior, actual callback
+  frequency, frame pacing, touches, lifecycle transitions and energy use. The
+  seeded engine is replayable for identical input checkpoints/times, not a
+  promise that different tick cadences produce identical random histories.
+  Different artwork sizes require rechecking hide clearance.
+- **Device verification required:** owner-led SE 3 checks of wander/exit/peek/
+  return, repeated taps, DEBUG controls, non-idle states, wrist-down/resume,
+  Reduce Motion, heat and battery, recorded in `DEVICE_TEST_LOG.md` before any
+  `DEVICE_VERIFIED` claim. Claude's pre-audit visual result is
+  **SIMULATOR_VERIFIED_ONLY**, reported in the owner's interruption transcript.
+- **Fallback:** retain the static low-power pose when animation is unavailable;
+  retain this procedural renderer until original final artwork is approved.

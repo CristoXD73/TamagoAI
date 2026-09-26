@@ -2,22 +2,27 @@ import SwiftUI
 import TamagoShared
 
 /// Phase 4 Stage A: the character is live (CharacterStateMachine +
-/// CharacterView). Voice, transport, and TTS are not wired yet — nothing
-/// drives the controller except the `#if DEBUG` preview controls
+/// CharacterView), and — while idle — a second, independent controller
+/// (CreatureBehaviorController, D-114) gives it an autonomous world: it
+/// wanders, approaches edges, and goes offscreen on its own. Voice,
+/// transport, and TTS are not wired yet — nothing drives
+/// CharacterInteractionController except the `#if DEBUG` preview controls
 /// (docs/DECISIONS.md D-103, D-102).
 @main
 struct TamagoWatchApp: App {
     @State private var controller = CharacterInteractionController()
+    @State private var creatureController = CreatureBehaviorController()
 
     var body: some Scene {
         WindowGroup {
-            RootView(controller: controller)
+            RootView(controller: controller, creatureController: creatureController)
         }
     }
 }
 
 private struct RootView: View {
     var controller: CharacterInteractionController
+    var creatureController: CreatureBehaviorController
 
     @State private var selectedPage = 0
     #if DEBUG
@@ -27,11 +32,11 @@ private struct RootView: View {
 
     var body: some View {
         TabView(selection: $selectedPage) {
-            CharacterScreen(controller: controller, isVisible: selectedPage == 0)
+            CharacterScreen(controller: controller, creatureController: creatureController, isVisible: selectedPage == 0)
                 .tag(0)
             #if DEBUG
             NavigationStack {
-                DebugStateControlsView(controller: controller)
+                DebugStateControlsView(controller: controller, creatureController: creatureController)
             }
             .tag(1)
             #endif
@@ -64,14 +69,23 @@ private struct RootView: View {
 
 private struct CharacterScreen: View {
     var controller: CharacterInteractionController
+    var creatureController: CreatureBehaviorController
     var isVisible: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
-            CharacterView(state: controller.state, isVisible: isVisible)
+        // D-114 / task §9: "pure black background... the Watch face should
+        // feel like a tiny dark habitat," full-bleed with no chrome. The
+        // state-name label is a debug aid, not production UI.
+        ZStack(alignment: .bottom) {
+            CharacterView(state: controller.state, creatureController: creatureController, isVisible: isVisible)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            #if DEBUG
             Text(controller.state.visual.rawValue)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .padding(.bottom, 2)
+            #endif
         }
+        .background(Color.black.ignoresSafeArea())
     }
 }

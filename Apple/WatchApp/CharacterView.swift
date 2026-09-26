@@ -1,12 +1,23 @@
 // CharacterView.swift
 //
-// VERIFICATION: SIMULATOR_VERIFIED_ONLY (SE 3 40 mm, watchOS 27.0 simulator).
+// VERIFICATION: UNVERIFIED for the post-audit timeline/low-power changes.
+// Prior renderer: SIMULATOR_VERIFIED_ONLY (Claude, SE 3 40 mm).
 //
 // The renderer decided in docs/DECISIONS.md D-102: TimelineView(.animation)
 // paused whenever the app isn't truly live, computing a frame from the
 // existing SpriteAnimationClock and CharacterArt. It holds no timer of its
 // own; only view visibility is stored. Everything it draws is a function of
 // `state` (from CharacterStateMachine, Apple/Shared) and the environment.
+//
+// D-114 extends this for `.idle`: instead of a small centered breathing
+// loop, the character becomes CreatureIdleStage — a full-screen habitat
+// driven by CreatureBehaviorController — so it can wander, approach edges,
+// and go offscreen (task: "make TamagoAI feel like a living creature
+// inhabiting the screen"). Every other visual state is untouched: same
+// CharacterArt loop, same centered CharacterFace, same layout. This view is
+// still the only place that ticks CreatureBehaviorController — one call,
+// only while idle and live — so D-102's "no timer of its own" holds for the
+// creature layer too.
 
 import SwiftUI
 import TamagoShared
@@ -15,6 +26,7 @@ import TamagoShared
 /// Motion at this one place, per D-102 and D-104.
 struct CharacterView: View {
     let state: CharacterState
+    var creatureController: CreatureBehaviorController
     var isVisible: Bool = true
     @State private var isPresented = false
 
@@ -23,16 +35,36 @@ struct CharacterView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
-        let art = CharacterArt.art(for: state.visual)
         let environmentIsLive = isVisible && isPresented && scenePhase == .active && !isLuminanceReduced && !accessibilityReduceMotion
 
         TimelineView(.animation(minimumInterval: 1.0 / 12, paused: !environmentIsLive)) { context in
             // D-102: cadence is only known once we're inside a tick; pausing
             // already covers the environment half of "live".
             let liveNow = environmentIsLive && context.cadence == .live
-            let elapsed = context.date.timeIntervalSince(state.enteredAt)
-            let frame = SpriteAnimationClock.frame(in: art.sequence, elapsed: elapsed, reduceMotion: !liveNow)
-            CharacterFace(expression: art.expression(at: frame))
+
+            if state.visual == .idle {
+                // Keep observation writes outside body evaluation. Cadence
+                // controls drawing fidelity; the active environment gates
+                // world advancement without introducing another timer.
+                Group {
+                    if liveNow {
+                        CreatureIdleStage(controller: creatureController, now: context.date)
+                    } else {
+                        // D-104: a visible static pose, even if autonomy was
+                        // offscreen when the environment stopped being live.
+                        let art = CharacterArt.art(for: .idle)
+                        CharacterFace(expression: art.expression(at: art.sequence.lowPowerFrame))
+                    }
+                }
+                    .onChange(of: context.date, initial: true) { _, now in
+                        if environmentIsLive { creatureController.tick(now: now) }
+                    }
+            } else {
+                let art = CharacterArt.art(for: state.visual)
+                let elapsed = context.date.timeIntervalSince(state.enteredAt)
+                let frame = SpriteAnimationClock.frame(in: art.sequence, elapsed: elapsed, reduceMotion: !liveNow)
+                CharacterFace(expression: art.expression(at: frame))
+            }
         }
         // Reserve stable space below the ripple without letting its changing
         // diameter push the label onto the 40 mm page indicator.
@@ -47,6 +79,9 @@ struct CharacterView: View {
 /// Draws one CharacterExpression. No timers, no @State — a pure function of
 /// its input, so a new expression each tick just replaces the last one
 /// (D-102: "transitions between states cut on the next frame, no cross-fades").
+///
+/// Body silhouette is an octopus-like dome + tentacle stubs (D-114 art
+/// direction: "curious, slightly alien... not human-like"), not a plain box.
 struct CharacterFace: View {
     let expression: CharacterExpression
 
@@ -54,7 +89,7 @@ struct CharacterFace: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
+            OctopusSilhouette()
                 .fill(expression.tint.gradient)
                 .frame(width: bodySize, height: bodySize)
                 .overlay {
@@ -62,6 +97,7 @@ struct CharacterFace: View {
                         EyesView(style: expression.eyes)
                         MouthView(style: expression.mouth)
                     }
+                    .offset(y: -bodySize * 0.12)
                 }
                 .overlay(alignment: .topTrailing) {
                     BadgeView(decoration: expression.decoration)
@@ -167,6 +203,39 @@ private struct BadgeView: View {
 }
 
 // MARK: - Custom paths
+
+/// A dome-shaped mantle over a row of rounded tentacle stubs. Deliberately
+/// simple (D-114: "improve the existing procedural placeholder enough to
+/// establish the architecture," not final art) but reads as octopus-like
+/// rather than a plain box, and is what CreatureView's future final
+/// animated artwork replaces without touching behavior/expression code.
+private nonisolated struct OctopusSilhouette: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let domeHeight = rect.height * 0.66
+        let dome = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: domeHeight)
+        path.addRoundedRect(in: dome, cornerSize: CGSize(width: rect.width * 0.5, height: domeHeight * 0.75), style: .continuous)
+
+        // Narrower stubs with real gaps between them, alternating length,
+        // so the fringe reads as separate tentacles rather than a second
+        // solid band that just recreates a rounded rectangle.
+        let tentacleCount = 5
+        let slot = rect.width / CGFloat(tentacleCount)
+        let tentacleWidth = slot * 0.55
+        let tentacleTop = rect.height * 0.5
+        for i in 0..<tentacleCount {
+            let centerX = slot * (CGFloat(i) + 0.5)
+            let isShort = i % 2 == 1
+            let bottom = isShort ? rect.height * 0.86 : rect.height
+            let tentacle = CGRect(
+                x: centerX - tentacleWidth / 2, y: tentacleTop,
+                width: tentacleWidth, height: bottom - tentacleTop
+            )
+            path.addRoundedRect(in: tentacle, cornerSize: CGSize(width: tentacleWidth * 0.5, height: tentacleWidth * 0.5), style: .continuous)
+        }
+        return path
+    }
+}
 
 private nonisolated struct SmileArc: Shape {
     var depth: CGFloat = 1.0

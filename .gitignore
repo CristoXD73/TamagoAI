@@ -26,3 +26,9 @@ build/
 
 # Local Xcode identity (team ID, real bundle prefix)
 Apple/Config/Local.xcconfig
+
+# Media capture / character processing scratch (final exports remain tracked)
+/docs/media/raw/
+/docs/media/_work/
+/Assets/CharacterSource/_work/
+/Assets/CharacterProcessed/_work/
