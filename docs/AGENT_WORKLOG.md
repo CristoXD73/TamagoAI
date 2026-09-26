@@ -345,3 +345,54 @@ docs describing them; (2) branding/hygiene — README restructure and
 commits; they're recorded here and in D-001's updated note.
 
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-26T15:35:00-0400: Claude Code — main-branch integration
+
+**Agent:** Claude Code
+**Branch:** `claude/great-volta-ogpuw8` → `main`
+**Starting commit SHA (main, before):** `cb2167b` ("Initial commit" — a
+one-line README; every commit on `claude/great-volta-ogpuw8` already
+contained `cb2167b` as an ancestor, confirmed with
+`git merge-base --is-ancestor origin/main HEAD` before acting)
+**Ending commit SHA (main, after):** `01a1636`
+
+**Work performed:** re-verified the ancestor relationship still held after
+the two checkpoint commits above, then:
+1. `git tag -a pre-main-integration-2026-09-26 cb2167b ...` and pushed it —
+   a safety tag pointing at exactly what `main` was before this change, per
+   the task's own "create a safety branch/tag before changing main"
+   instruction. Recoverable at any time via that tag.
+2. Re-ran `swift test` (122/122) and `npm test --prefix Gateway` (66/66)
+   immediately before pushing, per "run tests/build verification before
+   updating main."
+3. `git push origin claude/great-volta-ogpuw8:main` — GitHub's own output
+   confirmed this as a fast-forward (`cb2167b..01a1636`, not a `+`-prefixed
+   forced update). No history was rewritten; `cb2167b` remains in `main`'s
+   ancestry. **Not force-pushed**, and no other branch (`docs/tamagoai-
+   presentation`, or anyone else's) was merged or touched.
+4. Updated the local `main` branch pointer to match (`git branch -f main
+   origin/main`) without checking it out — this session stayed on
+   `claude/great-volta-ogpuw8` throughout.
+
+**Verification:** `gh repo view` confirms `defaultBranchRef.name == "main"`
+and that `main` now serves the full project (fetched and inspected
+`origin/main`'s log directly). GitHub's own rendered page was not viewed —
+no browser access from this session — so the *visual* result (e.g. whether
+the README hero renders as intended) is **NOT VERIFIED**; only the git-level
+outcome is confirmed.
+
+**Known issues:** none introduced by this step itself. The pre-existing ones
+(no `xcodebuild test` clean run this session; no physical-device
+verification) are unchanged by moving them onto `main`.
+
+**Cross-agent impact:** `main` is the repository's default branch — every
+future clone, fork, and "visit the repo" now lands on the real project
+instead of the placeholder initial commit. Any other agent or process with a
+stale local `main` will need to fast-forward-pull to catch up (no rebase or
+force-push means this is always a clean, non-destructive pull for anyone
+downstream). The `docs/tamagoai-presentation` branch was deliberately left
+alone (see the previous entry).
+
+**Signed-by:** Claude Code
