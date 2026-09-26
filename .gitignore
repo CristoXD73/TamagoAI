@@ -24,6 +24,13 @@ build/
 # macOS
 .DS_Store
 
+# Python (tools/previz, 3D/scripts)
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
 # Local Xcode identity (team ID, real bundle prefix)
 Apple/Config/Local.xcconfig
 
