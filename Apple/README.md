@@ -1,21 +1,31 @@
 # Apple/
 
-| Folder | Status |
-|---|---|
-| `Shared/` | Pure-Foundation Swift intended for a shared module used by all targets. **Never compiled** (`UNVERIFIED`). Compile it, then add unit tests that decode `Tests/Fixtures/protocol-v1/**`. |
-| `WatchApp/` | Empty. watchOS app target, created in Xcode by the local architect. |
-| `iPhoneApp/` | Empty. iOS companion (gateway config, token in Keychain, WatchConnectivity relay). Comes later. |
-| `Complication/` | Empty. WidgetKit complication extension. Comes later. |
+Structure decided in `docs/DECISIONS.md` **D-101** (Phase 3, Xcode 27.0).
 
-No `.xcodeproj` was generated in the cloud on purpose: it couldn't be
-validated there. Claude Opus in Xcode decides the target layout (plain Xcode
-project vs. XcodeGen vs. local Swift package for `Shared/`) and records it in
-`docs/DECISIONS.md`. It may move these folders if current Xcode templates
-prefer another structure.
+| Path | What | Status |
+|---|---|---|
+| `AppleTamago.xcodeproj` | Xcode project, file-system-synchronized folders. Shared schemes `TamagoWatch` (Watch app + complication; Test runs `TamagoTests`) and `TamagoPhone`. | builds: `SIMULATOR_VERIFIED_ONLY` |
+| `Shared/` | Local Swift package **`TamagoShared`** (pure Foundation, Swift 6). Sources stay at `Shared/*.swift`; tests in `Shared/Tests/TamagoSharedTests/`. | `UNIT_TESTED_ONLY` |
+| `WatchApp/` | `TamagoWatch` target (watchOS 27.0). Placeholder screen only. `Info.plist` holds `NSAllowsLocalNetworking` (D-107). | launch: `SIMULATOR_VERIFIED_ONLY` |
+| `Complication/` | `TamagoComplication` WidgetKit extension, embedded in the Watch app. Static placeholder. | build only |
+| `iPhoneApp/` | `TamagoPhone` target (iOS 27.0), embeds the Watch app. Placeholder screen only. | build only |
+| `Config/Tamago.xcconfig` | Placeholder bundle prefix `com.example.appletamago`, empty team. Put real values in git-ignored `Config/Local.xcconfig`. | n/a |
 
-Files in `Shared/`:
+Targets: `TamagoWatch`, `TamagoComplication`, `TamagoPhone`, and `TamagoTests`
+(a hostless watchOS unit-test bundle compiled from the same files as the
+package's own `TamagoSharedTests`).
 
-- `TamagoProtocolV1.swift`: Codable models for protocol v1, with
-  forward-compatible enum decoding and a `answers(_:)` stale-response guard.
-- `SpriteAnimationClock.swift`: deterministic intro+loop frame timing, adapted
-  from WatchPet (MIT; see header and `THIRD_PARTY_NOTICES.md`). Contains no art.
+Adding a Swift file to `WatchApp/`, `iPhoneApp/`, `Complication/` or `Shared/`
+needs **no project edit**. Put pure logic (state machine, snapshot mapping,
+transport contracts) in `Shared/` so it's testable on the host.
+
+```sh
+# from the repo root
+(cd Apple/Shared && swift test --scratch-path ../../.build/spm)
+(cd Apple && xcodebuild test -project AppleTamago.xcodeproj -scheme TamagoWatch \
+  -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' \
+  -derivedDataPath ../.build/DerivedData)
+```
+
+Fixture tests read `Tests/Fixtures/protocol-v1/` in place via `#filePath`. That
+works on the host and in the simulator, **not** on a physical device.

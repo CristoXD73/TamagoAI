@@ -1,0 +1,16 @@
+// Tamago.xcconfig: identity and signing shared by every Apple target.
+// See docs/DECISIONS.md D-101 and D-109.
+//
+// Placeholders only. Put the real values in Apple/Config/Local.xcconfig
+// (git-ignored), for example:
+//
+//   TAMAGO_BUNDLE_PREFIX = com.yourname.appletamago
+//   DEVELOPMENT_TEAM = ABCDE12345
+//
+// Never commit a team ID or a personal bundle prefix.
+
+TAMAGO_BUNDLE_PREFIX = com.example.appletamago
+DEVELOPMENT_TEAM =
+CODE_SIGN_STYLE = Automatic
+
+#include? "Local.xcconfig"

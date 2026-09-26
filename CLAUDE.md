@@ -18,8 +18,10 @@ adds Claude-specific notes.
 |---|---|---|
 | `Gateway/` | Node ≥22 Mac gateway, zero dependencies. `npm test`, `npm start`. | `UNIT_TESTED_ONLY` (CI + cloud) |
 | `Tests/Fixtures/protocol-v1/` | JSON fixtures shared by gateway and Swift tests. Gateway ones are generated from the live mock (`npm run fixtures`). | drift-checked by gateway tests |
-| `Apple/Shared/` | Pure-Foundation Swift: protocol models + sprite timing engine. | `UNVERIFIED` (never compiled) |
-| `Apple/WatchApp`, `Apple/iPhoneApp`, `Apple/Complication` | Empty. Targets are created locally in Xcode by the architect. | n/a |
+| `Apple/Shared/` | Local Swift package `TamagoShared`: protocol models + sprite timing engine, tests in `Tests/`. | `UNIT_TESTED_ONLY` (host + watchOS simulator) |
+| `Apple/AppleTamago.xcodeproj` | Targets `TamagoWatch`, `TamagoComplication`, `TamagoPhone`, `TamagoTests` (D-101). | builds: `SIMULATOR_VERIFIED_ONLY` |
+| `Apple/WatchApp`, `Apple/iPhoneApp`, `Apple/Complication` | Placeholder sources (synchronized folders). | Watch launch: `SIMULATOR_VERIFIED_ONLY` |
+| `Apple/Config/Tamago.xcconfig` | Placeholder bundle prefix, empty team; real values go in git-ignored `Local.xcconfig`. | n/a |
 | `docs/` | Brief, architecture, decisions, protocol, reuse, tests, logs. | n/a |
 | `scripts/smoke.sh` | curl smoke test against a running gateway. | manual |
 
@@ -32,11 +34,19 @@ npm run fixtures                       # regenerate gateway-derived fixtures aft
 TAMAGO_ALLOW_NO_AUTH=1 npm start       # loopback-only dev server on :8787
 TAMAGO_TOKEN=$(openssl rand -hex 24) TAMAGO_HOST=0.0.0.0 npm start   # LAN, for a physical Watch
 ../scripts/smoke.sh                    # in another terminal
+
+# Apple (from the repo root, local Mac with Xcode 27 only)
+cd Apple/Shared && swift test --scratch-path ../../.build/spm          # host, fastest
+cd Apple && xcodebuild test -project AppleTamago.xcodeproj -scheme TamagoWatch \
+  -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' \
+  -derivedDataPath ../.build/DerivedData                                # SE 3 40 mm
 ```
 
 ## Claude-specific reminders
 
 - Cloud sessions have **no Xcode or Swift toolchain**. Don't claim Swift compiles.
-- Don't generate an `.xcodeproj` in the cloud. The local architect owns targets.
+- Don't edit `Apple/AppleTamago.xcodeproj` in the cloud. Adding Swift files to the
+  synchronized folders needs no project edit.
+- Keep `-derivedDataPath` under the repo's `.build/` (external volume).
 - Premium Xcode time is scarce. Spend it on Apple-platform problems, not boilerplate.
 - Before finishing, update `docs/HANDOFF_LOG.md`.

@@ -9,9 +9,10 @@ tools, automation).
  idle ─tap─▶ listening ─▶ thinking ─▶ (Mac gateway → local AI → tools) ─▶ speaking ─▶ reaction ─▶ idle
 ```
 
-> Status: **Phase 1 foundation.** Protocol, mock gateway, fixtures, and docs
-> exist. The Watch app does not exist yet. Nothing here has run on an Apple
-> Watch. See `docs/HANDOFF_LOG.md`.
+> Status: **Phase 3 foundation.** Protocol, mock gateway, fixtures, docs, and a
+> compiled Xcode project (placeholder Watch app, complication, iPhone companion,
+> shared Swift package with 43 passing tests) exist. Nothing has run on a physical
+> Apple Watch. See `docs/HANDOFF_LOG.md`.
 
 ## Layout
 
@@ -21,8 +22,10 @@ THIRD_PARTY_NOTICES.md    MIT notices for adapted upstream code
 docs/                     brief, architecture, decisions, protocol, reuse, tests, logs
   handoff/                original multi-agent handoff pack (historical, "TamaWatch")
 Apple/
-  Shared/                 Swift protocol models + sprite timing engine (not compiled yet)
-  WatchApp/ iPhoneApp/ Complication/   placeholders, created locally in Xcode
+  AppleTamago.xcodeproj   Watch app, complication, iPhone companion, tests (D-101)
+  Shared/                 local Swift package TamagoShared (protocol + sprite timing) + tests
+  WatchApp/ iPhoneApp/ Complication/   placeholder sources
+  Config/                 Tamago.xcconfig (placeholder identity)
 Gateway/                  Mac gateway (Node ≥22, no dependencies)
   src/ test/ mock/ scripts/
 Tests/Fixtures/protocol-v1/   JSON fixtures shared by gateway + Swift tests

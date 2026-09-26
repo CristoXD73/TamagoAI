@@ -2,6 +2,8 @@
 
 Audited by Claude Code Cloud on 2026-09-26 by cloning both repositories and
 reading the source. Nothing was compiled (no Swift toolchain in the cloud).
+**Reviewed against the watchOS 27 SDK in Phase 3: see `DECISIONS.md` D-111** for
+the approved/amended verdict on every row below.
 
 | Upstream | Repository | Commit audited | License |
 |---|---|---|---|
@@ -133,7 +135,8 @@ License:           MIT
 Local file:        Apple/Shared/SpriteAnimationClock.swift
 Nature of modification: removed Codex state/row mapping; generalized to data-driven
                    sequences; public, UI-free API; loop-less sequences; lowPowerFrame;
-                   helpers renamed (durationMs). Verification: UNVERIFIED (not compiled).
+                   helpers renamed (durationMs); Phase 3: NaN/infinity/overflow-safe
+                   elapsed handling. Verification: UNIT_TESTED_ONLY (Phase 3, Xcode 27.0).
 Copyright notice preserved: yes (file header + THIRD_PARTY_NOTICES.md)
 ```
 

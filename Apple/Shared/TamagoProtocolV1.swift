@@ -1,8 +1,10 @@
 // TamagoProtocolV1.swift
 //
-// VERIFICATION: NOT COMPILED. Written in a Linux cloud sandbox with no Swift
-// toolchain. The local Xcode agent must compile it and add unit tests that
-// decode every file in Tests/Fixtures/protocol-v1/ before relying on it.
+// VERIFICATION: UNIT_TESTED_ONLY. Compiled with Xcode 27.0 / Swift 6.4; every
+// fixture in Tests/Fixtures/protocol-v1 is decoded by
+// Apple/Shared/Tests/TamagoSharedTests/ProtocolFixtureTests.swift (host + watchOS
+// 27 simulator). Originally written in the cloud without a Swift
+// toolchain.
 //
 // Mirrors docs/PROTOCOL_V1.md and Gateway/src/protocol.js. Enum raw values
 // must match those files exactly. Pure Foundation, no UI or transport code.

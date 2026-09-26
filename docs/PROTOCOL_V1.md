@@ -10,7 +10,7 @@ Sources of truth that must agree:
 |---|---|
 | this document | human spec |
 | `Gateway/src/protocol.js` | gateway enums + validation (tested) |
-| `Apple/Shared/TamagoProtocolV1.swift` | Swift Codable models (**not compiled yet**) |
+| `Apple/Shared/TamagoProtocolV1.swift` | Swift Codable models (`UNIT_TESTED_ONLY`: decodes every fixture, see `Apple/Shared/Tests/`) |
 | `Tests/Fixtures/protocol-v1/` | canonical examples; gateway ones are generated from the live mock and drift-checked in CI |
 
 ## 1. Transport

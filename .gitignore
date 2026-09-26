@@ -23,3 +23,6 @@ build/
 
 # macOS
 .DS_Store
+
+# Local Xcode identity (team ID, real bundle prefix)
+Apple/Config/Local.xcconfig

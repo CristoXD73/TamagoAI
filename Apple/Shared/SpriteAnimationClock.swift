@@ -1,7 +1,8 @@
 // SpriteAnimationClock.swift
 //
-// VERIFICATION: NOT COMPILED. Written in a Linux cloud sandbox with no Swift
-// toolchain. The local Xcode agent must compile it and unit-test it.
+// VERIFICATION: UNIT_TESTED_ONLY. Compiled with Xcode 27.0 / Swift 6.4 and
+// covered by Apple/Shared/Tests/TamagoSharedTests/SpriteAnimationClockTests.swift
+// (host + watchOS 27 simulator). Not yet driven by a real renderer.
 //
 // Adapted from WatchPet — https://github.com/lkuczborski/WatchPet
 //   file:   WatchPet/Views/PetAvatarView.swift (private enum CodexSpriteAnimation
@@ -19,6 +20,9 @@
 //     SpriteKit, ...) chosen in docs/DECISIONS.md.
 //   - Added `isFinished` / `hasLoop` helpers and a `lowPowerFrame` for the
 //     reduced-luminance / reduce-motion pose.
+//   - (Phase 3, local Xcode) Non-finite elapsed times are treated as the start
+//     and loop phase is computed in Double: `Int(elapsed * 1000)` trapped on
+//     NaN/infinity and overflowed 32-bit Int (arm64_32 Watch) after ~24.8 days.
 //
 // It uses no art assets. WatchPet's pets come from the Codex app bundle and
 // must NOT be redistributed with this project.
@@ -87,24 +91,25 @@ public enum SpriteAnimationClock {
             return sequence.lowPowerFrame
         }
 
-        let elapsedMs = max(Int(elapsed * 1000), 0)
+        let elapsedMs = milliseconds(elapsed)
         let introDuration = sequence.introDurationMs
-        if elapsedMs < introDuration {
-            return frame(in: sequence.intro, elapsedMs: elapsedMs)
+        if elapsedMs < Double(introDuration) {
+            return frame(in: sequence.intro, elapsedMs: Int(elapsedMs))
         }
 
         guard sequence.hasLoop else {
             return sequence.intro.last?.spriteFrame ?? sequence.lowPowerFrame
         }
 
-        let loopElapsed = (elapsedMs - introDuration) % max(sequence.loopDurationMs, 1)
-        return frame(in: sequence.loop, elapsedMs: loopElapsed)
+        let loopElapsed = (elapsedMs - Double(introDuration))
+            .truncatingRemainder(dividingBy: Double(max(sequence.loopDurationMs, 1)))
+        return frame(in: sequence.loop, elapsedMs: Int(loopElapsed))
     }
 
     /// True once a sequence without a loop has played its intro completely.
     /// State machines can use this to return a transient state to idle.
     public static func isFinished(_ sequence: AnimationSequence, elapsed: TimeInterval) -> Bool {
-        !sequence.hasLoop && Int(elapsed * 1000) >= sequence.introDurationMs
+        !sequence.hasLoop && elapsed.isFinite && milliseconds(elapsed) >= Double(sequence.introDurationMs)
     }
 
     /// Convenience: a row of `count` frames of equal duration, with an optional
@@ -124,6 +129,13 @@ public enum SpriteAnimationClock {
         durationsMs.enumerated().map { column, duration in
             AnimationFrame(SpriteFrame(row: row, column: column), durationMs: duration)
         }
+    }
+
+    /// Whole milliseconds since the start. Negative and non-finite values
+    /// (NaN, ±infinity) count as the start, so a bad time value can't trap.
+    private static func milliseconds(_ elapsed: TimeInterval) -> Double {
+        guard elapsed.isFinite, elapsed > 0 else { return 0 }
+        return (elapsed * 1000).rounded(.towardZero)
     }
 
     private static func frame(in frames: [AnimationFrame], elapsedMs: Int) -> SpriteFrame {
