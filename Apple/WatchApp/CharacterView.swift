@@ -5,7 +5,7 @@
 // The renderer decided in docs/DECISIONS.md D-102: TimelineView(.animation)
 // paused whenever the app isn't truly live, computing a frame from the
 // existing SpriteAnimationClock and CharacterArt. It holds no timer of its
-// own and stores no state — everything it draws is a pure function of
+// own; only view visibility is stored. Everything it draws is a function of
 // `state` (from CharacterStateMachine, Apple/Shared) and the environment.
 
 import SwiftUI
@@ -15,6 +15,8 @@ import TamagoShared
 /// Motion at this one place, per D-102 and D-104.
 struct CharacterView: View {
     let state: CharacterState
+    var isVisible: Bool = true
+    @State private var isPresented = false
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
@@ -22,7 +24,7 @@ struct CharacterView: View {
 
     var body: some View {
         let art = CharacterArt.art(for: state.visual)
-        let environmentIsLive = scenePhase == .active && !isLuminanceReduced && !accessibilityReduceMotion
+        let environmentIsLive = isVisible && isPresented && scenePhase == .active && !isLuminanceReduced && !accessibilityReduceMotion
 
         TimelineView(.animation(minimumInterval: 1.0 / 12, paused: !environmentIsLive)) { context in
             // D-102: cadence is only known once we're inside a tick; pausing
@@ -32,6 +34,11 @@ struct CharacterView: View {
             let frame = SpriteAnimationClock.frame(in: art.sequence, elapsed: elapsed, reduceMotion: !liveNow)
             CharacterFace(expression: art.expression(at: frame))
         }
+        // Reserve stable space below the ripple without letting its changing
+        // diameter push the label onto the 40 mm page indicator.
+        .frame(height: state.visual == .listening ? 140 : nil)
+        .onAppear { isPresented = true }
+        .onDisappear { isPresented = false }
         .accessibilityElement()
         .accessibilityLabel(Text(state.visual.rawValue))
     }
@@ -47,12 +54,6 @@ struct CharacterFace: View {
 
     var body: some View {
         ZStack {
-            if case let .ripple(progress) = expression.decoration {
-                Circle()
-                    .stroke(expression.tint.opacity(1 - progress), lineWidth: 2)
-                    .frame(width: bodySize + 55 * progress, height: bodySize + 55 * progress)
-            }
-
             RoundedRectangle(cornerRadius: 34, style: .continuous)
                 .fill(expression.tint.gradient)
                 .frame(width: bodySize, height: bodySize)
@@ -66,6 +67,15 @@ struct CharacterFace: View {
                     BadgeView(decoration: expression.decoration)
                         .offset(x: 10, y: -10)
                 }
+        }
+        // Decoration must not change the VStack's measured height each tick:
+        // the 163-point ripple previously pushed the label into the page dots.
+        .background {
+            if case let .ripple(progress) = expression.decoration {
+                Circle()
+                    .stroke(expression.tint.opacity(1 - progress), lineWidth: 2)
+                    .frame(width: bodySize + 55 * progress, height: bodySize + 55 * progress)
+            }
         }
         .scaleEffect(expression.scale)
         .rotationEffect(expression.tilt)

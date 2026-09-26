@@ -109,7 +109,7 @@ struct CharacterStateMachineTests {
 
     @Test func ackBeatElapsedMovesAcknowledgingToThinking() {
         let original = state(.acknowledging, activeRequestID: "req-1")
-        let (next, effects) = reduce(original, .ackBeatElapsed, now: t1)
+        let (next, effects) = reduce(original, .ackBeatElapsed(requestId: "req-1"), now: t1)
         #expect(next.visual == .thinking)
         #expect(next.activeRequestID == "req-1", "request ID threads through unchanged")
         #expect(effects.isEmpty)
@@ -118,7 +118,7 @@ struct CharacterStateMachineTests {
     @Test(arguments: [.idle, .listening, .thinking, .speaking] as [TamagoCharacterState])
     func ackBeatElapsedIsIllegalOutsideAcknowledging(_ from: TamagoCharacterState) {
         let original = state(from)
-        #expect(reduce(original, .ackBeatElapsed).0 == original)
+        #expect(reduce(original, .ackBeatElapsed(requestId: "req-1")).0 == original)
     }
 
     // MARK: toolProgress
@@ -231,7 +231,7 @@ struct CharacterStateMachineTests {
         let r = response(requestId: "req-1", speechText: "Uh oh.", characterState: .error, haptic: .failure)
         let (speaking, _) = reduce(original, .response(r), now: t0)
 
-        let (resolved, effects) = reduce(speaking, .speechFinished, now: t1)
+        let (resolved, effects) = reduce(speaking, .speechFinished(requestId: "req-1"), now: t1)
         #expect(resolved.visual == .error, "lands on the mood from the response that started speaking")
         #expect(effects.isEmpty, "haptic already played when entering .speaking")
     }
@@ -240,15 +240,15 @@ struct CharacterStateMachineTests {
         let original = state(.thinking, activeRequestID: "req-1")
         let r = response(requestId: "req-1", speechText: "Hi.", characterState: .happy)
         let (speaking, _) = reduce(original, .response(r), now: t0)
-        let (resolved, _) = reduce(speaking, .speechCancelled, now: t1)
+        let (resolved, _) = reduce(speaking, .speechCancelled(requestId: "req-1"), now: t1)
         #expect(resolved.visual == .happy)
     }
 
     @Test(arguments: [.idle, .listening, .thinking, .happy] as [TamagoCharacterState])
     func speechFinishedIsIllegalOutsideSpeaking(_ from: TamagoCharacterState) {
         let original = state(from)
-        #expect(reduce(original, .speechFinished).0 == original)
-        #expect(reduce(original, .speechCancelled).0 == original)
+        #expect(reduce(original, .speechFinished(requestId: "req-1")).0 == original)
+        #expect(reduce(original, .speechCancelled(requestId: "req-1")).0 == original)
     }
 
     // MARK: response — final, no speech (→ reaction directly)
@@ -278,10 +278,10 @@ struct CharacterStateMachineTests {
     @Test(arguments: [.happy, .success, .confused, .error] as [TamagoCharacterState])
     func reactionFinishedReturnsToIdleAndClearsTheRequest(_ from: TamagoCharacterState) {
         let original = state(from, activeRequestID: "req-1", followUpExpected: true)
-        let (next, effects) = reduce(original, .reactionFinished, now: t1)
+        let (next, effects) = reduce(original, .reactionFinished(requestId: "req-1"), now: t1)
         #expect(next.visual == .idle)
         #expect(next.activeRequestID == nil)
-        #expect(!next.followUpExpected)
+        #expect(next.followUpExpected)
         #expect(next.enteredAt == t1)
         #expect(effects.isEmpty)
     }
@@ -289,7 +289,7 @@ struct CharacterStateMachineTests {
     @Test(arguments: [.idle, .listening, .thinking, .speaking, .disconnected] as [TamagoCharacterState])
     func reactionFinishedIsIllegalOutsideReactionMoods(_ from: TamagoCharacterState) {
         let original = state(from)
-        #expect(reduce(original, .reactionFinished).0 == original)
+        #expect(reduce(original, .reactionFinished(requestId: "req-1")).0 == original)
     }
 
     // MARK: cancel / backgrounded — legal from every state
@@ -323,7 +323,7 @@ struct CharacterStateMachineTests {
         #expect(cancelled.visual == .idle)
         // A speechFinished arriving after cancel must not resurrect .happy —
         // it's illegal from .idle, so it's simply ignored.
-        #expect(reduce(cancelled, .speechFinished).0 == cancelled)
+        #expect(reduce(cancelled, .speechFinished(requestId: "req-1")).0 == cancelled)
     }
 
     // MARK: routeLost / routeRestored
@@ -371,7 +371,7 @@ struct CharacterStateMachineTests {
         guard case let .sendRequest(sentRequest) = effects.first else { Issue.record("expected sendRequest"); return }
         #expect(sentRequest.requestId == requestID)
 
-        (s, effects) = reduce(s, .ackBeatElapsed, now: t0)
+        (s, effects) = reduce(s, .ackBeatElapsed(requestId: id.uuidString), now: t0)
         #expect(s.visual == .thinking)
         #expect(effects.isEmpty)
 
@@ -383,11 +383,11 @@ struct CharacterStateMachineTests {
         #expect(s.visual == .speaking)
         #expect(effects == [.playHaptic(.success), .speak(text: "pong")])
 
-        (s, effects) = reduce(s, .speechFinished, now: t0)
+        (s, effects) = reduce(s, .speechFinished(requestId: id.uuidString), now: t0)
         #expect(s.visual == .success)
         #expect(effects.isEmpty)
 
-        (s, effects) = reduce(s, .reactionFinished, now: t1)
+        (s, effects) = reduce(s, .reactionFinished(requestId: id.uuidString), now: t1)
         #expect(s == CharacterState.initial.withEnteredAt(t1))
         #expect(effects.isEmpty)
     }
@@ -397,12 +397,135 @@ struct CharacterStateMachineTests {
         (s, _) = reduce(s, .userActivated, now: t0)
         let id = UUID()
         (s, _) = reduce(s, .transcript(text: "ping", requestId: id), now: t0)
-        (s, _) = reduce(s, .ackBeatElapsed, now: t0)
+        (s, _) = reduce(s, .ackBeatElapsed(requestId: id.uuidString), now: t0)
         (s, _) = reduce(s, .response(response(requestId: s.activeRequestID, speechText: "", characterState: .confused, haptic: .notification)), now: t0)
         #expect(s.visual == .confused, "no speech means no speaking detour")
-        (s, _) = reduce(s, .reactionFinished, now: t1)
+        (s, _) = reduce(s, .reactionFinished(requestId: id.uuidString), now: t1)
         #expect(s.visual == .idle)
         #expect(s.activeRequestID == nil)
+    }
+
+    // Checkpoint A: adversarial cases missing from the original suite.
+    @Test func oldCompletionCannotFinishANewerInteraction() {
+        // A was cancelled; B is now speaking. A's late delegate callback
+        // must not finish B (the original event API carried no identity).
+        let b = state(.thinking, activeRequestID: "request-b")
+        let speaking = reduce(b, .response(response(requestId: "request-b", speechText: "B"))).0
+        let (next, effects) = reduce(speaking, .speechFinished(requestId: "request-a"))
+        #expect(next == speaking)
+        #expect(effects.isEmpty)
+    }
+
+    @Test func completedIdleResponseClearsRequestIdentity() {
+        for speech in ["", "Done"] {
+            var s = reduce(state(.thinking, activeRequestID: "req-1"),
+                           .response(response(speechText: speech, characterState: .idle))).0
+            if !speech.isEmpty { s = reduce(s, .speechFinished(requestId: "req-1")).0 }
+            #expect(s.visual == .idle)
+            #expect(s.activeRequestID == nil)
+        }
+    }
+
+    @Test func followUpSurvivesReactionCompletion() {
+        let reaction = reduce(state(.thinking, activeRequestID: "req-1"),
+                              .response(response(followUpExpected: true))).0
+        let idle = reduce(reaction, .reactionFinished(requestId: "req-1")).0
+        #expect(idle.visual == .idle)
+        #expect(idle.followUpExpected)
+        #expect(idle.activeRequestID == nil)
+        #expect(!reduce(idle, .userActivated).0.followUpExpected)
+        #expect(!reduce(idle, .backgrounded).0.followUpExpected)
+    }
+
+    @Test(arguments: ["client/gateway-unavailable.json", "client/disconnected.json"])
+    func clientOfflineFixturesResolveToDisconnected(_ path: String) throws {
+        let r = try JSONDecoder().decode(TamagoResponse.self, from: FixtureLoader.data(path))
+        var s = reduce(state(.thinking, activeRequestID: r.requestId), .response(r)).0
+        if s.visual == .speaking { s = reduce(s, .speechFinished(requestId: try #require(r.requestId))).0 }
+        #expect(s.visual == .disconnected)
+        #expect(s.activeRequestID == nil)
+    }
+
+    @Test func duplicateFinalResponseHasNoEffects() {
+        let r = response(speechText: "done")
+        let speaking = reduce(state(.thinking, activeRequestID: "req-1"), .response(r)).0
+        let duplicate = reduce(speaking, .response(r))
+        #expect(duplicate.0 == speaking)
+        #expect(duplicate.1.isEmpty)
+    }
+
+    @Test func oldResponseCannotOverwriteNewRequestAfterBackground() {
+        var s = reduce(state(.thinking, activeRequestID: "req-1"), .backgrounded).0
+        s = reduce(s, .userActivated).0
+        s = reduce(s, .transcript(text: "new", requestId: UUID())).0
+        let stale = reduce(s, .response(response()))
+        #expect(stale.0 == s)
+        #expect(stale.1.isEmpty)
+    }
+
+    @Test(arguments: [CharacterEvent.ackBeatElapsed(requestId: "old"),
+                      .speechFinished(requestId: "old"), .speechCancelled(requestId: "old"),
+                      .reactionFinished(requestId: "old")])
+    func staleCompletionsAreIgnoredInEveryState(_ event: CharacterEvent) {
+        for visual in TamagoCharacterState.allCases {
+            let original = state(visual, activeRequestID: "new")
+            let result = reduce(original, event)
+            #expect(result.0 == original)
+            #expect(result.1.isEmpty)
+        }
+    }
+
+    @Test func duplicateCompletionCannotResetFollowUpOrReplayReaction() {
+        let speaking = reduce(state(.thinking, activeRequestID: "req-1"),
+                              .response(response(speechText: "done", followUpExpected: true))).0
+        let reaction = reduce(speaking, .speechFinished(requestId: "REQ-1")).0
+        #expect(reduce(reaction, .speechFinished(requestId: "req-1")).0 == reaction)
+        let idle = reduce(reaction, .reactionFinished(requestId: "REQ-1")).0
+        #expect(reduce(idle, .reactionFinished(requestId: "req-1")).0 == idle)
+        #expect(idle.followUpExpected)
+    }
+
+    @MainActor @Test func controllerKeepsReducerAsItsOnlyStateOwner() {
+        let controller = CharacterInteractionController()
+        let id = UUID()
+        controller.apply(.userActivated, now: t0)
+        controller.apply(.transcript(text: "test", requestId: id), now: t0)
+        #expect(controller.state.visual == .acknowledging)
+        #expect(controller.lastEffects.count == 1)
+        let pending = controller.state
+        controller.apply(.ackBeatElapsed(requestId: "old"), now: t1)
+        #expect(controller.state == pending)
+        #expect(controller.lastEffects.isEmpty)
+        controller.apply(.backgrounded, now: t1)
+        #expect(controller.state == CharacterState.initial.withEnteredAt(t1))
+        #expect(controller.lastEffects == [.cancelRequest, .stopSpeech])
+        controller.apply(.response(response(requestId: id.uuidString)), now: t1)
+        #expect(controller.state == CharacterState.initial.withEnteredAt(t1))
+        #expect(controller.lastEffects.isEmpty)
+    }
+
+    @Test func illegalTransitionsMatchTheEntireDecisionTable() {
+        let ready: Set<TamagoCharacterState> = [.idle, .sleeping, .disconnected, .happy, .success, .confused, .error]
+        let waiting: Set<TamagoCharacterState> = [.acknowledging, .thinking, .toolRunning]
+        let events: [(CharacterEvent, Set<TamagoCharacterState>)] = [
+            (.userActivated, ready), (.wake, [.sleeping]), (.inactivityTimeout, [.idle]),
+            (.transcript(text: "test", requestId: UUID()), [.listening]),
+            (.ackBeatElapsed(requestId: "req-1"), [.acknowledging]),
+            (.toolProgress(requestId: "req-1"), [.thinking]),
+            (.response(response()), waiting),
+            (.speechFinished(requestId: "req-1"), [.speaking]),
+            (.speechCancelled(requestId: "req-1"), [.speaking]),
+            (.reactionFinished(requestId: "req-1"), [.happy, .success, .confused, .error]),
+            (.routeLost, [.idle, .sleeping]), (.routeRestored, [.disconnected])
+        ]
+        for (event, allowed) in events {
+            for visual in TamagoCharacterState.allCases where !allowed.contains(visual) {
+                let original = state(visual, activeRequestID: "req-1", followUpExpected: true)
+                let result = reduce(original, event)
+                #expect(result.0 == original)
+                #expect(result.1.isEmpty)
+            }
+        }
     }
 
     // MARK: Determinism

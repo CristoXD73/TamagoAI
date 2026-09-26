@@ -442,3 +442,26 @@ off-LAN exposure).
 | Q6 | REFERENCE_ONLY TextField dictation | **Promoted to the V1 voice path** (D-106): `Speech.framework` is absent on watchOS 27. |
 | Q7, Q9 | REFERENCE_ONLY | **Approved** (later phases). |
 | Q10 | REFERENCE_ONLY XcodeGen `project.yml` | **Rejected as a tool** (D-101). Its `WKCompanionAppBundleIdentifier`/`WKRunsIndependentlyOfCompanionApp` settings are used. |
+
+
+### D-112 Checkpoint A: completion identity repair (D-103 clarification)
+
+- **Decision:** `ackBeatElapsed`, `speechFinished`, `speechCancelled`, and
+  `reactionFinished` carry the request ID captured when the corresponding
+  work starts. The reducer rejects mismatched IDs before applying D-103's
+  existing transition table. No wire-protocol change and no new async work.
+- **Reason:** Checkpoint A reproduced an old speech completion advancing a
+  newer request's speaking state. State-only guards cannot distinguish them.
+- **Alternatives:** relying solely on future task cancellation (insufficient:
+  queued callbacks may still arrive); a second state machine (unnecessary).
+- **Risks:** future effect executors must capture the originating ID, never
+  look up the current ID when a callback arrives. Transcript/capture identity
+  remains a responsibility to settle when capture is implemented; Stage A
+  has no asynchronous capture source.
+- **Device verification required:** cancellation during real speech and a new
+  interaction, once speech exists. Current reducer coverage is UNIT_TESTED_ONLY.
+- **Fallback:** none; keep identity validation in the canonical reducer.
+- **Existing D-103 semantics restored:** offline error envelopes resolve to
+  disconnected; idle/disconnected terminal responses clear request identity;
+  reaction completion preserves follow-up intent until a new interaction or
+  explicit cancellation/background reset.

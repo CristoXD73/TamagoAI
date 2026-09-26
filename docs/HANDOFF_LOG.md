@@ -429,3 +429,202 @@ loop or transport yet — that's Sonnet's Phase 6/7/9 per `MASTER_BRIEF.md`.
 **Do not redo:** `CharacterStateMachine`/`CharacterInteractionController` and
 their tests, `CharacterExpression`/`CharacterArt`/`CharacterView`, the debug
 harness, the `TamagoResponse` public initializer, the D-104 background-reset wiring.
+
+
+---
+
+### 2026-09-26 10:47: Codex: CODEX CHECKPOINT A — independent audit and repair
+
+**Branch:** `claude/great-volta-ogpuw8`.
+**Commit(s):** the commit containing this entry, parent `ab73e87` (Stage A).
+Initial working tree was clean. Reviewed `ab73e87` and preceding project
+normalization `eacf5ff`; no PR opened, no merge, no Stage B work.
+
+**Files changed:** `Apple/Shared/CharacterStateMachine.swift`, its
+`CharacterStateMachineTests.swift`, WatchApp `CharacterView.swift`,
+`TamagoWatchApp.swift`, `DebugStateControlsView.swift`, `docs/DECISIONS.md`
+(D-112), `docs/ACCEPTANCE_TESTS.md`, this log, and
+`docs/screenshots/checkpoint-a/*.png`.
+**Upstream source reused:** None. Original procedural character retained;
+existing attributed SpriteAnimationClock unchanged.
+
+**Baseline:** reproduced before production-source edits. Host and SE 3 40 mm
+watchOS 27 simulator both passed **83 Swift tests** (UNIT_TESTED_ONLY).
+Gateway passed **66/66** (UNIT_TESTED_ONLY). Explicit Watch and iPhone 17
+simulator builds passed. The prior handoff's arithmetic was wrong: **43 existing
++ 40 Stage A tests = 83**, not 43 + 60. `debugGoTo` lives in the Watch target
+and was not unit-tested by that package suite, contrary to the prior handoff.
+The phrase “Verified on-device (simulator)” in that entry means
+SIMULATOR_VERIFIED_ONLY; it is not physical evidence.
+
+Initial sandbox attempts could not write compiler caches or access simulator
+services. Gateway's sandbox run stalled while tests attempted loopback servers.
+Approved reruns succeeded. These were environment failures, not source failures.
+No Swift compiler warnings appeared; Xcode did emit the existing
+`appintentsmetadataprocessor` warning: “Metadata extraction skipped, no
+AppIntents.framework dependency found.” The previous blanket “Warnings: none”
+claim does not reproduce.
+
+**Demonstrated defects and repairs:**
+
+1. **Late completions:** an old speech callback advanced request B from speaking
+   to its reaction. The original event had no identity, so checking only the
+   visual state could not reject it. Added originating request IDs to ack,
+   speech finish/cancel and reaction completion events, with reducer guards.
+   Updated debug callers and documented the local API clarification in D-112.
+   No wire change. UNIT_TESTED_ONLY.
+2. **Terminal identity:** a final idle response, either immediate or after
+   speech, left `activeRequestID` set forever (idle cannot accept
+   `reactionFinished`). Clear identity upon terminal idle/disconnected entry.
+   UNIT_TESTED_ONLY.
+3. **Follow-up lost:** `reactionFinished` used the cancellation-style idle
+   initializer, discarding `followUpExpected` before D-103's idle affordance
+   could use it. Preserve intent on normal completion; activation and
+   cancel/background still clear it. No affordance added. UNIT_TESTED_ONLY.
+4. **Offline envelope mapping:** both existing client offline fixtures resolved
+   to idle rather than D-103's disconnected state. Map error codes
+   `gateway_unavailable`/`disconnected` to disconnected, including the
+   speaking handoff. UNIT_TESTED_ONLY.
+5. **Listening layout:** the original committed `listening.png` shows the label
+   colliding with page dots. Ripple diameter participated in VStack layout,
+   moving the label each frame. Draw it as a background decoration with stable
+   reserved height; inspected the repaired ripple, label and page dots on the
+   40 mm simulator. SIMULATOR_VERIFIED_ONLY.
+6. **Visibility ownership gap:** the only pause inputs were scene/luminance/
+   Reduce Motion. An active scene with the debug page selected did not itself
+   pause the character. Added explicit page selection plus appearance gates;
+   these are rendering visibility, not a second character state machine.
+   Runtime hidden-page tick cessation remains UNVERIFIED (no touch control).
+7. **Repeated preview hook:** `CharacterScreen.onAppear` re-applied the launch
+   state whenever the page reappeared, overwriting debug selections/background
+   reset. Moved it to a once-per-root debug-only hook. Background/reopen stayed
+   idle in the same PID, with the original thinking launch environment still
+   present. SIMULATOR_VERIFIED_ONLY. Manual tab return remains UNVERIFIED.
+8. **Payload logging:** the baseline test log printed entire rejected response
+   payloads, and the same interpolation would print rejected transcripts.
+   Removed associated payloads from the debug diagnostic. Source reviewed;
+   sensitive production-input logging remains UNVERIFIED because Stage A has
+   no real input/transport. Final tests emit state-only diagnostics.
+
+The first four new regressions failed against unchanged reducer code (8
+assertion issues across four test functions, including parameterized fixture
+cases). The full intermediate run had 89 tests. Evidence is in local
+`.build/checkpoint-a/reproduced-defects.log`; subsequent repaired runs passed.
+
+**Tests added (10 functions, parameterized cases counted within each):** stale
+speech completion; terminal idle identity with/without speech; follow-up
+retention; both client offline fixtures; duplicate final response; old response
+after background/new request; all four stale completion kinds across all 12
+states; duplicate speech/reaction completion and case-insensitive IDs; MainActor
+controller state/effect ownership; exhaustive illegal event/state pairs from
+D-103. Existing tests updated for completion identity and corrected follow-up
+semantics. Final breakdown: **50 reducer/controller + 22 protocol + 21 clock =
+93 Swift tests**, host and Watch simulator, all passed (UNIT_TESTED_ONLY).
+Gateway **66/66**, zero failed/skipped/cancelled (UNIT_TESTED_ONLY).
+
+**Audit findings without scope expansion:** controller mutations are synchronous
+and MainActor-isolated; reducer is pure and emits effects only. There are no
+Tasks/timers to retain/cancel in Stage A, no executor, and one TimelineView capped
+at 12 fps. Reduce Motion/inactive/reduced luminance choose the static frame by
+source inspection; actual environment-driven behavior remains UNVERIFIED.
+Existing clock tests cover real elapsed-time/frame boundaries, non-finite input
+and long elapsed times. No clock changes were needed for Stage A's sequences.
+Reaction/ack/speech completion drivers are intentionally absent; preview states
+hold until manually changed. This is a Stage A limitation, not an assertion
+that reactions automatically time out.
+
+Source/diff review found no Stage A additions of network calls, microphone/TTS,
+WatchConnectivity, private APIs, fake background modes, signing/config changes,
+credentials, protocol fields, or upstream artwork. Public model initializers
+are additive Swift API only. No architecture replacement was required.
+
+**Exact build/test commands run (repository root):**
+
+```sh
+# Baseline (logs under .build/checkpoint-a/baseline-*.log)
+swift test --package-path Apple/Shared --scratch-path .build/spm -Xswiftc -warnings-as-errors
+xcodebuild test -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' -derivedDataPath .build/DerivedData
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' -derivedDataPath .build/DerivedData
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/DerivedData
+npm test --prefix Gateway
+# Reproduce failing cases before repairing the reducer
+swift test --package-path Apple/Shared --scratch-path .build/spm -Xswiftc -warnings-as-errors --filter 'oldCompletion|completedIdle|followUpSurvives|clientOffline'
+# Final (logs: final-swift, final-watch-test, final-watch-build, final-phone,
+# final-gateway, release-watch, all .log beneath .build/checkpoint-a)
+swift test --package-path Apple/Shared --scratch-path .build/spm -Xswiftc -warnings-as-errors
+xcodebuild test -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' -derivedDataPath .build/DerivedData SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' -derivedDataPath .build/DerivedData SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/DerivedData SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch -configuration Release -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' -derivedDataPath .build/DerivedData SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+npm test --prefix Gateway
+rg -n 'warning: |Test run with' .build/checkpoint-a/final-{swift,watch-test,phone}.log
+rg -n 'warning: ' .build/checkpoint-a/release-watch.log
+git diff --check
+```
+
+**Simulator evidence:** SIMULATOR_VERIFIED_ONLY. Inspected all original
+screenshots and independently launched/captured all 12 states on the SE 3
+40 mm simulator. Default-size labels/character fit after the listening repair.
+The first sleeping capture caught the system launch screen; retook it after
+launch and inspected the actual character. Committed evidence is under
+`docs/screenshots/checkpoint-a/`. Simulator capture to the external volume
+failed with Cocoa 513; capture to `/tmp` succeeded and files were copied in.
+
+Exact simulator commands below; the local `capture-states.py` repeated the
+launch/screenshot commands for the 12 enum names, with 0.7 seconds between
+launch and capture. Sleeping was then separately retaken. Lifecycle launch
+returned PID 29613 before and after backgrounding (same process).
+
+```sh
+xcrun simctl list devices booted
+xcrun simctl install 8B5287E9-BD6A-422A-B353-B8E3499AE31D .build/DerivedData/Build/Products/Debug-watchsimulator/Tamago.app
+SIMCTL_CHILD_TAMAGO_PREVIEW_STATE=listening xcrun simctl launch --terminate-running-process 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.example.appletamago.watchkitapp
+xcrun simctl io 8B5287E9-BD6A-422A-B353-B8E3499AE31D screenshot /tmp/tamago-checkpoint-a-listening-fixed.png
+python3 .build/checkpoint-a/capture-states.py
+SIMCTL_CHILD_TAMAGO_PREVIEW_STATE=sleeping xcrun simctl launch --terminate-running-process 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.example.appletamago.watchkitapp
+xcrun simctl io 8B5287E9-BD6A-422A-B353-B8E3499AE31D screenshot /tmp/tamago-checkpoint-a/sleeping.png
+SIMCTL_CHILD_TAMAGO_PREVIEW_STATE=thinking xcrun simctl launch --terminate-running-process 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.example.appletamago.watchkitapp
+xcrun simctl io 8B5287E9-BD6A-422A-B353-B8E3499AE31D screenshot /tmp/tamago-checkpoint-a/lifecycle-thinking.png
+xcrun simctl launch 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.apple.Mandrake
+xcrun simctl launch 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.example.appletamago.watchkitapp
+xcrun simctl io 8B5287E9-BD6A-422A-B353-B8E3499AE31D screenshot /tmp/tamago-checkpoint-a/lifecycle-reopened.png
+xcrun simctl terminate 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.example.appletamago.watchkitapp
+xcrun simctl install 8B5287E9-BD6A-422A-B353-B8E3499AE31D .build/DerivedData/Build/Products/Release-watchsimulator/Tamago.app
+SIMCTL_CHILD_TAMAGO_PREVIEW_STATE=thinking xcrun simctl launch 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.example.appletamago.watchkitapp
+xcrun simctl io 8B5287E9-BD6A-422A-B353-B8E3499AE31D screenshot /tmp/tamago-checkpoint-a/release-preview-ignored.png
+strings .build/DerivedData/Build/Products/Release-watchsimulator/Tamago.app/Tamago | rg 'TAMAGO_PREVIEW_STATE|debugGoTo|DebugStateControlsView|Preview request|Manual events'
+```
+
+Release marker scan had no matches (rg exit 1, expected). Release launched
+idle despite `TAMAGO_PREVIEW_STATE=thinking`, with no debug page dots.
+SIMULATOR_VERIFIED_ONLY. No new production launch argument was introduced.
+Final Watch xcresult:
+`.build/DerivedData/Logs/Test/Test-TamagoWatch-2026.09.26_10-44-33--0400.xcresult`.
+
+**Passed:** host and Watch tests, Watch Debug/Release builds, iPhone simulator
+build, Gateway suite, Release hook exclusion, visual/lifecycle simulator checks.
+**Failed:** no outstanding test/build failures; initial sandbox failures and
+pre-repair regressions described above. Zero compiler warnings; metadata
+extraction warnings remain visible and unsuppressed (two in final Watch test,
+two in final phone build, one in final Release build).
+**Physical-device evidence:** none; no DEVICE_VERIFIED claims added and
+DEVICE_TEST_LOG unchanged.
+**Unverified:** real Watch signing/install; wrist/Always-On/reduced luminance;
+Reduce Motion setting behavior; battery/heat and runtime hidden-view ticks;
+manual debug-tab swipe/tap/Crown; accessibility text sizes; iPhone launch;
+all deferred voice/transport/complication behavior. CUA could not access the
+Simulator app, so no touch injection or manual interaction is claimed.
+**Known risks:** future async capture needs its own session identity, and future
+completion executors must capture IDs at scheduling time. Tests run on the
+Watch simulator architecture, not physical arm64_32. These repairs do not
+establish device timing or battery guarantees.
+
+**Recommendation: PASS for the bounded Stage A code checkpoint.** Reproduced
+baseline, repaired demonstrated reducer/layout defects, passed all final suites
+and simulator checks without adding product functionality. Safe to continue
+from this code; physical Stage A acceptance is still UNVERIFIED.
+**Next recommended task (ONE bounded step):** owner-led physical SE 3 Stage A
+character/lifecycle/debug-control acceptance, recording observations in
+DEVICE_TEST_LOG before expanding the product.
+**Do not redo:** existing architecture/art direction, wire protocol, gateway,
+project/signing settings, or deferred Stage B features.

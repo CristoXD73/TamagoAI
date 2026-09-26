@@ -4,7 +4,7 @@ Every item carries exactly one label: `DEVICE_VERIFIED` · `SIMULATOR_VERIFIED_O
 · `UNIT_TESTED_ONLY` · `UNVERIFIED`. No "should work". Platform-sensitive items
 need physical-device evidence in `DEVICE_TEST_LOG.md` before V1 exits.
 
-Status as of **Phase 4 Stage A (2026-09-26, local Xcode 27.0)**. Anything not listed as done is `UNVERIFIED`.
+Status as of **CODEX CHECKPOINT A (2026-09-26, local Xcode 27.0)**. Anything not listed as done is `UNVERIFIED`.
 
 ## A. Build and signing
 | Item | Status |
@@ -12,7 +12,7 @@ Status as of **Phase 4 Stage A (2026-09-26, local Xcode 27.0)**. Anything not li
 | Watch app builds | SIMULATOR_VERIFIED_ONLY (live character + debug harness; SE 3 40 mm watchOS 27.0 simulator, Phase 4) |
 | iPhone companion builds | SIMULATOR_VERIFIED_ONLY (placeholder; iOS 27.0 simulator build, embeds the Watch app; not launched) |
 | Complication extension builds | SIMULATOR_VERIFIED_ONLY (build + embedding only; never added to a face) |
-| Unit tests build (Swift) | UNIT_TESTED_ONLY (83 tests: host `swift test` + SE 3 40 mm simulator) |
+| Unit tests build (Swift) | UNIT_TESTED_ONLY (93 tests: host `swift test` + SE 3 40 mm simulator) |
 | `Apple/Shared/*.swift` compiles | UNIT_TESTED_ONLY (Swift 6.4, zero warnings with `-warnings-as-errors`) |
 | Signed dev app installs on physical Watch | UNVERIFIED (no team configured, Watch not connected) |
 | App launches | SIMULATOR_VERIFIED_ONLY (character screen + debug tab on SE 3 40 mm simulator) |
@@ -22,12 +22,12 @@ Status as of **Phase 4 Stage A (2026-09-26, local Xcode 27.0)**. Anything not li
 | Item | Status |
 |---|---|
 | idle / listening / thinking / speaking / success / error / disconnected render | SIMULATOR_VERIFIED_ONLY (SE 3 40 mm; all 12 wire states, screenshotted via the debug harness) |
-| Sprite frame timing (`SpriteAnimationClock`) | UNIT_TESTED_ONLY (21 tests) + SIMULATOR_VERIFIED_ONLY (drives `CharacterView` on-device) |
-| `CharacterStateMachine` transitions deterministic | UNIT_TESTED_ONLY (60 new tests: legal transitions, illegal-transition rejection, full happy-path/no-speech paths, purity) |
-| Stale response can't overwrite current state | UNIT_TESTED_ONLY (reducer guard, D-103: mismatched ID, no active request, and late-response-after-cancel all dropped) + SIMULATOR_VERIFIED_ONLY (`TamagoResponse.answers(_:)` unchanged) |
-| View disappearance stops expensive animation | SIMULATOR_VERIFIED_ONLY (`TimelineView(.animation(paused:))` gated on scenePhase/isLuminanceReduced/accessibilityReduceMotion, D-102) |
+| Sprite frame timing (`SpriteAnimationClock`) | UNIT_TESTED_ONLY (21 clock tests; hardware timing unverified) |
+| `CharacterStateMachine` transitions deterministic | UNIT_TESTED_ONLY (50 reducer/controller tests: original 40 plus 10 Checkpoint A regressions and adversarial tests) |
+| Stale response can't overwrite current state | UNIT_TESTED_ONLY (request-ID guards on responses and completion callbacks, including cancel/background followed by a new request) |
+| View disappearance stops expensive animation | UNVERIFIED (explicit page-selection and appearance gates added; runtime hidden-page tick counting and manual swipe remain unobserved) |
 | `.background` doesn't corrupt state on reopen | SIMULATOR_VERIFIED_ONLY (D-104: driven to `.thinking`, backgrounded via the watch face, reopened → `.idle`, screenshotted) |
-| 40 mm layout doesn't clip | SIMULATOR_VERIFIED_ONLY |
+| 40 mm layout doesn't clip | SIMULATOR_VERIFIED_ONLY (all 12 states inspected at default text size; listening ripple/label collision repaired; screenshots in `screenshots/checkpoint-a/`) |
 
 ## C. Persistence / frontmost (physical device only)
 Active animation · screen inactivity · wrist lower/raise · Crown dismissal ·
@@ -80,7 +80,7 @@ response can't overwrite newer request · verified on physical Watch + iPhone. *
 ## I. Security
 | Item | Status |
 |---|---|
-| No passcode bypass / wrist spoofing / private APIs / fake background sessions | Rule in `AGENTS.md`; UNVERIFIED in code (no app code yet) |
+| No passcode bypass / wrist spoofing / private APIs / fake background sessions | UNVERIFIED (Checkpoint A source audit found no prohibited APIs/modes; no hardware observation) |
 | Keychain for sensitive client config | UNVERIFIED |
 | No raw Ollama exposed publicly | Gateway defaults to loopback; Ollama stays on its own loopback port. UNVERIFIED on owner's network |
 | TLS/auth plan before remote/cellular | Stated in `ARCHITECTURE.md`; design not yet written |
@@ -90,3 +90,10 @@ response can't overwrite newer request · verified on physical Watch + iPhone. *
 15 min active animation · 15 min repeated requests · no runaway heat · no
 aggressive offline retry · animation pauses when hidden · no hidden high-rate
 timers. **All UNVERIFIED.**
+
+
+Checkpoint A scope: PASS for the existing character/debug slice. Automatic
+acknowledgment, speech and reaction completion drivers remain absent by the
+Stage A boundary; debug states intentionally hold. This is not physical-device
+acceptance. Release ignores `TAMAGO_PREVIEW_STATE` and shows no debug page:
+SIMULATOR_VERIFIED_ONLY. See HANDOFF_LOG for commands, defects and remaining gaps.

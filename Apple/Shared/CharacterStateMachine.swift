@@ -63,17 +63,18 @@ public enum CharacterEvent: Sendable, Equatable {
     /// caller-generated ID becomes `activeRequestID` and is used to build the
     /// `TamagoRequest` in the `sendRequest` effect.
     case transcript(text: String, requestId: UUID)
-    case ackBeatElapsed
+    /// Completion callbacks must carry the ID captured when work began.
+    case ackBeatElapsed(requestId: String)
     /// Progress on the in-flight request (future: gateway tool progress).
     case toolProgress(requestId: String)
     /// A transport response. Dropped unless the current state accepts it
     /// *and* its `requestId` matches `activeRequestID` — the stale-response guard.
     case response(TamagoResponse)
-    case speechFinished
-    case speechCancelled
+    case speechFinished(requestId: String)
+    case speechCancelled(requestId: String)
     /// The reaction's hold/animation has finished (`SpriteAnimationClock.isFinished`
     /// or a ~2.5 s hold, decided by the caller — the reducer reads no clock).
-    case reactionFinished
+    case reactionFinished(requestId: String)
     /// Crown/back/tap-to-stop, or any other user-initiated cancel.
     case cancel
     /// Scene phase → `.background` (D-104).
@@ -133,8 +134,8 @@ public enum CharacterStateMachine {
             next.activeRequestID = request.requestId
             return (next, [.sendRequest(request)])
 
-        case .ackBeatElapsed:
-            guard state.visual == .acknowledging else { return ignored(state, event) }
+        case let .ackBeatElapsed(requestId):
+            guard matches(requestId, state.activeRequestID), state.visual == .acknowledging else { return ignored(state, event) }
             return (with(state, visual: .thinking, now: now), [])
 
         case let .toolProgress(requestId):
@@ -147,15 +148,18 @@ public enum CharacterStateMachine {
             else { return ignored(state, event) }
             return handle(response, from: state, now: now)
 
-        case .speechFinished, .speechCancelled:
-            guard state.visual == .speaking else { return ignored(state, event) }
+        case let .speechFinished(requestId), let .speechCancelled(requestId):
+            guard matches(requestId, state.activeRequestID), state.visual == .speaking else { return ignored(state, event) }
             var next = with(state, visual: state.pendingReaction ?? .idle, now: now)
             next.pendingReaction = nil
+            if next.visual == .idle || next.visual == .disconnected { next.activeRequestID = nil }
             return (next, [])
 
-        case .reactionFinished:
-            guard reactionMoods.contains(state.visual) else { return ignored(state, event) }
-            return (idle(now: now), [])
+        case let .reactionFinished(requestId):
+            guard matches(requestId, state.activeRequestID), reactionMoods.contains(state.visual) else { return ignored(state, event) }
+            var next = idle(now: now)
+            next.followUpExpected = state.followUpExpected
+            return (next, [])
 
         case .cancel, .backgrounded:
             // Legal from any state, including a no-op from `.idle`.
@@ -189,6 +193,7 @@ public enum CharacterStateMachine {
         if response.speechText.isEmpty {
             next.visual = mood
             next.pendingReaction = nil
+            if mood == .idle || mood == .disconnected { next.activeRequestID = nil }
             return (next, [.playHaptic(response.haptic)])
         } else {
             next.visual = .speaking
@@ -203,7 +208,11 @@ public enum CharacterStateMachine {
     /// (TamagoCharacterState's forward-compatible `init(from:)`), so this is a
     /// defensive fallback, not the common path.
     private static func reactionMood(for response: TamagoResponse) -> TamagoCharacterState {
-        TamagoCharacterState.reactionStates.contains(response.characterState) ? response.characterState : .idle
+        if response.status == .error,
+           response.error?.code == .gatewayUnavailable || response.error?.code == .disconnected {
+            return .disconnected
+        }
+        return TamagoCharacterState.reactionStates.contains(response.characterState) ? response.characterState : .idle
     }
 
     private static func matches(_ candidate: String?, _ active: String?) -> Bool {
@@ -224,7 +233,7 @@ public enum CharacterStateMachine {
 
     private static func ignored(_ state: CharacterState, _ event: CharacterEvent) -> (CharacterState, [CharacterEffect]) {
         #if DEBUG
-        print("CharacterStateMachine: ignored \(event) while in \(state.visual)")
+        print("CharacterStateMachine: ignored event while in \(state.visual)")
         #endif
         return (state, [])
     }

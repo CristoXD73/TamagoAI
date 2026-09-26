@@ -37,7 +37,11 @@ struct DebugStateControlsView: View {
             }
 
             Section {
-                Button("reactionFinished") { controller.apply(.reactionFinished) }
+                Button("reactionFinished") {
+                    if let id = controller.state.activeRequestID {
+                        controller.apply(.reactionFinished(requestId: id))
+                    }
+                }
                 Button("cancel") { controller.apply(.cancel) }
             } header: {
                 Text("Manual events")
@@ -77,7 +81,9 @@ extension CharacterInteractionController {
             apply(.transcript(text: "Preview request.", requestId: UUID()), now: now)
         case .thinking:
             debugGoTo(.acknowledging)
-            apply(.ackBeatElapsed, now: Date())
+            if let id = state.activeRequestID {
+                apply(.ackBeatElapsed(requestId: id), now: Date())
+            }
         case .toolRunning:
             debugGoTo(.thinking)
             if let requestId = state.activeRequestID {
