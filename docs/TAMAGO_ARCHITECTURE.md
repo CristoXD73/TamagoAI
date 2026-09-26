@@ -2,8 +2,9 @@
 
 This diagram describes intended responsibilities, **UNVERIFIED** as an
 end-to-end system. [DECISIONS.md](DECISIONS.md) is authoritative; see
-[HANDOFF_LOG.md](HANDOFF_LOG.md) for component-specific test evidence. It does
-not assert that the current character branch implements voice or transport.
+[HANDOFF_LOG.md](HANDOFF_LOG.md) for component-specific test evidence. As of
+D-116 the direct Watch → Mac route, pairing and voice input exist and are
+simulator-verified. The iPhone relay is still planned.
 
 ```mermaid
 flowchart TB
@@ -26,7 +27,7 @@ flowchart TB
     tools[Tools / memory / automations — future, Mac-owned]
     app <-->|WatchConnectivity relay — planned| phone
     phone <-->|Protocol v1 — LAN| gateway
-    app <-->|Preferred direct route — LAN| gateway
+    app <-->|Direct HTTP to tamagoai.local — built, D-116| gateway
     gateway <--> ai
     ai <-.->|Future orchestration via gateway| tools
     gateway <-.->|Authorization and execution boundary| tools
@@ -50,5 +51,4 @@ Ollama exposure; remote/cellular transport requires a separate reviewed design.
 The Mermaid block can be embedded in the GitHub README. Its future raster
 export is `docs/media/architecture.png`; see [capture guide](MEDIA_CAPTURE_GUIDE.md).
 For protocol fields use [PROTOCOL_V1.md](PROTOCOL_V1.md), and for detailed component
-boundaries consult [ARCHITECTURE.md](ARCHITECTURE.md) together with newer decisions
-(the architecture overview retains historical Phase 1 status text).
+boundaries consult [ARCHITECTURE.md](ARCHITECTURE.md) together with newer decisions.

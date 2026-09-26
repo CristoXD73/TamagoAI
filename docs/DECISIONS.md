@@ -606,6 +606,10 @@ off-LAN exposure).
 
 ### D-115 Watch↔Mac transport: a real HTTP client executing the existing effect contract, nothing more
 
+> **Partly superseded by D-116:** `GatewayReachabilityMonitor` and its fixed
+> 20 s poll were removed (event-driven reachability + D-107's backoff instead),
+> and `checkHealth()` became `probe()`. The transport itself stands.
+
 - **Decision:** the Watch-side gap was never the protocol or the Mac gateway —
   both already existed (`Gateway/src/server.js`: request IDs, timeouts,
   dedupe, bearer auth, timing-safe comparison, loopback-only enforcement when
@@ -691,3 +695,133 @@ off-LAN exposure).
 - **Fallback:** none needed for the transport itself — `GatewayClient` never
   throws, so a missing/unreachable gateway degrades to the `.disconnected`
   mood the reducer already defines, not a crash or a frozen creature.
+
+### D-116 Pairing, discovery by name, voice input, and the caller-supplied beats
+
+- **Platform finding that shapes everything here (checked, not assumed):** Apple
+  TN3135 *Low-level networking on watchOS* (revised 2026-07-16) classes
+  Network.framework, `NWBrowser`/`NetService` (Bonjour), `NWConnection`,
+  `NWPathMonitor`, and `URLSessionStreamTask`/`URLSessionWebSocketTask` as
+  low-level networking, which watchOS **blocks** for ordinary apps (allowed only
+  for active audio streaming, CallKit calls, or a tvOS DeviceDiscoveryUI
+  listener). A blocked `NWConnection` sits in `.waiting(ENETDOWN)`; an
+  `NWPathMonitor` stays `.unsatisfied`. **The simulator always allows it**, so
+  Watch-side Bonjour would pass every simulator test and fail on hardware.
+  Only URLSession HTTP(S) is available to TamagoAI. This confirms D-107's "no
+  sockets, streaming, or Network.framework".
+- **Discovery:** the gateway publishes, through macOS's own `/usr/bin/dns-sd -P`
+  (no npm dependency), both a `_tamagoai._tcp` Bonjour service and a fixed mDNS
+  hostname, **`tamagoai.local`**, pointing at its LAN IPv4 (re-published if the
+  Mac's address changes). The Watch uses `http://tamagoai.local:8787` through
+  plain URLSession, which resolves `.local` names via the system resolver — the
+  high-level path. No IP address is ever typed. This refines D-107's
+  `http://<mac>.local:8787` idea: a *fixed* name means the Watch doesn't need to
+  learn each Mac's hostname. Advertising happens only on a non-loopback bind
+  (`TAMAGO_HOST=0.0.0.0`) and can be disabled (`TAMAGO_ADVERTISE=0`). **Limit:**
+  one TamagoAI gateway per LAN (a second one conflicts on the name).
+- **Pairing (PROTOCOL_V1 §14):** the gateway now creates a persistent identity
+  once — a public `gatewayId` and a random 256-bit bearer token — in
+  `~/Library/Application Support/TamagoAI/gateway.json` (file 0600, directory
+  0700); `TAMAGO_TOKEN` still overrides the token. At startup it prints a
+  6-digit pairing code to the owner's terminal: valid 10 minutes, single use,
+  closed after 5 wrong codes. `POST /v1/pair {pairingCode}` returns
+  `{gatewayId, gatewayName, token}`. The Watch stores the token per **D-109**
+  (Keychain generic password, service `<bundle id>.gateway`, account `token`,
+  `AfterFirstUnlockThisDeviceOnly`, non-synchronizable) and the non-secret rest
+  in UserDefaults. Restarting either side doesn't require re-pairing. The
+  loopback `TAMAGO_ALLOW_NO_AUTH=1` dev mode is unchanged and has no pairing.
+  This is direct Watch pairing; D-108's iPhone-provisioned token remains the
+  planned path if direct LAN proves unreliable on hardware (D-107 fallback).
+- **What pairing protects, and what it doesn't:**
+  - Protected: a device on the LAN without the token cannot use
+    `/v1/request` (verified live: 401 with no token and with a guessed token).
+    The code can't be reused (410) or guessed online (5 attempts per window,
+    10⁶ codes). The token never lives in Git, logs, UserDefaults, or iCloud.
+  - **Not protected:** V1 is plain HTTP on the LAN (already an accepted,
+    documented risk). Someone who can observe LAN traffic can read the token
+    during pairing or any request. Nothing authenticates the *gateway* to the
+    Watch: a malicious device that claims `tamagoai.local` could receive a
+    request and the token. `gatewayId` only catches an *honest* second gateway,
+    because it's public. There's no token rotation, expiry, or per-device
+    revocation (re-pair by moving `gateway.json` aside, which unpairs every
+    Watch). Closing these needs TLS with pinning or a request-signing scheme
+    (e.g. an HMAC so the token is never sent). That's a future decision.
+- **Reachability (supersedes D-115's monitor):** event-driven first. One probe
+  (`GET /v1/health`, 3 s) when the scene becomes active. Every request outcome
+  counts as a probe (`GatewayExchange.reachedGateway`: a gateway-sent timeout
+  proves the Mac is there, a synthesized one doesn't). A connected link is
+  **never polled**. Polling happens only while the Mac is missing, on D-107's
+  5 s → 15 s → 60 s (cap) backoff, and only while the scene is active. Nothing
+  runs while inactive or backgrounded. `NWPathMonitor` was considered and is
+  unavailable (TN3135). The pure `TransportState` (searching, connecting,
+  connected, reconnecting, offline) drives the reducer's existing
+  `.routeLost`/`.routeRestored`. Energy cost on hardware is **UNVERIFIED**.
+- **Voice input (D-106, implemented):** "hold ≥ 0.45 s anywhere" on the creature
+  (CREATURE_SPEC §4) applies `.userActivated`, then calls WatchKit's public,
+  non-deprecated `presentTextInputController(withSuggestions:allowedInputMode: .plain)`
+  on `WKApplication.shared().visibleInterfaceController`. That works under the
+  SwiftUI app lifecycle (verified in the simulator), and `.plain` goes straight
+  to dictation on a device. The returned text becomes `.transcript`; cancel or
+  empty goes to idle. A plain tap still belongs to the creature. The system
+  sheet covers the creature while it's up (accepted by D-106). If the Watch is
+  unpaired, the trigger opens pairing instead. No custom microphone pipeline
+  (`Speech.framework` is absent from the watchOS 27 SDK). **Actual dictation is
+  UNVERIFIED:** the simulator has no speech input, and its keystroke injection
+  doesn't reach the Scribble canvas. DEBUG runs can pass `TAMAGO_DEBUG_SUGGESTIONS`
+  so tapping a suggestion exercises the real sheet → text → request path.
+- **Caller-supplied beats (D-103 gap closed):** the reducer reads no clock, so
+  D-103 left `ackBeatElapsed` (~0.6 s) and `reactionFinished` (≤ 2.5 s hold) to
+  the caller. Nothing supplied them. So a slow answer never showed `thinking`,
+  and **every answer left the creature stuck in its reaction mood forever**.
+  `TamagoConnection` now schedules both on the transition; stale beats are
+  dropped by the reducer's state + requestId guard. Verified live: idle → listening →
+  acknowledging → thinking (`slow 6000`) → speaking → reaction → idle.
+- **Offline keeps idle life:** CREATURE_SPEC §5.3 `disconnected` says "otherwise
+  its idle life continues normally. Not sad, not alarming," but the renderer ran
+  the idle habitat only for `.idle`. It now runs it for `.disconnected` too, so
+  an offline or unpaired creature keeps wandering instead of sitting on a static
+  pose. This is existing behavior routed differently, not new motion. The
+  spec's glow-missing embodiment still needs an approved prototype. **Flagged
+  for owner review.**
+- **Semantic states:** `CreatureSemanticState` (idle, listening, sending,
+  thinking, receiving, speaking, offline, recovering) is *derived* from the
+  canonical visual state and the link phase. It isn't a second state machine and
+  isn't UI. `receiving` is the reaction mood that follows an answer. It's used by
+  tests and DEBUG diagnostics until approved motion embodies it.
+- **Sound:** `CreatureSoundCue` defines six names so assets can drop in by file
+  name (`creature_<cue>.caf/.m4a/.wav`). Only the three CREATURE_SPEC §9.3
+  sanctions are wired: listening → `curious` (bloop), acknowledging →
+  `acknowledge` (pop), happy/success → `pleased` (burble). Idle-life sounds are
+  forbidden by the spec, so `thinking`/`uncertain`/`sleepy` exist but nothing
+  plays them. Sound is off by default (spec §9.1), limited to one cue per 1.5 s,
+  and non-blocking (`AVAudioPlayer`). No approved assets exist: DEBUG builds
+  fall back to generated **DEVELOPMENT PLACEHOLDER** tones (short, soft,
+  enveloped sines), and Release builds play nothing. Audibility and
+  silent-mode behavior are **UNVERIFIED**.
+- **Speech:** still off by default. The DEBUG panel has a one-off "Hello. I'm
+  Tamago." (`speak(_:force:)`) through the real path, plus enabled/rate/pitch/stop
+  controls. Verified: the synthesizer runs about 3 s in the simulator and its
+  delegate completion fires. **Audible output UNVERIFIED.**
+- **Known discrepancy, not changed:** CREATURE_SPEC §9.2 wants `.start` on
+  listening and `.click` on acknowledging. The reducer emits `.click` on
+  `userActivated`. Aligning it touches the reducer's tested contract, so it's
+  left for an owner-approved haptic pass.
+- **Full-screen invariant:** the creature stage must equal the display
+  (162×197 pt on SE 3 40 mm, previously regressed to 158×131 pt because
+  `.ignoresSafeArea()` was on the background only). It's recorded in AGENTS.md §5
+  and at the fix site. DEBUG builds now measure the stage against
+  `WKInterfaceDevice.screenBounds` and show ✓/✗ in diagnostics, printing
+  `STAGE REGRESSION` on failure. An automated layout test needs a UI-test target
+  or library that doesn't exist yet.
+- **Verification:** 137 host Swift tests; 79 gateway tests. Live in the SE 3 40 mm
+  simulator against a LAN-mode gateway: `tamagoai.local` resolves via the system
+  resolver, pairing, Keychain persistence across relaunch, authenticated
+  requests, hold → dictation sheet → request → reaction → idle, gateway stop →
+  graceful `disconnected` with idle life → gateway restart → automatic recovery.
+  All of this is **SIMULATOR_VERIFIED_ONLY**. A physical Watch has not been
+  tried, and TN3135 says the simulator is exactly where networking behavior can
+  differ.
+- **Device verification required:** `tamagoai.local` from a physical Watch on
+  Wi-Fi *and* while proxied through the iPhone (turn iPhone Wi-Fi and Bluetooth
+  off in Settings, per TN3135), real dictation, audible speech and sounds with
+  silent mode on and off, haptics, and energy.

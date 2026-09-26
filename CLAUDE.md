@@ -13,6 +13,7 @@ adds Claude-specific notes.
 5b. `docs/CREATURE_SPEC.md`: how the creature behaves (read before touching any character code)
 5c. `docs/VISUAL_APPROVAL_GATE.md` + `docs/ANIMATION_PROTOTYPE_PLAN.md`: **no character motion ships without an owner-approved visual prototype**
 6. Your role's section in `docs/handoff/TamaWatch_COMPLETE_HANDOFF.md`
+7. `docs/PRODUCT_PRESENTATION.md` — mandatory before touching the README, a website or product presentation
 
 ## Repository map
 
@@ -37,7 +38,7 @@ cd Gateway
 npm test                               # all gateway tests, no network or Ollama needed
 npm run fixtures                       # regenerate gateway-derived fixtures after protocol changes
 TAMAGO_ALLOW_NO_AUTH=1 npm start       # loopback-only dev server on :8787
-TAMAGO_TOKEN=$(openssl rand -hex 24) TAMAGO_HOST=0.0.0.0 npm start   # LAN, for a physical Watch
+TAMAGO_HOST=0.0.0.0 npm start          # LAN: persistent token, prints a pairing code, publishes tamagoai.local
 ../scripts/smoke.sh                    # in another terminal
 
 # Apple (from the repo root, local Mac with Xcode 27 only)

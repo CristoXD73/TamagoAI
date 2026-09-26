@@ -72,7 +72,7 @@ response can't overwrite newer request · verified on physical Watch + iPhone. *
 | One local AI adapter (Ollama) | UNVERIFIED_LOCAL_PROVIDER (stub-fetch unit tests only) |
 | Provider failure → structured error | UNIT_TESTED_ONLY |
 | Tests run without Ollama | UNIT_TESTED_ONLY |
-| Secrets from env, not Git | UNIT_TESTED_ONLY (config tests; refuses to start without token) |
+| Secrets from env, not Git | UNIT_TESTED_ONLY (config tests: token from `TAMAGO_TOKEN` or the owner-only identity file, never the repo; no-auth only on loopback) |
 | Request logs have IDs | UNIT_TESTED_ONLY |
 | Sensitive content not logged | UNIT_TESTED_ONLY |
 | Runs on the owner's Mac mini | UNVERIFIED |

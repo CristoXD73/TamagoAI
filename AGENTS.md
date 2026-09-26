@@ -7,6 +7,9 @@ Apple Tamago (formerly "TamaWatch") is a Tamagotchi-style companion for Apple Wa
 The Watch is the **face**; the owner's Mac mini is the **brain**. Read
 `docs/MASTER_BRIEF.md` first, then the latest entry in `docs/HANDOFF_LOG.md`.
 
+**Before modifying the README, a website, or any product presentation, read
+`docs/PRODUCT_PRESENTATION.md`.** It's mandatory, not optional background.
+
 ## 1. Stay in your lane
 
 - **Do not try to finish the whole product.** Do your assigned stage only
@@ -80,6 +83,18 @@ Label every claim about behavior with exactly one of:
 - No hidden high-rate timers, no tight retry loops, and no animation work that
   continues after its view disappears. Battery is a product constraint.
 - Keep model/network code separate from animation/rendering code.
+- **Full-screen invariant (never regress):** the creature stage fills the whole
+  Watch display. That's **162×197 pt on the Apple Watch SE 3 40 mm simulator**
+  (verified). A regression once shrank it to 158×131 pt because
+  `.ignoresSafeArea()` was applied to the black *background* only, leaving the
+  content in the safe area. No TabView, debug, settings, pairing or network UI
+  may shrink the stage. DEBUG builds show `Stage W×H ✓/✗` in Diagnostics and
+  print `STAGE REGRESSION` on failure; check it after any layout change
+  (D-115, D-116).
+- **watchOS networking:** the Watch uses URLSession HTTP only. Network.framework,
+  Bonjour browsing (`NWBrowser`/`NetService`), `NWPathMonitor` and WebSocket or
+  stream tasks are blocked on physical Watches (Apple TN3135), even though the
+  simulator allows them. Don't build on them (D-116).
 
 ## 6. Hand off properly
 

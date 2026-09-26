@@ -81,34 +81,66 @@ If CoreSimulator is unavailable in a restricted session, report that limitation;
 do not change signing, provisioning, targets or deployment settings. Physical
 deployment is a separate owner-led task.
 
-## Testing the Watch ↔ Mac loop (D-115)
+## The Watch ↔ Mac loop (D-115, D-116)
 
-The Watch app now has a real HTTP client (`Apple/Shared/GatewayTransport.swift`,
-`Apple/WatchApp/TamagoConnection.swift`) that executes
-`CharacterStateMachine`'s `sendRequest`/`cancelRequest` effects against a real
-gateway — see D-115. There is no production voice-input trigger yet (that
-needs its own approved visual prototype per the Visual Approval Gate), so the
-proof path is the DEBUG-only harness:
+Two gateway modes:
+
+| Mode | Command (from `Gateway/`) | Auth | Discovery |
+|---|---|---|---|
+| **Paired / LAN** (the real product path) | `TAMAGO_HOST=0.0.0.0 npm start` | persistent token, obtained by pairing | publishes `tamagoai.local` + `_tamagoai._tcp` |
+| **Loopback dev** | `TAMAGO_ALLOW_NO_AUTH=1 npm start` | none, `127.0.0.1` only | none |
+
+In LAN mode the gateway prints a 6-digit **pairing code** (10 min, single use).
+Its identity lives in `~/Library/Application Support/TamagoAI/gateway.json`
+(`TAMAGO_STATE_DIR` overrides the directory, e.g. for a throwaway test).
+Restarting keeps the same token, so a paired Watch stays paired. Moving that
+file aside unpairs every Watch.
+
+**On a Watch (simulator or device):** an unpaired app offers pairing on first
+launch. Enter the code there, or hold on the creature and it asks. After that,
+**hold ≥ 0.45 s anywhere on the creature** to talk: system dictation opens, the
+text goes to the Mac, and the creature reacts. The Watch finds the Mac at
+`http://tamagoai.local:8787`. Nobody types an address.
 
 ```sh
-# Terminal 1 — start the gateway with the deterministic mock provider
-cd Gateway && TAMAGO_ALLOW_NO_AUTH=1 npm start
-
-# Terminal 2 — build, install, launch on a booted Watch simulator
-# (the simulator reaches the gateway via 127.0.0.1, which only works from the
-# simulator — a physical Watch needs TAMAGO_GATEWAY_URL set to the Mac's LAN
-# address instead)
-xcodebuild -scheme TamagoWatch -configuration Debug \
-  -destination "id=$TAMAGO_SIM_UDID" -derivedDataPath .build/DerivedData build
-xcrun simctl install "$TAMAGO_SIM_UDID" .build/DerivedData/Build/Products/Debug-watchsimulator/Tamago.app
-xcrun simctl launch "$TAMAGO_SIM_UDID" "$TAMAGO_SIM_BUNDLE_ID"
+# check discovery from the Mac itself (same resolver path URLSession uses)
+dscacheutil -q host -a name tamagoai.local
+curl -s http://tamagoai.local:8787/v1/health
 ```
 
-On the Watch, open the Debug tab (swipe from the character screen) → "Live
-gateway" section → tap any command (`ping`, `state happy`, …). The gateway's
-own log line and the Watch's "Transport diagnostics" section should show the
-same request ID and a real round-trip time. `Gateway/src/providers/mock.js`
-documents every command the mock provider understands.
+**Simulator limits and DEBUG launch hooks.** The simulator has no dictation, and
+`simctl`/automation keystrokes don't reach the Watch's Scribble canvas. These
+DEBUG-only environment variables (`SIMCTL_CHILD_…` on `xcrun simctl launch`)
+bridge that without changing what's being tested:
+
+| Variable | Effect |
+|---|---|
+| `TAMAGO_DEBUG_PAIRING_CODE=123456` | calls the same `pair(code:)` the pairing sheet uses |
+| `TAMAGO_DEBUG_SUGGESTIONS="ping,state happy"` | the real system dictation sheet shows these as suggestions to tap |
+| `TAMAGO_GATEWAY_URL` / `TAMAGO_GATEWAY_TOKEN` | developer override of the gateway (e.g. `http://127.0.0.1:8787` for loopback dev mode) |
+| `TAMAGO_PREVIEW_STATE=<state>` | jump to a character state (screenshots) |
+
+```sh
+SIMCTL_CHILD_TAMAGO_DEBUG_PAIRING_CODE=394879 \
+  xcrun simctl launch "$TAMAGO_SIM_UDID" "$TAMAGO_SIM_BUNDLE_ID"
+SIMCTL_CHILD_TAMAGO_DEBUG_SUGGESTIONS="state happy,slow 6000" \
+  xcrun simctl launch "$TAMAGO_SIM_UDID" "$TAMAGO_SIM_BUNDLE_ID"
+```
+
+The Debug tab (swipe left from the creature, DEBUG builds only) shows
+**Diagnostics** first: semantic creature state, link phase, discovery, paired
+Mac, gateway URL, provider, last request ID and round trip, speech, dictation,
+last transport error, and **Stage W×H ✓/✗** (the full-screen invariant, AGENTS.md §5).
+It also has the talk trigger, live gateway commands, pairing and unpairing,
+the "Hello. I'm Tamago." speech test with rate/pitch, and creature-sound tests
+(DEVELOPMENT PLACEHOLDER tones, since no approved assets exist).
+`Gateway/mock/README.md` lists the mock provider's commands; `slow <ms>` is
+useful for seeing `thinking`.
+
+**Physical Watch:** everything above is `SIMULATOR_VERIFIED_ONLY`. Apple TN3135
+warns that the simulator never enforces watchOS's networking restrictions. Test
+on hardware both on Wi-Fi and with the paired iPhone's Wi-Fi *and* Bluetooth off
+in Settings (D-116, device verification list).
 
 ## Assets, protocol and evidence
 

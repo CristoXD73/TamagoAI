@@ -1,8 +1,10 @@
 # Architecture
 
-Status: Phase 1. Only the **gateway** exists and is tested. Everything on the
-Apple side is a plan for the Xcode agents; Opus confirms or changes it in
-`DECISIONS.md`.
+Status (2026-09-26): the gateway, the Watch app's character/state machine, the
+Watch's direct HTTP transport, pairing and `tamagoai.local` discovery exist and
+are tested (D-114–D-116). The iPhone relay/configuration companion in the
+diagram is still **planned, not built**. Nothing has run on a physical Watch.
+`DECISIONS.md` is authoritative.
 
 ## System
 
@@ -13,9 +15,9 @@ Apple side is a plan for the Xcode agents; Opus confirms or changes it in
 │ SpriteAnimationClock   │ responses   │  HTTP    │  GET  /v1/protocol                  │
 │                  InteractionController├─────────▶│  POST /v1/request ─▶ AIProvider     │
 │  voice in ─┘   TTS out   haptics     │ protocol │        (auth, validation, timeout,  │
-│                  TransportRouter     │   v1     │         dedupe, structured errors)  │
-│                   ├ DirectTransport ─┘          │            ├ MockProvider (tests)   │
-│                   └ PhoneRelayTransport ─┐      │            └ OllamaProvider (unverified)
+│  TamagoConnection → GatewayClient    │   v1     │         dedupe, structured errors)  │
+│  (direct HTTP: tamagoai.local)       │          │  POST /v1/pair (pairing code)       │
+│  [PhoneRelayTransport: planned] ─┐   │          │   ├ MockProvider (tests) / Ollama   │
 │ Complication (WidgetKit snapshot)        │      │                  ▼                  │
 └──────────────────────────────────────────┘      │            local tools (later)      │
                      WatchConnectivity ▼          └─────────────────────────────────────┘
@@ -44,8 +46,15 @@ Apple side is a plan for the Xcode agents; Opus confirms or changes it in
   `X-Request-Id` header.
 - `src/providers/`: `mock.js` (deterministic), `ollama.js`
   (`UNVERIFIED_LOCAL_PROVIDER`), `provider.js` (contract + `ProviderError`).
-- `src/config.js` + `src/cli.js`: env config. Refuses to start without a token
-  unless `TAMAGO_ALLOW_NO_AUTH=1` on loopback. Warns when binding all interfaces.
+- `src/config.js` + `src/cli.js`: env config. Without `TAMAGO_TOKEN`, uses the
+  persistent identity token (`src/identity.js`: `gatewayId` + random 256-bit
+  token in `~/Library/Application Support/TamagoAI/gateway.json`, 0600/0700).
+  `TAMAGO_ALLOW_NO_AUTH=1` is loopback-only and has no identity or pairing.
+  Warns when binding all interfaces.
+- `src/pairing.js`: the 6-digit, 10-minute, single-use, 5-attempt pairing window
+  behind `POST /v1/pair` (PROTOCOL_V1 §14).
+- `src/advertise.js`: publishes `_tamagoai._tcp` and `tamagoai.local` via
+  `/usr/bin/dns-sd -P` on a LAN bind; re-publishes if the Mac's IP changes.
 - Zero npm dependencies. Node ≥22.
 
 ## Security posture (V1)
@@ -69,6 +78,11 @@ Apple side is a plan for the Xcode agents; Opus confirms or changes it in
     exercised.
 - Future privileged tools (e.g. restarting services) need their own
   authorization design. The mock `tool` command only *simulates* this.
+- **Pairing (D-116):** a Watch gets the token only by entering the code the
+  gateway shows its owner; the token is then kept in the Watch Keychain (D-109).
+  Unpaired LAN devices get 401 on `/v1/request` (verified live). What this does
+  **not** protect against is listed in D-116: plain-HTTP sniffing and
+  impersonation of `tamagoai.local`, and there's no rotation or per-device revocation.
 - **Replay protection:** the gateway's requestId dedupe (`server.js`, 256
   entries / 10 min) already means a replayed request is answered once, not
   re-run against the provider — but nothing currently rejects a replayed
@@ -76,12 +90,9 @@ Apple side is a plan for the Xcode agents; Opus confirms or changes it in
   there is no timestamp/nonce freshness check. Acceptable for a
   loopback/trusted-LAN, single-user tool; would need revisiting before any
   design that isn't "one owner's Mac, one owner's Watch."
-- **Accidental discovery by unrelated devices:** not a concern for loopback
-  (the current, only-verified path). If a future LAN deployment adds
-  discovery (task's Bonjour/mDNS ask, not built this pass — see D-115), the
-  service should advertise/respond in a way that doesn't invite other devices
-  on the same network to find and probe it; bearer-token auth already means
-  discovery alone can't reach `/v1/request`, but `/v1/health` and
-  `/v1/protocol` are currently unauthenticated by design (D-115 leans on this
-  for the reachability monitor) and disclose gateway version/provider —
-  low-sensitivity, but worth remembering if the trust boundary ever changes.
+- **Discovery by unrelated devices:** the LAN-mode gateway *does* advertise
+  itself now (D-116), so anything on the network can find it. Discovery alone
+  can't reach `/v1/request` (token required). `/v1/health` and `/v1/protocol`
+  stay unauthenticated by design, since the Watch probes them. They disclose
+  gateway version, provider name and the public `gatewayId`. Loopback dev mode
+  doesn't advertise.
