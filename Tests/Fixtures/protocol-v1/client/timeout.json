@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000001",
+  "status": "error",
+  "text": "That took too long. Try again?",
+  "speechText": "That took too long. Try again?",
+  "characterState": "confused",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "timeout",
+    "message": "No HTTP response before the client timeout.",
+    "retryable": true
+  }
+}

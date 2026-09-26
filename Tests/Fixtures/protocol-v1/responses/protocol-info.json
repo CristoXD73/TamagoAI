@@ -1,0 +1,60 @@
+{
+  "protocolVersion": 1,
+  "supportedProtocolVersions": [
+    1
+  ],
+  "gatewayVersion": "0.1.0",
+  "provider": "mock",
+  "authRequired": true,
+  "inputTypes": [
+    "text"
+  ],
+  "characterStates": [
+    "sleeping",
+    "idle",
+    "listening",
+    "acknowledging",
+    "thinking",
+    "toolRunning",
+    "speaking",
+    "happy",
+    "success",
+    "confused",
+    "error",
+    "disconnected"
+  ],
+  "reactionStates": [
+    "idle",
+    "happy",
+    "success",
+    "confused",
+    "error"
+  ],
+  "haptics": [
+    "none",
+    "click",
+    "success",
+    "failure",
+    "notification",
+    "retry"
+  ],
+  "errorCodes": [
+    "invalid_request",
+    "unsupported_protocol",
+    "auth_failed",
+    "not_found",
+    "method_not_allowed",
+    "payload_too_large",
+    "internal_error",
+    "provider_error",
+    "provider_unavailable",
+    "timeout",
+    "gateway_unavailable",
+    "disconnected"
+  ],
+  "limits": {
+    "maxBodyBytes": 16384,
+    "maxInputTextChars": 2000,
+    "maxResponseTextChars": 1000
+  }
+}

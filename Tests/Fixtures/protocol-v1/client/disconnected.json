@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000001",
+  "status": "error",
+  "text": "I'm offline right now.",
+  "speechText": "I'm offline right now.",
+  "characterState": "disconnected",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "disconnected",
+    "message": "No route to the gateway (no Wi-Fi and iPhone unreachable).",
+    "retryable": true
+  }
+}

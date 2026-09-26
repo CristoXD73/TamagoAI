@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": null,
+  "status": "error",
+  "text": "My home brain didn't recognize me.",
+  "speechText": "My home brain didn't recognize me.",
+  "characterState": "error",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "auth_failed",
+    "message": "Missing or invalid bearer token.",
+    "retryable": false
+  }
+}

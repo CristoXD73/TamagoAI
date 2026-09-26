@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000003",
+  "status": "ok",
+  "text": "Jellyfin is back online.",
+  "speechText": "Done. Jellyfin is back online.",
+  "characterState": "success",
+  "haptic": "success",
+  "followUpExpected": false
+}

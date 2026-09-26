@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000002",
+  "status": "ok",
+  "text": "Now I'm happy.",
+  "speechText": "Now I'm happy.",
+  "characterState": "happy",
+  "haptic": "success",
+  "followUpExpected": false
+}

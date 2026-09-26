@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000007",
+  "status": "error",
+  "text": "We speak different protocol versions. Please update me.",
+  "speechText": "We speak different protocol versions. Please update me.",
+  "characterState": "confused",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "unsupported_protocol",
+    "message": "protocolVersion 2 is not supported; supported: 1.",
+    "retryable": false
+  }
+}

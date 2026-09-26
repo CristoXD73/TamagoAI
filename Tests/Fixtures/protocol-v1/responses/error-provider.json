@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000009",
+  "status": "error",
+  "text": "My thinking engine had a problem.",
+  "speechText": "My thinking engine had a problem.",
+  "characterState": "error",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "provider_error",
+    "message": "Mock provider was asked to fail.",
+    "retryable": true
+  }
+}

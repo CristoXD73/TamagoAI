@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000006",
+  "status": "error",
+  "text": "I didn't understand that request.",
+  "speechText": "I didn't understand that request.",
+  "characterState": "confused",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "invalid_request",
+    "message": "text must be a string.",
+    "retryable": false
+  }
+}

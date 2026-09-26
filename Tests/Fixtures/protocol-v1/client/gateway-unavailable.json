@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000001",
+  "status": "error",
+  "text": "I can't reach my home brain.",
+  "speechText": "I can't reach my home brain.",
+  "characterState": "disconnected",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "gateway_unavailable",
+    "message": "Could not connect to the gateway.",
+    "retryable": true
+  }
+}

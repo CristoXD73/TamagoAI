@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": null,
+  "status": "error",
+  "text": "I didn't understand that request.",
+  "speechText": "I didn't understand that request.",
+  "characterState": "confused",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "invalid_request",
+    "message": "Body is not valid JSON.",
+    "retryable": false
+  }
+}

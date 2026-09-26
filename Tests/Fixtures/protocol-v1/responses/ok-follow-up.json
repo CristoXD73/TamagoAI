@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000004",
+  "status": "ok",
+  "text": "Which one do you mean?",
+  "speechText": "Which one do you mean?",
+  "characterState": "confused",
+  "haptic": "notification",
+  "followUpExpected": true
+}

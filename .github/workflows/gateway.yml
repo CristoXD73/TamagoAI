@@ -1,0 +1,25 @@
+# Runs ONLY the Node gateway tests. Nothing here builds, signs, or tests the
+# Apple Watch / iPhone apps — that requires Xcode on macOS and a real device.
+name: gateway
+
+on:
+  push:
+    paths: ['Gateway/**', 'Tests/Fixtures/**', '.github/workflows/gateway.yml']
+  pull_request:
+    paths: ['Gateway/**', 'Tests/Fixtures/**', '.github/workflows/gateway.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test

@@ -1,0 +1,144 @@
+{
+  "protocolVersion": 1,
+  "generatedBy": "Gateway/scripts/generate-fixtures.js",
+  "fixtures": [
+    {
+      "path": "requests/valid-text.json",
+      "kind": "request",
+      "source": "client"
+    },
+    {
+      "path": "requests/valid-minimal.json",
+      "kind": "request",
+      "source": "client"
+    },
+    {
+      "path": "requests/invalid-missing-text.json",
+      "kind": "request",
+      "source": "client"
+    },
+    {
+      "path": "requests/unsupported-protocol.json",
+      "kind": "request",
+      "source": "client"
+    },
+    {
+      "path": "requests/malformed.txt",
+      "kind": "request",
+      "source": "client",
+      "note": "raw, not valid JSON"
+    },
+    {
+      "path": "responses/ok-success.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "Plain success (ping -> pong)."
+    },
+    {
+      "path": "responses/ok-happy.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "Success that sets characterState happy."
+    },
+    {
+      "path": "responses/ok-tool-success.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "Simulated local tool action succeeded."
+    },
+    {
+      "path": "responses/ok-follow-up.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "Gateway expects a follow-up utterance."
+    },
+    {
+      "path": "responses/error-timeout.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 504,
+      "description": "Provider exceeded the gateway timeout."
+    },
+    {
+      "path": "responses/error-invalid-request-malformed.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 400,
+      "description": "Body is not valid JSON; requestId unknown (null)."
+    },
+    {
+      "path": "responses/error-invalid-request-schema.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 400,
+      "description": "Valid JSON but missing text; requestId echoed."
+    },
+    {
+      "path": "responses/error-unsupported-protocol.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 400,
+      "description": "Client sent protocolVersion 2."
+    },
+    {
+      "path": "responses/error-auth-failed.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 401,
+      "description": "Missing/invalid bearer token; body not parsed."
+    },
+    {
+      "path": "responses/error-provider.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 502,
+      "description": "Provider failed (mock \"state error\")."
+    },
+    {
+      "path": "responses/error-provider-unavailable.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 503,
+      "description": "Local AI engine not running."
+    },
+    {
+      "path": "responses/protocol-info.json",
+      "kind": "protocolInfo",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "GET /v1/protocol"
+    },
+    {
+      "path": "client/thinking-accepted.json",
+      "kind": "response",
+      "source": "client-synthesized",
+      "httpStatus": null,
+      "description": "Request handed off (e.g. relay ack); keep showing thinking. Not final."
+    },
+    {
+      "path": "client/gateway-unavailable.json",
+      "kind": "response",
+      "source": "client-synthesized",
+      "httpStatus": null,
+      "description": "Transport could not connect to the gateway (connection refused / DNS / no route)."
+    },
+    {
+      "path": "client/disconnected.json",
+      "kind": "response",
+      "source": "client-synthesized",
+      "httpStatus": null,
+      "description": "No usable route at all (no Wi-Fi, iPhone unreachable)."
+    },
+    {
+      "path": "client/timeout.json",
+      "kind": "response",
+      "source": "client-synthesized",
+      "httpStatus": null,
+      "description": "Client-side request timeout before any HTTP response."
+    }
+  ]
+}

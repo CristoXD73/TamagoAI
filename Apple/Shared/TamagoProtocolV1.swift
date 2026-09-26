@@ -1,0 +1,163 @@
+// TamagoProtocolV1.swift
+//
+// VERIFICATION: NOT COMPILED. Written in a Linux cloud sandbox with no Swift
+// toolchain. The local Xcode agent must compile it and add unit tests that
+// decode every file in Tests/Fixtures/protocol-v1/ before relying on it.
+//
+// Mirrors docs/PROTOCOL_V1.md and Gateway/src/protocol.js. Enum raw values
+// must match those files exactly. Pure Foundation, no UI or transport code.
+
+import Foundation
+
+public enum TamagoProtocol {
+    public static let version = 1
+}
+
+// MARK: - Enums
+
+public enum TamagoInputType: String, Codable, Sendable {
+    case text
+}
+
+public enum TamagoResponseStatus: String, Codable, Sendable {
+    case ok
+    case accepted
+    case error
+}
+
+public enum TamagoCharacterState: String, Codable, Sendable, CaseIterable {
+    case sleeping
+    case idle
+    case listening
+    case acknowledging
+    case thinking
+    case toolRunning
+    case speaking
+    case happy
+    case success
+    case confused
+    case error
+    case disconnected
+
+    /// States a gateway may send. All others are driven locally by the Watch.
+    public static let reactionStates: Set<TamagoCharacterState> = [.idle, .happy, .success, .confused, .error]
+
+    /// Forward compatibility: an unknown value from a newer gateway decodes as
+    /// `.idle` instead of failing the whole response.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TamagoCharacterState(rawValue: raw) ?? .idle
+    }
+}
+
+public enum TamagoHaptic: String, Codable, Sendable, CaseIterable {
+    case none
+    case click
+    case success
+    case failure
+    case notification
+    case retry
+
+    /// Unknown values decode as `.none`.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TamagoHaptic(rawValue: raw) ?? TamagoHaptic.none
+    }
+}
+
+public enum TamagoErrorCode: String, Codable, Sendable {
+    case invalidRequest = "invalid_request"
+    case unsupportedProtocol = "unsupported_protocol"
+    case authFailed = "auth_failed"
+    case notFound = "not_found"
+    case methodNotAllowed = "method_not_allowed"
+    case payloadTooLarge = "payload_too_large"
+    case internalError = "internal_error"
+    case providerError = "provider_error"
+    case providerUnavailable = "provider_unavailable"
+    case timeout
+    // Client-synthesized only; a gateway never sends these.
+    case gatewayUnavailable = "gateway_unavailable"
+    case disconnected
+    /// Any code this client does not know yet.
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TamagoErrorCode(rawValue: raw) ?? .unknown
+    }
+}
+
+// MARK: - Request
+
+public struct TamagoClientInfo: Codable, Sendable, Equatable {
+    public var device: String?
+    public var route: String?
+    public var appVersion: String?
+
+    public init(device: String? = nil, route: String? = nil, appVersion: String? = nil) {
+        self.device = device
+        self.route = route
+        self.appVersion = appVersion
+    }
+}
+
+public struct TamagoRequest: Codable, Sendable, Equatable {
+    public var protocolVersion: Int
+    /// Lowercased UUID string. Generate a fresh one for every logical request,
+    /// including user-initiated retries.
+    public var requestId: String
+    public var inputType: TamagoInputType
+    public var text: String
+    public var client: TamagoClientInfo?
+
+    public init(text: String, requestId: UUID = UUID(), client: TamagoClientInfo? = nil) {
+        self.protocolVersion = TamagoProtocol.version
+        self.requestId = requestId.uuidString.lowercased()
+        self.inputType = .text
+        self.text = text
+        self.client = client
+    }
+}
+
+// MARK: - Response
+
+public struct TamagoErrorInfo: Codable, Sendable, Equatable {
+    public var code: TamagoErrorCode
+    public var message: String
+    public var retryable: Bool
+}
+
+public struct TamagoResponse: Codable, Sendable, Equatable {
+    public var protocolVersion: Int
+    /// Null only for errors raised before the gateway could read a request ID
+    /// (malformed JSON, auth failure).
+    public var requestId: String?
+    public var status: TamagoResponseStatus
+    public var text: String
+    public var speechText: String
+    public var characterState: TamagoCharacterState
+    public var haptic: TamagoHaptic
+    public var followUpExpected: Bool
+    public var error: TamagoErrorInfo?
+
+    /// Stale-response guard: true only if this response belongs to `request`.
+    /// Compare case-insensitively; the gateway lowercases IDs.
+    public func answers(_ request: TamagoRequest) -> Bool {
+        guard let requestId else { return false }
+        return requestId.caseInsensitiveCompare(request.requestId) == .orderedSame
+    }
+}
+
+// MARK: - Protocol info (GET /v1/protocol)
+
+public struct TamagoProtocolInfo: Codable, Sendable {
+    public var protocolVersion: Int
+    public var supportedProtocolVersions: [Int]
+    public var gatewayVersion: String
+    public var authRequired: Bool
+
+    public var supportsThisClient: Bool {
+        supportedProtocolVersions.contains(TamagoProtocol.version)
+    }
+}

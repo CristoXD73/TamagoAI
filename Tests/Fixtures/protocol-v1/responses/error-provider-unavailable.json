@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000010",
+  "status": "error",
+  "text": "My thinking engine isn't running right now.",
+  "speechText": "My thinking engine isn't running right now.",
+  "characterState": "error",
+  "haptic": "failure",
+  "followUpExpected": false,
+  "error": {
+    "code": "provider_unavailable",
+    "message": "Mock provider is pretending to be offline.",
+    "retryable": true
+  }
+}

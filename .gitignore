@@ -1,0 +1,25 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+*.cer
+*.pem
+*.key
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Xcode / Swift
+xcuserdata/
+DerivedData/
+build/
+.build/
+*.xcuserstate
+*.xcscmblueprint
+.swiftpm/
+
+# macOS
+.DS_Store
