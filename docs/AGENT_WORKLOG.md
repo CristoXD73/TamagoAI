@@ -126,7 +126,7 @@ The owner then supplied the file at a concrete filesystem path
 **Agent:** Claude Code
 **Branch:** `claude/great-volta-ogpuw8`
 **Starting commit SHA:** `bd1a17c`
-**Ending commit SHA:** (recorded in a follow-up once committed)
+**Ending commit SHA:** `f4f6d0d`
 **Files changed:**
 - `docs/assets/tamagoai-hero.webp` (new — the supplied hero image, copied verbatim)
 - `README.md` (restructured: hero image promoted near the top; existing content
