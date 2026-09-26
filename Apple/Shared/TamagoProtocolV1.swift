@@ -128,6 +128,12 @@ public struct TamagoErrorInfo: Codable, Sendable, Equatable {
     public var code: TamagoErrorCode
     public var message: String
     public var retryable: Bool
+
+    public init(code: TamagoErrorCode, message: String, retryable: Bool) {
+        self.code = code
+        self.message = message
+        self.retryable = retryable
+    }
 }
 
 public struct TamagoResponse: Codable, Sendable, Equatable {
@@ -142,6 +148,30 @@ public struct TamagoResponse: Codable, Sendable, Equatable {
     public var haptic: TamagoHaptic
     public var followUpExpected: Bool
     public var error: TamagoErrorInfo?
+
+    /// Every response the gateway sends is decoded, not constructed (Codable
+    /// synthesizes `init(from:)` for that; unaffected by this initializer).
+    /// This one is for building a `TamagoResponse` in-process: the
+    /// client-synthesized envelopes PROTOCOL_V1 §8 describes
+    /// (`gateway_unavailable`, `disconnected`, client `timeout` — none of
+    /// which ever arrive as JSON) and, in Stage A, the debug harness that
+    /// previews reaction states without a gateway. `protocolVersion` is always
+    /// `TamagoProtocol.version`; a response literally can't claim another one.
+    public init(
+        requestId: String?, status: TamagoResponseStatus, text: String, speechText: String,
+        characterState: TamagoCharacterState, haptic: TamagoHaptic,
+        followUpExpected: Bool = false, error: TamagoErrorInfo? = nil
+    ) {
+        self.protocolVersion = TamagoProtocol.version
+        self.requestId = requestId
+        self.status = status
+        self.text = text
+        self.speechText = speechText
+        self.characterState = characterState
+        self.haptic = haptic
+        self.followUpExpected = followUpExpected
+        self.error = error
+    }
 
     /// Stale-response guard: true only if this response belongs to `request`.
     /// Compare case-insensitively; the gateway lowercases IDs.

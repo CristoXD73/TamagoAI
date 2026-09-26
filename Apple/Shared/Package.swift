@@ -23,7 +23,12 @@ let package = Package(
             name: "TamagoShared",
             path: ".",
             exclude: ["Tests"],
-            sources: ["TamagoProtocolV1.swift", "SpriteAnimationClock.swift"]
+            sources: [
+                "TamagoProtocolV1.swift",
+                "SpriteAnimationClock.swift",
+                "CharacterStateMachine.swift",
+                "CharacterInteractionController.swift",
+            ]
         ),
         .testTarget(
             name: "TamagoSharedTests",

@@ -272,3 +272,160 @@ covers the character (D-106). App Group + signing need the owner's team (D-101/D
 
 **Do not redo:** D-101…D-111, the Xcode project/targets, the package layout,
 the fixture and clock tests, the clock fix, `docs/LOCAL_ENVIRONMENT.md`.
+
+---
+
+### 2026-09-26: Claude Sonnet (local Xcode): Phase 4 Stage A — character comes alive
+
+**Branch:** `claude/great-volta-ogpuw8`
+
+**Commits:** `eacf5ff` (Xcode-normalized project file, no manual edits), plus the commit right after this log entry (all Stage A work).
+
+**Scope:** exactly D-103 (state machine) + D-102 (renderer) + the part of D-104
+that's reachable without voice/transport (pause animation when not live;
+reset to idle on background). No microphone, speech, TTS, AI requests,
+transport, WatchConnectivity, complication content, or final art — per the assignment.
+
+**1. `CharacterStateMachine` (`Apple/Shared/CharacterStateMachine.swift`)**
+- Pure reducer implementing D-103's transition table exactly: `CharacterState`
+  (`visual`, `activeRequestID`, `enteredAt`, `followUpExpected`, and an
+  internal `pendingReaction` for the `speaking → reaction` handoff — not a
+  competing boolean, just the one piece of data `speechFinished` needs, set
+  once and consumed once), `CharacterEvent`, `CharacterEffect`, and
+  `CharacterStateMachine.reduce(_:event:now:)`. No I/O, no clock reads —
+  `now` is passed in. An event with no legal transition from the current
+  state returns the state unchanged with no effects (`#if DEBUG` prints which
+  event was dropped and from where).
+- `CharacterInteractionController` (`Apple/Shared/CharacterInteractionController.swift`):
+  the `@MainActor @Observable` owner D-103 specifies. Stage A scope only —
+  it applies events through the reducer and records the resulting effects;
+  nothing executes them yet (no transport/speech/haptics exist).
+- Added a public initializer to `TamagoResponse` (`TamagoProtocolV1.swift`).
+  It only had `Codable`'s synthesized `init(from:)` before, so no module
+  outside `TamagoShared` could construct one in-process. This isn't a wire
+  change (no field, encoding, or enum changed) — it's the piece PROTOCOL_V1
+  §8's client-synthesized envelopes and Stage A's debug harness both need.
+  `protocolVersion` is hardcoded to `TamagoProtocol.version` inside it.
+- **Tests** (`Apple/Shared/Tests/TamagoSharedTests/CharacterStateMachineTests.swift`,
+  60 new `@Test`s, several parameterized over `TamagoCharacterState.allCases`):
+  every legal transition in D-103's table; illegal transitions from every
+  applicable state (asserts the *exact same* `CharacterState` value comes
+  back, not just the same `visual`); `cancel`/`backgrounded` from all 12
+  states always → idle with both effects; the three stale-response shapes
+  (mismatched ID, no active request, late response after a `cancel` already
+  cleared the ID — the specific case D-103 calls out); `toolProgress`/`response`
+  ID matching is case-insensitive like `TamagoResponse.answers(_:)`;
+  `reactionFinished` only legal from the four reaction moods; the
+  `speaking → reaction` handoff resolves to the mood the *response* carried,
+  not a fixed one; two full request-ID-threaded paths (with and without a
+  speaking detour); `reduce` is a pure function (same inputs → equal outputs).
+
+**2. `CharacterView` — original placeholder character (`Apple/WatchApp/`)**
+- No art assets exist yet, so a "frame" is a small set of procedural draw
+  parameters (`CharacterExpression.swift`) instead of an asset-catalog image —
+  the one deliberate departure from D-102's literal wording. `CharacterView`
+  still drives it with exactly the decided timing:
+  `TimelineView(.animation(minimumInterval: 1/12, paused: !environmentIsLive))`,
+  and inside the closure, `liveNow = environmentIsLive && context.cadence == .live`
+  feeds `SpriteAnimationClock.frame(reduceMotion: !liveNow)` — unchanged from
+  Phase 3. Swapping in real per-frame images later only touches
+  `CharacterArt`/`CharacterView`, not the state machine or the clock.
+  `environmentIsLive` reads `scenePhase`, `isLuminanceReduced`,
+  `accessibilityReduceMotion` at this one place (D-102/D-104).
+- `CharacterArt.swift`: a distinct `AnimationSequence` + expression loop per
+  `TamagoCharacterState` (all 12), still built from
+  `SpriteAnimationClock.row(...)` — no separate timer anywhere.
+- The character is an original rounded-blob creature (SwiftUI shapes + SF
+  Symbols only — no upstream/WatchPet/Codex art or code). Idle breathes and
+  blinks; listening widens its eyes with an expanding ripple; thinking looks
+  side to side with an orbiting dot; speaking's mouth flaps; happy/success
+  bounce/pop with a sparkle/checkmark badge; confused rocks with a "?";
+  error shows X eyes, a frown, and a fast shake; disconnected goes flat and
+  grey; sleeping breathes slowly with a "Z". Screenshots of all 12 in
+  `docs/screenshots/phase4-stage-a/`.
+- One real compile issue: `Shape`'s `path(in:)` is a nonisolated protocol
+  requirement, but the app target's `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
+  (D-101) made every new type MainActor-isolated by default, which the
+  compiler correctly rejected as an isolation conflict on the four custom
+  `Shape`s. Fixed by marking those four structs `nonisolated`.
+
+**3. Debug state controls (`Apple/WatchApp/DebugStateControlsView.swift`, `#if DEBUG`-gated)**
+- A List (second page of a `TabView`) with a button per state. `debugGoTo(_:)`
+  never bypasses the reducer — it composes whatever *legal* event sequence
+  reaches the target from a clean `cancel`, so pressing a button exercises
+  the exact same `CharacterStateMachine` a real interaction would. Reaction
+  states and `.speaking` stay put until the developer taps something else
+  (no auto-timer for `reactionFinished`/`speechFinished` — those come from
+  real TTS/hold-timing in a later phase, out of scope here). Compiles out of
+  Release builds entirely (can't become production architecture by accident).
+- Added a `TAMAGO_PREVIEW_STATE` launch-environment hook (also `#if DEBUG`)
+  so every state could be screenshotted without touch injection into the
+  simulator (not available in this environment):
+  `SIMCTL_CHILD_TAMAGO_PREVIEW_STATE=<state> xcrun simctl launch <udid> <bundle-id>`.
+
+**4. Lifecycle (D-104, in scope for Stage A)**
+- Animation pausing is covered by `CharacterView`'s `environmentIsLive` above.
+- Added `.onChange(of: scenePhase)` in `RootView`: scene → `.background` calls
+  `controller.apply(.backgrounded)` (→ idle; no request/speech to cancel yet,
+  but this alone means relaunch can never resume stuck in a transient state).
+  `.inactive` is left alone (already just pauses the animation).
+- **Verified on-device** (SE 3 40 mm simulator): drove the app to `.thinking`,
+  brought the watch face (`com.apple.Mandrake`) to the foreground (backgrounds
+  our app), relaunched — character was `.idle`, not stuck in `.thinking`.
+  Screenshots: `docs/screenshots/phase4-stage-a/lifecycle-*.png`.
+
+**Test commands and results**
+```sh
+(cd Apple/Shared && swift test --scratch-path ../../.build/spm -Xswiftc -warnings-as-errors)
+(cd Apple && xcodebuild test -project AppleTamago.xcodeproj -scheme TamagoWatch \
+  -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' \
+  -derivedDataPath ../.build/DerivedData)
+(cd Apple && xcodebuild build -project AppleTamago.xcodeproj -scheme TamagoPhone \
+  -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.build/DerivedData)
+(cd Gateway && npm test)
+```
+- Swift: **83/83 passed** (43 existing + 60 new), host and SE 3 40 mm
+  simulator, zero compiler warnings (`-warnings-as-errors`) in every target.
+- Gateway: 66/66 (unaffected; ran anyway as a sanity check — no protocol wire
+  change, only an additive Swift initializer).
+- `TamagoWatch` and `TamagoPhone` both build clean. `TamagoPhone` build
+  unchanged from Phase 3 (not part of this stage).
+
+**Simulator result:** installed and launched on **Apple Watch SE 3 (40 mm),
+watchOS 27.0** (`8B5287E9-BD6A-422A-B353-B8E3499AE31D`). All 12
+`TamagoCharacterState` values render distinctly, no clipping at 40 mm, page
+dots confirm the debug tab exists. `SIMULATOR_VERIFIED_ONLY` throughout —
+**no physical Watch available this session; nothing here is `DEVICE_VERIFIED`.**
+
+**Warnings:** none.
+
+**Unresolved / left for later phases**
+- The debug tab's own rendering (the List itself) was exercised only through
+  its wiring (`debugGoTo` unit-tested, screenshots taken via the launch-env
+  hook that calls the same method) — I couldn't swipe to page 2 without touch
+  injection in this environment. Low risk: it's a plain SwiftUI `List`.
+- `reactionFinished`/`ackBeatElapsed`/`speechFinished` have no automatic timer
+  yet (by design — those need real TTS completion / hold-timing, which need
+  voice+TTS, out of scope here). The debug harness triggers them manually.
+- `CompanionSnapshot` persistence (D-104) isn't implemented; not needed yet
+  since a fresh process always starts at `CharacterState.initial` anyway.
+- Everything physical: Always-On/reduced-luminance cadence, wrist raise/lower,
+  Crown, cover-to-sleep, Return to Clock — all still `UNVERIFIED`, need the
+  real SE 3.
+
+**Storage:** `.build/` grew from 485 MB to 507 MB (git-ignored, on
+`/Volumes/Storage`). Simulator device data unchanged at 1.1 GiB (already
+existed from Phase 3). Internal SSD free space ~29 GiB (was ~30 GiB at the
+end of Phase 3) — incidental, nothing relocated.
+
+**Next recommended task (Codex, Phase 5 — BUILD_REVIEW):** review this
+branch's Stage A commits against `docs/DECISIONS.md` D-102/D-103/D-104 and
+`AGENTS.md`. Specifically check: (1) the reducer's exhaustiveness and that no
+path lets a stale response slip through, (2) that `CharacterExpression`/
+`CharacterArt` contain no upstream-derived art or code, (3) that
+`#if DEBUG`-gated code cannot reach a Release build. Do not build the voice
+loop or transport yet — that's Sonnet's Phase 6/7/9 per `MASTER_BRIEF.md`.
+
+**Do not redo:** `CharacterStateMachine`/`CharacterInteractionController` and
+their tests, `CharacterExpression`/`CharacterArt`/`CharacterView`, the debug
+harness, the `TamagoResponse` public initializer, the D-104 background-reset wiring.

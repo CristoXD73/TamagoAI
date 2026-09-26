@@ -4,29 +4,30 @@ Every item carries exactly one label: `DEVICE_VERIFIED` · `SIMULATOR_VERIFIED_O
 · `UNIT_TESTED_ONLY` · `UNVERIFIED`. No "should work". Platform-sensitive items
 need physical-device evidence in `DEVICE_TEST_LOG.md` before V1 exits.
 
-Status as of **Phase 3 (2026-09-26, local Xcode 27.0)**. Anything not listed as done is `UNVERIFIED`.
+Status as of **Phase 4 Stage A (2026-09-26, local Xcode 27.0)**. Anything not listed as done is `UNVERIFIED`.
 
 ## A. Build and signing
 | Item | Status |
 |---|---|
-| Watch app builds | SIMULATOR_VERIFIED_ONLY (placeholder app; SE 3 40 mm watchOS 27.0 simulator, Phase 3) |
+| Watch app builds | SIMULATOR_VERIFIED_ONLY (live character + debug harness; SE 3 40 mm watchOS 27.0 simulator, Phase 4) |
 | iPhone companion builds | SIMULATOR_VERIFIED_ONLY (placeholder; iOS 27.0 simulator build, embeds the Watch app; not launched) |
 | Complication extension builds | SIMULATOR_VERIFIED_ONLY (build + embedding only; never added to a face) |
-| Unit tests build (Swift) | UNIT_TESTED_ONLY (43 tests: host `swift test` + SE 3 40 mm simulator) |
+| Unit tests build (Swift) | UNIT_TESTED_ONLY (83 tests: host `swift test` + SE 3 40 mm simulator) |
 | `Apple/Shared/*.swift` compiles | UNIT_TESTED_ONLY (Swift 6.4, zero warnings with `-warnings-as-errors`) |
 | Signed dev app installs on physical Watch | UNVERIFIED (no team configured, Watch not connected) |
-| App launches | SIMULATOR_VERIFIED_ONLY (placeholder screen on SE 3 40 mm simulator) |
+| App launches | SIMULATOR_VERIFIED_ONLY (character screen + debug tab on SE 3 40 mm simulator) |
 | No secrets committed | UNIT_TESTED_ONLY: manual grep at Phase 1; `.gitignore` covers env and signing files |
 
 ## B. Character engine
 | Item | Status |
 |---|---|
-| idle / listening / thinking / speaking / success / error / disconnected render | UNVERIFIED |
-| Sprite frame timing (`SpriteAnimationClock`) | UNIT_TESTED_ONLY (21 tests; renderer not built yet) |
-| Transitions deterministic | UNVERIFIED |
-| Stale response can't overwrite current state | UNVERIFIED on Watch; `TamagoResponse.answers(_:)` is UNIT_TESTED_ONLY; the reducer guard (D-103) isn't written yet |
-| View disappearance stops expensive animation | UNVERIFIED |
-| 40 mm layout doesn't clip | UNVERIFIED |
+| idle / listening / thinking / speaking / success / error / disconnected render | SIMULATOR_VERIFIED_ONLY (SE 3 40 mm; all 12 wire states, screenshotted via the debug harness) |
+| Sprite frame timing (`SpriteAnimationClock`) | UNIT_TESTED_ONLY (21 tests) + SIMULATOR_VERIFIED_ONLY (drives `CharacterView` on-device) |
+| `CharacterStateMachine` transitions deterministic | UNIT_TESTED_ONLY (60 new tests: legal transitions, illegal-transition rejection, full happy-path/no-speech paths, purity) |
+| Stale response can't overwrite current state | UNIT_TESTED_ONLY (reducer guard, D-103: mismatched ID, no active request, and late-response-after-cancel all dropped) + SIMULATOR_VERIFIED_ONLY (`TamagoResponse.answers(_:)` unchanged) |
+| View disappearance stops expensive animation | SIMULATOR_VERIFIED_ONLY (`TimelineView(.animation(paused:))` gated on scenePhase/isLuminanceReduced/accessibilityReduceMotion, D-102) |
+| `.background` doesn't corrupt state on reopen | SIMULATOR_VERIFIED_ONLY (D-104: driven to `.thinking`, backgrounded via the watch face, reopened → `.idle`, screenshotted) |
+| 40 mm layout doesn't clip | SIMULATOR_VERIFIED_ONLY |
 
 ## C. Persistence / frontmost (physical device only)
 Active animation · screen inactivity · wrist lower/raise · Crown dismissal ·
