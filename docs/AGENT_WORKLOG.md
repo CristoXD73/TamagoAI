@@ -11,9 +11,9 @@ handoff/task-assignment doc — see `docs/HANDOFF_LOG.md` for that.
 **Agent:** Claude Code
 **Branch:** `claude/great-volta-ogpuw8`
 **Starting commit SHA:** `586e96b` (local HEAD at the start of this batch)
-**Ending commit SHA:** see the commit that carries this file (recorded below
-once known; the branch was fast-forwarded to `a93d896` mid-batch — see
-"Cross-agent impact")
+**Ending commit SHA:** `d98af5b` (pushed to `origin/claude/great-volta-ogpuw8`;
+the branch was fast-forwarded from `586e96b` to `a93d896` mid-batch to catch
+up with origin before this commit landed on top — see "Cross-agent impact")
 **Files changed:**
 - `Apple/WatchApp/TamagoWatchApp.swift` (production fix)
 - `docs/AGENT_WORKLOG.md` (new, this file)
