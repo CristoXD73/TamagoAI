@@ -1052,3 +1052,143 @@ what removes these.
 **Next recommended task:** the owner reviews `docs/prototypes/animation-v1/05_edge_inspection/` and the
 storyboards and records APPROVED / REVISION_REQUESTED per animation. Commission the NEEDED NOW art (N1–N4).
 **Do not:** implement any of the 10 animations, or write engineering handoffs, before owner approval.
+
+---
+
+### 2026-09-26: Codex: Blender iterative-agent preflight
+
+**Branch:** `claude/great-volta-ogpuw8`.
+**Commit(s):** none; HEAD `586e96b`. No staging, commit or push.
+**Files changed:** `3D/blender/agent-preflight.blend`,
+`3D/renders/validation/agent-preflight-v1.png`,
+`3D/renders/validation/agent-preflight-v2.png`, `docs/HANDOFF_LOG.md`.
+**Upstream source reused:** None. Original primitive-based test geometry.
+
+Inspected all three approved reference images through their `3D/references/`
+links for general white-volume/dark-eye/black-background visual language only.
+Created a deliberately simple tapered rounded UV-sphere mantle and two dark
+ellipsoid eyes, smooth shading, neutral white material, black world, studio
+area lights and an orthographic camera. No tentacles or real TamagoAI modeling.
+Controlled Blender 5.2.2 LTS through background CLI and Python `bpy`; Cycles CPU,
+32 samples with denoising. Actually opened and visually inspected both PNGs.
+V1's lower tip faded into black and the object occupied about half the frame.
+V2 added a 90 W lower soft fill, raised side fill from 35 to 100 W, and changed
+orthographic scale from 4.6 to 3.45. Visual inspection confirmed a readable lower
+contour and tighter framing. Saved the revised editable scene after rendering.
+
+**Tests run (exact commands, repository root):**
+```sh
+/Applications/Blender.app/Contents/MacOS/Blender --version
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python /tmp/tamago-preflight-create.py > /tmp/tamago-preflight-v1.log 2>&1
+/Applications/Blender.app/Contents/MacOS/Blender --background 3D/blender/agent-preflight.blend --python /tmp/tamago-preflight-revise.py > /tmp/tamago-preflight-v2.log 2>&1
+/Applications/Blender.app/Contents/MacOS/Blender --background 3D/blender/agent-preflight.blend --python /tmp/tamago-preflight-verify.py > /tmp/tamago-preflight-verify.log 2>&1
+git diff --check
+```
+**Passed:** fresh Blender process reopened final `.blend`; Python assertions
+checked three meshes, eight total objects, revised camera and lower light, and
+loaded both nonempty PNGs at 768 × 768. Geometry: mantle 2,048 polygons / 3,968
+triangles; each eye 512 polygons / 960 triangles; total 3,072 polygons / 5,888
+triangles. Four lights + one camera complete the eight objects. No modifiers.
+Evidence: actual inspected renders and `/tmp/tamago-preflight-verification.json`;
+scripts and process transcripts remain in `/tmp/tamago-preflight-*`.
+**Failed:** initial sandboxed Blender startup exited 139 before scene creation;
+rerunning with approved escalation succeeded. Subsequent Blender operations used
+approved escalation. Blender emitted an architecture cache-line warning but
+completed rendering, saving and reopen verification with exit 0.
+**Physical-device evidence (+ label):** none. **UNVERIFIED** for Watch/runtime
+behavior; this task validates Blender artifacts only, with no Apple simulator
+or hardware claims. No app tests required for this artifact-only assignment.
+**Unverified:** real character modeling, rigging, animation, export and app use.
+**Known risks:** this deliberately simple test is not a production character or
+an assessment of final-art quality. Existing app edits, reference images and
+smoke-test assets were preserved.
+**Next recommended task (ONE bounded step):** owner review of the preflight
+renders and editable scene before assigning any real-character modeling work.
+**Do not redo:** approved reference images; do not advance into real modeling
+under this preflight assignment.
+
+---
+
+### 2026-09-26: Codex: TamagoAI V0.1 proportion blockout
+
+**Branch:** `claude/great-volta-ogpuw8`. **Commit(s):** none; HEAD `586e96b`.
+**Files changed:** `3D/blender/tamagoai-master-v01.blend`,
+`3D/scripts/model_v01.py`, `3D/scripts/correct_v01.py`,
+`3D/renders/validation/v01-{front,q34,side,back,top,underside}.png`,
+`3D/renders/validation/v01-counts.json`, and this handoff.
+**Upstream source reused:** None; original Blender primitive/curve construction.
+
+Used the three approved references already inspected together in this session:
+broad posterior mantle, lateral dimensional eyes, narrower attachment region,
+eight long tapering curled tentacles. Created one unified soft mantle/body mesh,
+two dark eye meshes and eight individually editable Bezier tubes. Neutral white,
+black world, broad neutral area lights, six orthographic cameras sharing scale
+5.8, no DOF. Saved coherent geometry before camera setup or any rendering.
+
+Performed exactly one visual review of the six initial renders together.
+Observed over-broad lower face, over-protruding eyes and faceted tube shading.
+One correction pass tapered only the lower forward face, scaled eyes by 0.9,
+recessed them slightly, and enabled smooth curve shading. Saved immediately,
+then regenerated all six views and saved final scene. No second visual refinement
+loop; final artistic comparison is reserved for the owner.
+
+**Tests run (exact commands):**
+```sh
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python 3D/scripts/model_v01.py > /tmp/tamago-model-v01.log 2>&1
+/Applications/Blender.app/Contents/MacOS/Blender --background 3D/blender/tamagoai-master-v01.blend --python 3D/scripts/correct_v01.py > /tmp/tamago-model-v01-correction.log 2>&1
+git diff --check
+```
+**Passed:** Blender creation/render process; early save confirmed in transcript;
+correction process reopened saved scene. Six initial renders inspected. Counts
+include evaluated curve geometry: 22 objects (11 geometry, five lights, six
+cameras); eight tentacles; 18,164 polygons / 35,976 triangles.
+**Failed:** none in this assignment; Blender used approved escalation based on
+preflight's established sandbox startup failure.
+**Physical-device evidence (+ label):** none; Watch behavior **UNVERIFIED**.
+This is Blender artifact work, not Apple runtime verification.
+**Unverified:** owner approval of proportions; final correction not subjected to
+another visual review per the one-review limit. No rig, animation, expressions,
+production topology, watchOS optimization, integration or hardware testing.
+**Known risks:** roots overlap the body rather than forming production continuous
+topology; tentacle arrangement is regular and simplified, with some silhouette
+occlusion in orthographic views. Owner should inspect posterior mantle profile,
+eye placement and tentacle footprint against references.
+**Next recommended task (ONE bounded step):** owner review of V0.1's six views.
+**Do not redo:** no autonomous V0.2 or further refinement. Watch app, references
+and preflight assets unchanged by this task; no commit or push.
+
+---
+
+### 2026-09-26: Claude Code: full-bleed Watch stage fix (engineering-only, Visual Approval Gate exempt)
+
+**Branch:** `claude/great-volta-ogpuw8`
+**Commit(s):** see the commit adding this entry.
+**Files changed:** `Apple/WatchApp/TamagoWatchApp.swift`, `docs/AGENT_WORKLOG.md` (new,
+see `AGENTS.md` §8), `AGENTS.md` (§8 added), this log.
+**Upstream source reused:** None.
+**Tests run (exact commands):**
+```sh
+cd Apple && xcodebuild -scheme TamagoWatch -configuration Debug \
+  -destination 'id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' build
+cd Apple && xcodebuild test -scheme TamagoWatch -configuration Debug \
+  -destination 'id=8B5287E9-BD6A-422A-B353-B8E3499AE31D'
+```
+**Passed:** build; 112/112 Swift tests (`SpriteAnimationClock`, `Protocol v1
+fixtures`, `CreatureBehaviorEngine`, `CharacterStateMachine`). Instrumented
+`GeometryReader.size` directly (temporary debug label, removed before
+checkpoint) and confirmed on the SE 3 40 mm simulator: stage grew from
+158×131 pt to 162×197 pt, matching the device's full 162×197 pt display.
+Bisected `TabView` out as a suspect (removing it left the shrink at 158×138 pt,
+essentially unchanged) before finding the real cause.
+**Failed:** none.
+**Physical-device evidence (+ label):** none. `SIMULATOR_VERIFIED_ONLY`
+(SE 3 40 mm simulator only).
+**Unverified:** physical-hardware behavior; behavior on other Watch case
+sizes (only 40 mm was measured, though the fix uses no hardcoded dimensions).
+**Known risks:** none identified. The creature's wander range still
+self-limits to 16%–84% of the stage by design (`CreatureBehaviorEngine`,
+untouched by this fix).
+**Next recommended task (ONE bounded step):** owner spot-check on a physical
+SE 3 (or another case size) and record the result in `docs/DEVICE_TEST_LOG.md`.
+**Do not redo:** this specific safe-area investigation; see
+`docs/AGENT_WORKLOG.md` for the full root-cause writeup and bisection detail.

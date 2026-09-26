@@ -86,6 +86,7 @@ private struct CharacterScreen: View {
                 .padding(.bottom, 2)
             #endif
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(Color.black)
+        .ignoresSafeArea()
     }
 }

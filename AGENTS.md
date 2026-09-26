@@ -107,3 +107,33 @@ approved prototype. Full rule, exemptions and the approval register: `docs/VISUA
 - The approved reference art in `Assets/CharacterReference/` is visual ground truth: don't redesign,
   humanize, or restyle the character.
 
+## 8. Cross-agent worklog
+
+Every AI agent that modifies this repository must append its own entry to
+`docs/AGENT_WORKLOG.md` **before checkpointing** (staging/committing) work.
+This is distinct from `docs/HANDOFF_LOG.md` (§6): the handoff log is the
+task-assignment/next-step record; the worklog is a flat, append-only audit
+trail of what each agent actually did to the repository and how it was
+verified.
+
+Each entry must identify:
+
+- agent
+- machine-derived timestamp (ISO-8601, with timezone)
+- branch
+- starting commit SHA
+- ending commit SHA, if known at write time
+- files changed
+- work performed
+- tests/builds actually performed (exact commands where practical)
+- things NOT verified
+- known issues
+- cross-agent impact (e.g. touching another agent's uncommitted work,
+  resolving a shared-file conflict, reordering/rebasing shared history)
+- Signed-by
+
+**Agents must never claim another agent's tests or verification as their
+own.** If you rely on a build, test run, or on-device observation you did not
+personally perform, attribute it to whoever performed it (or mark it
+unverified by you) instead of restating it as your own result.
+
