@@ -188,8 +188,40 @@ public struct TamagoProtocolInfo: Codable, Sendable {
     public var supportedProtocolVersions: [Int]
     public var gatewayVersion: String
     public var authRequired: Bool
+    /// Provider name (`mock`, `ollama`, …). Optional: older gateways omit it.
+    public var provider: String?
+    /// PROTOCOL_V1 §14; absent on an unpaired, loopback-only dev gateway.
+    public var gatewayId: String?
 
     public var supportsThisClient: Bool {
         supportedProtocolVersions.contains(TamagoProtocol.version)
+    }
+}
+
+// MARK: - Pairing (PROTOCOL_V1 §14)
+
+public struct TamagoPairingRequest: Codable, Sendable, Equatable {
+    public var pairingCode: String
+    public var deviceName: String?
+
+    public init(pairingCode: String, deviceName: String? = nil) {
+        self.pairingCode = pairingCode
+        self.deviceName = deviceName
+    }
+}
+
+/// What a successful `POST /v1/pair` returns. `token` is the secret the Watch
+/// stores in its Keychain and sends as the bearer token from then on.
+public struct TamagoPairingGrant: Codable, Sendable, Equatable {
+    public var protocolVersion: Int
+    public var gatewayId: String
+    public var gatewayName: String
+    public var token: String
+
+    public init(gatewayId: String, gatewayName: String, token: String) {
+        self.protocolVersion = TamagoProtocol.version
+        self.gatewayId = gatewayId
+        self.gatewayName = gatewayName
+        self.token = token
     }
 }

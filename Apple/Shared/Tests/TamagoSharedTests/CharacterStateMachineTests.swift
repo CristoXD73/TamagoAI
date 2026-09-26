@@ -193,6 +193,52 @@ struct CharacterStateMachineTests {
         #expect(effects.isEmpty)
     }
 
+    @Test func requestACancelledThenBStartedLateAIsDroppedAndBResolves() {
+        // User starts A, cancels, starts B; A's answer arrives late, then B's.
+        let idA = UUID(), idB = UUID()
+        let a = idA.uuidString.lowercased(), b = idB.uuidString.lowercased()
+        var s = state(.listening)
+        (s, _) = reduce(s, .transcript(text: "first", requestId: idA))
+        #expect(s.activeRequestID == a)
+        (s, _) = reduce(s, .cancel)
+        (s, _) = reduce(s, .userActivated)
+        (s, _) = reduce(s, .transcript(text: "second", requestId: idB))
+        #expect(s.activeRequestID == b)
+
+        let beforeLateA = s
+        let (afterLateA, lateEffects) = reduce(s, .response(response(requestId: a, characterState: .confused)))
+        #expect(afterLateA == beforeLateA, "A's late answer must never touch B's in-flight state")
+        #expect(lateEffects.isEmpty)
+
+        let (afterB, _) = reduce(afterLateA, .response(response(requestId: b, characterState: .happy)))
+        #expect(afterB.visual == .happy)
+        #expect(afterB.activeRequestID == b)
+    }
+
+    @Test func delayedResponseAfterRouteRestorationIsDropped() {
+        // Gateway disappears mid-request → client synthesizes gatewayUnavailable
+        // → disconnected (identity cleared) → route comes back → the original
+        // request's real answer finally arrives. It must be ignored.
+        let id = UUID()
+        let rid = id.uuidString.lowercased()
+        var s = state(.listening)
+        (s, _) = reduce(s, .transcript(text: "hello", requestId: id))
+        let unavailable = TamagoResponse(
+            requestId: rid, status: .error, text: "", speechText: "",
+            characterState: .idle, haptic: .none, followUpExpected: false,
+            error: TamagoErrorInfo(code: .gatewayUnavailable, message: "gone", retryable: true))
+        (s, _) = reduce(s, .response(unavailable))
+        #expect(s.visual == .disconnected)
+        #expect(s.activeRequestID == nil)
+        (s, _) = reduce(s, .routeRestored)
+        #expect(s.visual == .idle)
+
+        let before = s
+        let (after, effects) = reduce(s, .response(response(requestId: rid, characterState: .happy)))
+        #expect(after == before)
+        #expect(effects.isEmpty)
+    }
+
     @Test(arguments: [.idle, .listening, .speaking, .happy, .disconnected] as [TamagoCharacterState])
     func responseIsIllegalOutsideAwaitingStates(_ from: TamagoCharacterState) {
         // Even with a *matching* ID, only acknowledging/thinking/toolRunning accept it.

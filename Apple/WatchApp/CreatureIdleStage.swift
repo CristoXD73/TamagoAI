@@ -13,7 +13,7 @@
 // CharacterView already runs one TimelineView for the whole character and
 // passes this view its tick's `now`; CharacterView is the one call site
 // that advances CreatureBehaviorController, exactly once per frame, only
-// while state.visual == .idle and the environment is live.
+// while state.visual is .idle or .disconnected (D-116) and the environment is live.
 
 import SwiftUI
 import TamagoShared

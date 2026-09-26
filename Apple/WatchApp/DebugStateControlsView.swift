@@ -20,6 +20,9 @@ struct DebugStateControlsView: View {
     var controller: CharacterInteractionController
     var creatureController: CreatureBehaviorController
     var connection: TamagoConnection
+    var onTalk: () -> Void
+
+    @State private var pairingStatus: String?
 
     private let previewStates: [TamagoCharacterState] = [
         .idle, .listening, .acknowledging, .thinking, .toolRunning, .speaking,
@@ -34,17 +37,23 @@ struct DebugStateControlsView: View {
 
     var body: some View {
         List {
+            diagnostics
+
             Section {
+                Button("Talk (same path as hold-to-talk)", action: onTalk)
                 ForEach(liveGatewayCommands, id: \.self) { command in
                     Button("Send to gateway: \(command)") {
                         sendToGateway(command)
                     }
                 }
             } header: {
-                Text("Live gateway (task §2/§6 proof)")
+                Text("Live gateway")
             } footer: {
-                Text("Requires a running gateway (`cd Gateway && TAMAGO_ALLOW_NO_AUTH=1 npm start`) reachable at TAMAGO_GATEWAY_URL (default http://127.0.0.1:8787, works from the simulator only). Goes through the real HTTP round trip, not the previews below.")
+                Text("Real HTTP round trips to the gateway in Diagnostics, not the previews below.")
             }
+
+            pairing
+            speechAndSound
 
             Section {
                 ForEach(previewStates, id: \.self) { target in
@@ -81,34 +90,125 @@ struct DebugStateControlsView: View {
             }
 
             Section {
-                Text(controller.state.visual.rawValue).bold()
-                if let id = controller.state.activeRequestID {
-                    Text(id).font(.caption2).foregroundStyle(.secondary)
-                }
                 Text(creatureController.state.phase.debugDescription).font(.caption2).foregroundStyle(.secondary)
             } header: {
-                Text("Current state")
-            }
-
-            Section {
-                LabeledContent("Gateway") {
-                    switch connection.isReachable {
-                    case .some(true): Text("reachable").foregroundStyle(.green)
-                    case .some(false): Text("unreachable").foregroundStyle(.red)
-                    case .none: Text("unknown").foregroundStyle(.secondary)
-                    }
-                }
-                if let ms = connection.lastRoundTripMS {
-                    LabeledContent("Last round trip", value: "\(ms) ms")
-                }
-                if let id = connection.lastRequestID {
-                    Text(id).font(.caption2).foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Transport diagnostics (task §21)")
+                Text("Creature world")
             }
         }
         .navigationTitle("Debug")
+    }
+
+    // MARK: Diagnostics — everything an owner needs on hardware, nothing on the creature screen
+
+    private var diagnostics: some View {
+        Section {
+            LabeledContent("Creature", value: connection.semanticState.rawValue)
+            LabeledContent("Visual", value: controller.state.visual.rawValue)
+            LabeledContent("Link", value: connection.transport.phase.rawValue)
+            LabeledContent("Discovery", value: probeDescription)
+            LabeledContent("Paired", value: credentialDescription)
+            Text(connection.gatewayURL.absoluteString).font(.caption2)
+            LabeledContent("Provider", value: connection.providerName ?? "—")
+            LabeledContent("Round trip", value: connection.lastRoundTripMS.map { "\($0) ms" } ?? "—")
+            if let id = connection.lastRequestID {
+                Text("req \(id)").font(.caption2).foregroundStyle(.secondary)
+            }
+            LabeledContent("Speech", value: connection.speech.isEnabled ? "on" : "off")
+            LabeledContent("Dictation", value: connection.voiceInputPresented.map { $0 ? "presented" : "unavailable" } ?? "—")
+            if let error = connection.lastTransportError {
+                Text(error).font(.caption2).foregroundStyle(.orange)
+            }
+            LabeledContent("Stage", value: stageDescription)
+        } header: {
+            Text("Diagnostics")
+        }
+    }
+
+    private var probeDescription: String {
+        switch connection.lastProbe {
+        case nil: "—"
+        case .reachable: "found"
+        case .notFound: "not found"
+        case .unreachable: "not answering"
+        case .wrongGateway: "other gateway"
+        }
+    }
+
+    private var credentialDescription: String {
+        switch connection.credential {
+        case .developerOverride: "dev override"
+        case let .paired(name, _): name
+        case .unpaired: "no"
+        }
+    }
+
+    private var stageDescription: String {
+        let metrics = StageMetrics.shared
+        guard let size = metrics.stageSize else { return "—" }
+        let mark = metrics.isFullScreen == true ? "✓" : "✗"
+        return "\(Int(size.width))×\(Int(size.height)) \(mark)"
+    }
+
+    // MARK: Pairing
+
+    private var pairing: some View {
+        Section {
+            TextFieldLink("Pair with code", prompt: Text("123 456")) { code in
+                Task {
+                    pairingStatus = "Pairing…"
+                    pairingStatus = switch await connection.pair(code: code) {
+                    case let .paired(grant): "Paired with \(grant.gatewayName)"
+                    case .wrongCode: "Wrong code"
+                    case .closed: "Pairing closed"
+                    case .unreachable: "Mac not reachable"
+                    }
+                }
+            }
+            if let pairingStatus { Text(pairingStatus).font(.caption2) }
+            Button("Unpair", role: .destructive) { connection.unpair() }
+        } header: {
+            Text("Pairing")
+        }
+    }
+
+    // MARK: Speech and sound — owner testing on hardware
+
+    @ViewBuilder
+    private var speechAndSound: some View {
+        @Bindable var speech = connection.speech
+        @Bindable var sounds = connection.sounds
+        Section {
+            Button("Speak: \"Hello. I'm Tamago.\"") {
+                speech.speak("Hello. I'm Tamago.", force: true)
+            }
+            Button("Stop speech") { speech.stop() }
+            Toggle("Speech enabled", isOn: $speech.isEnabled)
+            // watchOS renders a Stepper's label as its large central value;
+            // a small explicit label keeps the row usable on a 40 mm screen.
+            Stepper(value: $speech.rate, in: 0.3...0.6, step: 0.05) {
+                Text("Rate \(speech.rate, format: .number.precision(.fractionLength(2)))").font(.footnote)
+            }
+            Stepper(value: $speech.pitchMultiplier, in: 0.8...1.3, step: 0.05) {
+                Text("Pitch \(speech.pitchMultiplier, format: .number.precision(.fractionLength(2)))").font(.footnote)
+            }
+        } header: {
+            Text("Speech")
+        } footer: {
+            Text("The test phrase plays once even with speech off. Answers are only spoken when enabled.")
+        }
+        Section {
+            Toggle("Sounds enabled", isOn: $sounds.isEnabled)
+            ForEach(CreatureSoundCue.allCases, id: \.self) { cue in
+                Button("Play \(cue.rawValue)") { sounds.play(cue, force: true) }
+            }
+            if let last = sounds.lastPlayed {
+                Text("\(last.cue.rawValue): \(last.source)").font(.caption2)
+            }
+        } header: {
+            Text("Creature sounds")
+        } footer: {
+            Text("No approved sound assets exist. These are DEVELOPMENT PLACEHOLDER tones and never ship.")
+        }
     }
 
     /// Drives the *real* reducer path a live voice interaction will one day

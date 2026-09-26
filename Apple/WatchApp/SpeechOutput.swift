@@ -25,9 +25,11 @@
 // delegate callback, keeps the reducer's contract satisfied either way.
 
 import AVFAudio
+import Observation
 import TamagoShared
 
 @MainActor
+@Observable
 final class SpeechOutput: NSObject, AVSpeechSynthesizerDelegate {
     /// Conservative default — see file header. Flip explicitly, don't infer.
     var isEnabled: Bool = false
@@ -36,17 +38,19 @@ final class SpeechOutput: NSObject, AVSpeechSynthesizerDelegate {
     /// Set by TamagoConnection to feed `.speechFinished` back into the
     /// reducer. Fires once per `speak(_:)` call, whether or not anything was
     /// actually spoken.
-    var onFinished: (() -> Void)?
+    @ObservationIgnored var onFinished: (() -> Void)?
 
-    private let synthesizer = AVSpeechSynthesizer()
+    @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
 
     override init() {
         super.init()
         synthesizer.delegate = self
     }
 
-    func speak(_ text: String) {
-        guard isEnabled, !text.isEmpty else {
+    /// `force` is for the DEBUG "Hello. I'm Tamago." test only: a deliberate,
+    /// one-off utterance through this same path, without turning speech on.
+    func speak(_ text: String, force: Bool = false) {
+        guard isEnabled || force, !text.isEmpty else {
             onFinished?()
             return
         }

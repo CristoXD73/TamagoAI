@@ -1,47 +1,90 @@
 // TamagoConnection.swift
 //
-// VERIFICATION: manually run end-to-end against the live Node gateway on the
-// SE 3 40 mm simulator (see docs/HANDOFF_LOG.md for the exact steps and
-// observed result). Everything else here is SIMULATOR_VERIFIED_ONLY /
-// UNVERIFIED per-effect as noted below. Not DEVICE_VERIFIED.
+// VERIFICATION: end-to-end against the live Node gateway from the SE 3 40 mm
+// simulator (docs/HANDOFF_LOG.md). SIMULATOR_VERIFIED_ONLY; not
+// DEVICE_VERIFIED. docs/DECISIONS.md D-115 (transport) and D-116 (pairing,
+// discovery, reachability, voice input, sound).
 //
-// The platform-layer executor CharacterInteractionController.onEffects was
-// added for: turns CharacterEffect into real work (network, haptics), which
-// CharacterStateMachine and CharacterInteractionController deliberately never
-// do themselves (docs/DECISIONS.md D-103). One instance, attached once, in
-// TamagoWatchApp.
+// The platform-layer executor for CharacterEffect (network, haptics, speech,
+// sound) — CharacterStateMachine never performs effects itself (D-103). Also
+// owns the Mac link: which gateway, with what credential, and whether it's
+// there. It never adds UI; everything here reaches the creature only through
+// the reducer's existing events (.routeLost/.routeRestored/.response).
 
 import Foundation
 import Observation
+import OSLog
+import Security
 import TamagoShared
+import WatchKit
 
-/// `@Observable` only so DEBUG-only diagnostics (task §21) can display these
-/// four fields; task §4 explicitly forbids surfacing any of this as
-/// permanent consumer UI, and no non-debug view reads this class's state.
 @MainActor
 @Observable
 final class TamagoConnection {
-    private(set) var lastRequestID: String?
-    private(set) var lastRoundTripMS: Int?
-    /// `nil` until the first health check completes.
-    private(set) var isReachable: Bool?
-
-    private let client: GatewayClient
-    private let speech: SpeechOutput
-    private weak var controller: CharacterInteractionController?
-    private var inFlightTask: Task<Void, Never>?
-    private var speechWatchdog: Task<Void, Never>?
-
-    init(configuration: GatewayConfiguration, speech: SpeechOutput) {
-        self.client = GatewayClient(configuration: configuration)
-        self.speech = speech
+    enum Credential: Equatable {
+        /// `TAMAGO_GATEWAY_URL` set at launch (simctl) — development only.
+        case developerOverride
+        case paired(gatewayName: String, gatewayId: String)
+        case unpaired
     }
 
-    /// Wires this connection to receive every effect the controller produces,
-    /// from any call site (debug harness, scene-phase changes, a future real
-    /// input path) — see CharacterInteractionController.onEffects.
+    enum TalkOutcome: Equatable { case listening, needsPairing, notNow, inputUnavailable }
+
+    private(set) var credential: Credential
+    private(set) var gatewayURL: URL
+    private(set) var transport = TransportState()
+    private(set) var lastProbe: GatewayProbe?
+    private(set) var lastRequestID: String?
+    private(set) var lastRoundTripMS: Int?
+    private(set) var lastTransportError: String?
+    private(set) var providerName: String?
+    private(set) var voiceInputPresented: Bool?
+
+    let speech: SpeechOutput
+    let sounds: CreatureSoundPlayer
+
+    var canTalk: Bool { credential != .unpaired }
+    var semanticState: CreatureSemanticState {
+        .derive(visual: controller?.state.visual ?? .idle, link: transport.phase)
+    }
+
+    @ObservationIgnored private var client: GatewayClient
+    @ObservationIgnored private weak var controller: CharacterInteractionController?
+    @ObservationIgnored private var inFlightTask: Task<Void, Never>?
+    @ObservationIgnored private var speechWatchdog: Task<Void, Never>?
+    @ObservationIgnored private var probeTask: Task<Void, Never>?
+    @ObservationIgnored private var beat: Task<Void, Never>?
+    @ObservationIgnored private var isActive = false
+    @ObservationIgnored private var lastVisual: TamagoCharacterState = .idle
+
+    private static let log = Logger(subsystem: "ai.tamago.watch", category: "transport")
+
+    init(speech: SpeechOutput, sounds: CreatureSoundPlayer) {
+        let (configuration, credential) = Self.resolveSettings()
+        self.client = GatewayClient(configuration: configuration)
+        self.gatewayURL = configuration.baseURL
+        self.credential = credential
+        self.speech = speech
+        self.sounds = sounds
+    }
+
+    /// Developer override, then the Keychain pairing, else unpaired at the
+    /// well-known name. A paired Watch never needs an address typed.
+    static func resolveSettings() -> (GatewayConfiguration, Credential) {
+        let env = ProcessInfo.processInfo.environment
+        if let raw = env["TAMAGO_GATEWAY_URL"], let url = URL(string: raw) {
+            return (GatewayConfiguration(baseURL: url, authToken: env["TAMAGO_GATEWAY_TOKEN"]), .developerOverride)
+        }
+        if let record = PairingStore.load() {
+            return (GatewayConfiguration(baseURL: record.baseURL, authToken: record.token, expectedGatewayId: record.gatewayId),
+                    .paired(gatewayName: record.gatewayName, gatewayId: record.gatewayId))
+        }
+        return (GatewayConfiguration(baseURL: GatewayConfiguration.wellKnownBaseURL), .unpaired)
+    }
+
     func attach(to controller: CharacterInteractionController) {
         self.controller = controller
+        lastVisual = controller.state.visual
         controller.onEffects = { [weak self] effects in
             self?.run(effects)
         }
@@ -53,20 +96,105 @@ final class TamagoConnection {
             guard let requestId = self.controller?.state.activeRequestID else { return }
             self.controller?.apply(.speechFinished(requestId: requestId))
         }
+        // No paired brain: the creature is offline, not broken (task §5).
+        if !canTalk { controller.apply(.routeLost) }
     }
 
+    // MARK: Scene lifecycle — the only thing that starts link checks
+
+    /// One probe per activation, then only what the backoff asks for.
+    func sceneBecameActive() {
+        isActive = true
+        scheduleProbe(after: 0)
+    }
+
+    /// Nothing runs for the link while the display isn't live (task §22).
+    func sceneBecameInactive() {
+        isActive = false
+        probeTask?.cancel()
+        probeTask = nil
+    }
+
+    // MARK: Talk trigger (D-106 / D-116)
+
+    /// The same path for the "hold anywhere" gesture and the DEBUG button.
+    func beginTalking() -> TalkOutcome {
+        guard let controller else { return .notNow }
+        guard canTalk else { return .needsPairing }
+        controller.apply(.userActivated)
+        guard controller.state.visual == .listening else { return .notNow }
+        let presented = VoiceInput.present { [weak controller] text in
+            // Empty/cancelled → the reducer treats it as a cancel (D-103).
+            controller?.apply(.transcript(text: text ?? "", requestId: UUID()))
+        }
+        voiceInputPresented = presented
+        guard presented else {
+            controller.apply(.cancel)
+            return .inputUnavailable
+        }
+        return .listening
+    }
+
+    // MARK: Pairing (D-116)
+
+    func pair(code: String) async -> PairingOutcome {
+        let url = credential == .developerOverride ? gatewayURL : GatewayConfiguration.wellKnownBaseURL
+        let outcome = await GatewayClient(configuration: GatewayConfiguration(baseURL: url))
+            .pair(code: code, deviceName: WKInterfaceDevice.current().name)
+        guard case let .paired(grant) = outcome else { return outcome }
+
+        let status = PairingStore.save(PairingRecord(
+            baseURL: url, token: grant.token, gatewayId: grant.gatewayId,
+            gatewayName: grant.gatewayName, pairedAt: .now))
+        reconfigure(GatewayConfiguration(baseURL: url, authToken: grant.token, expectedGatewayId: grant.gatewayId),
+                    credential: .paired(gatewayName: grant.gatewayName, gatewayId: grant.gatewayId))
+        if status != errSecSuccess {
+            lastTransportError = "Paired for this session only: Keychain save failed (\(status))."
+        }
+        return outcome
+    }
+
+    func unpair() {
+        PairingStore.clear()
+        reconfigure(GatewayConfiguration(baseURL: GatewayConfiguration.wellKnownBaseURL), credential: .unpaired)
+        controller?.apply(.routeLost)
+    }
+
+    private func reconfigure(_ configuration: GatewayConfiguration, credential: Credential) {
+        client = GatewayClient(configuration: configuration)
+        gatewayURL = configuration.baseURL
+        self.credential = credential
+        transport = TransportState()
+        lastProbe = nil
+        providerName = nil
+        lastTransportError = nil
+        scheduleProbe(after: 0)
+    }
+
+    // MARK: Effects
+
     private func run(_ effects: [CharacterEffect]) {
+        handleTransition()
         for effect in effects {
             switch effect {
             case let .sendRequest(request):
                 inFlightTask?.cancel()
                 lastRequestID = request.requestId
                 let startedAt = Date()
+                Self.log.debug("request \(request.requestId, privacy: .public) sent")
                 inFlightTask = Task { [weak self, client] in
-                    let response = await client.send(request)
+                    let exchange = await client.exchange(request)
                     guard let self, !Task.isCancelled else { return }
-                    self.lastRoundTripMS = Int(Date().timeIntervalSince(startedAt) * 1000)
-                    self.controller?.apply(.response(response))
+                    let ms = Int(Date().timeIntervalSince(startedAt) * 1000)
+                    self.lastRoundTripMS = ms
+                    let code = exchange.response.error?.code.rawValue ?? "ok"
+                    Self.log.debug("request \(request.requestId, privacy: .public) answered in \(ms) ms: \(code, privacy: .public) (reached gateway: \(exchange.reachedGateway))")
+                    self.lastTransportError = exchange.response.error.map { "\(exchange.reachedGateway ? "gateway" : "transport"): \($0.code.rawValue)" }
+                    // A stale answer is dropped by the reducer's requestId guard (D-103);
+                    // cancelling this task is the first line, the guard is the real one.
+                    self.controller?.apply(.response(exchange.response))
+                    // The request itself is the reachability check — no poll needed.
+                    self.recordLink(reachable: exchange.reachedGateway)
                 }
 
             case .cancelRequest:
@@ -74,24 +202,13 @@ final class TamagoConnection {
                 inFlightTask = nil
 
             case let .playHaptic(haptic):
-                // DEVICE_VERIFIED-pending: WKInterfaceDevice haptics can't be
-                // felt through this session's tooling; the call itself is a
-                // direct, documented WatchKit API (SIMULATOR_VERIFIED_ONLY
-                // that it's reached with no crash).
                 HapticPlayer.play(haptic)
 
             case let .speak(text):
-                // UNVERIFIED audio: see SpeechOutput.swift header. Disabled
-                // by default — no audio plays, but `onFinished` still fires
-                // so `.speaking` isn't a dead end.
                 speech.speak(text)
-                // D-106's own watchdog requirement, never implemented until
-                // now: if AVSpeechSynthesizer's delegate never fires (glitch,
-                // interruption), don't leave `.speaking` stuck. Harmless if
-                // the real completion already resolved it first — the
-                // reducer's `.speechFinished` guard requires `state.visual ==
-                // .speaking` and a matching requestId, so a late/duplicate
-                // call here is just ignored.
+                // D-106's watchdog: if the synthesizer's delegate never fires,
+                // don't leave `.speaking` stuck. A late/duplicate call is
+                // harmless — the reducer requires `.speaking` + a matching ID.
                 let requestId = controller?.state.activeRequestID
                 let estimatedSeconds = max(2.0, Double(text.count) / 15.0) + 3.0
                 speechWatchdog?.cancel()
@@ -106,33 +223,89 @@ final class TamagoConnection {
                 speech.stop()
 
             case .updateComplicationSnapshot:
-                // Declared for D-103/D-105 completeness; not emitted in
-                // Stage A (see CharacterEffect's doc comment). Nothing to do.
                 break
             }
         }
     }
 
-    /// One-shot reachability probe (`GET /v1/health`). Used by
-    /// `GatewayReachabilityMonitor`, not by the request/response path itself.
-    func checkHealth() async -> Bool {
-        let reachable = await client.checkHealth()
-        isReachable = reachable
-        return reachable
+    /// Runs after every `apply`: sound cues for the transition, and the two
+    /// timed beats D-103 assigns to the caller because the reducer reads no
+    /// clock — `ackBeatElapsed` (~0.6 s: acknowledging → thinking) and
+    /// `reactionFinished` (≤ 2.5 s hold: reaction → idle). Nothing supplied
+    /// either before this, so a slow answer never showed `thinking` and every
+    /// answer left the creature stuck in its reaction mood.
+    private func handleTransition() {
+        guard let state = controller?.state else { return }
+        let visual = state.visual
+        defer { lastVisual = visual }
+        guard visual != lastVisual else { return }
+        if let cue = CreatureSoundCue.cue(from: lastVisual, to: visual) {
+            sounds.play(cue)
+        }
+        beat?.cancel()
+        beat = nil
+        guard let requestId = state.activeRequestID else { return }
+        let event: CharacterEvent
+        let seconds: Double
+        if visual == .acknowledging {
+            (event, seconds) = (.ackBeatElapsed(requestId: requestId), 0.6)
+        } else if CharacterStateMachine.reactionMoods.contains(visual) {
+            (event, seconds) = (.reactionFinished(requestId: requestId), 2.5)
+        } else {
+            return
+        }
+        // A stale beat is harmless: the reducer checks state + requestId.
+        beat = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.controller?.apply(event)
+        }
     }
-}
 
-extension GatewayConfiguration {
-    /// `127.0.0.1` is only reachable from the Watch *simulator* (it shares
-    /// the host Mac's loopback interface); a physical Watch needs the Mac's
-    /// real LAN address here instead — see this file's own header and task
-    /// §4 (no manual-IP requirement is implemented yet; this env-var override
-    /// is the interim path, mirroring the existing `TAMAGO_PREVIEW_STATE`
-    /// simctl-launch hook in TamagoWatchApp.swift).
-    static func watchAppDefault() -> GatewayConfiguration {
-        let env = ProcessInfo.processInfo.environment
-        let fallback = URL(string: "http://127.0.0.1:8787")!
-        let url = env["TAMAGO_GATEWAY_URL"].flatMap(URL.init(string:)) ?? fallback
-        return GatewayConfiguration(baseURL: url, authToken: env["TAMAGO_GATEWAY_TOKEN"])
+    // MARK: Link
+
+    private func recordLink(reachable: Bool) {
+        transport.apply(reachable ? .reachable : .unreachable)
+        // Each is ignored by the reducer outside the one state it applies to.
+        controller?.apply(reachable ? .routeRestored : .routeLost)
+        if let delay = transport.nextProbeDelay, delay > 0 {
+            scheduleProbe(after: delay)
+        } else if transport.phase == .connected {
+            probeTask?.cancel()
+            probeTask = nil
+        }
+    }
+
+    private func scheduleProbe(after seconds: TimeInterval) {
+        probeTask?.cancel()
+        probeTask = nil
+        guard isActive, canTalk else { return }
+        probeTask = Task { [weak self] in
+            if seconds > 0 { try? await Task.sleep(for: .seconds(seconds)) }
+            guard !Task.isCancelled, let self else { return }
+            await self.runProbe()
+        }
+    }
+
+    private func runProbe() async {
+        transport.apply(.probeStarted)
+        let result = await client.probe()
+        guard !Task.isCancelled else { return }
+        lastProbe = result
+        switch result {
+        case .reachable:
+            lastTransportError = nil
+            if providerName == nil { providerName = await client.protocolInfo()?.provider }
+            recordLink(reachable: true)
+        case .notFound:
+            lastTransportError = "tamagoai.local not found on this network"
+            recordLink(reachable: false)
+        case .unreachable:
+            lastTransportError = "gateway not answering"
+            recordLink(reachable: false)
+        case let .wrongGateway(found):
+            lastTransportError = "a different gateway answered (\(found ?? "no id"))"
+            recordLink(reachable: false)
+        }
     }
 }

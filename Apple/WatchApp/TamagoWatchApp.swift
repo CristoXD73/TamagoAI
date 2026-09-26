@@ -1,18 +1,18 @@
 import SwiftUI
 import TamagoShared
+#if DEBUG
+import WatchKit
+#endif
 
-/// Phase 4 Stage A: the character is live (CharacterStateMachine +
-/// CharacterView), and — while idle — a second, independent controller
-/// (CreatureBehaviorController, D-114) gives it an autonomous world: it
-/// wanders, approaches edges, and goes offscreen on its own. Voice,
-/// transport, and TTS are not wired yet — nothing drives
-/// CharacterInteractionController except the `#if DEBUG` preview controls
-/// (docs/DECISIONS.md D-103, D-102).
+/// The character is live (CharacterStateMachine + CharacterView); while idle,
+/// CreatureBehaviorController (D-114) gives it an autonomous world. The Mac
+/// link, pairing, voice input, speech and sound run through TamagoConnection
+/// (D-115, D-116). Hold anywhere on the creature to talk.
 @main
 struct TamagoWatchApp: App {
     @State private var controller = CharacterInteractionController()
     @State private var creatureController = CreatureBehaviorController()
-    @State private var connection = TamagoConnection(configuration: .watchAppDefault(), speech: SpeechOutput())
+    @State private var connection = TamagoConnection(speech: SpeechOutput(), sounds: CreatureSoundPlayer())
 
     var body: some Scene {
         WindowGroup {
@@ -27,7 +27,8 @@ private struct RootView: View {
     var connection: TamagoConnection
 
     @State private var selectedPage = 0
-    @State private var reachabilityMonitor: GatewayReachabilityMonitor?
+    @State private var showPairing = false
+    @State private var didOfferPairing = false
     #if DEBUG
     @State private var didApplyLaunchPreview = false
     #endif
@@ -35,14 +36,19 @@ private struct RootView: View {
 
     var body: some View {
         TabView(selection: $selectedPage) {
-            CharacterScreen(controller: controller, creatureController: creatureController, isVisible: selectedPage == 0)
+            CharacterScreen(controller: controller, creatureController: creatureController,
+                            isVisible: selectedPage == 0, onTalk: talk)
                 .tag(0)
             #if DEBUG
             NavigationStack {
-                DebugStateControlsView(controller: controller, creatureController: creatureController, connection: connection)
+                DebugStateControlsView(controller: controller, creatureController: creatureController,
+                                       connection: connection, onTalk: talk)
             }
             .tag(1)
             #endif
+        }
+        .sheet(isPresented: $showPairing) {
+            PairingView(connection: connection)
         }
         #if DEBUG
         .onAppear {
@@ -55,36 +61,46 @@ private struct RootView: View {
                let target = TamagoCharacterState(rawValue: raw) {
                 controller.debugGoTo(target)
             }
+            // Same pair(code:) path as the pairing sheet, minus typing — the
+            // simulator can't type into the Scribble canvas (see VoiceInput).
+            if let code = ProcessInfo.processInfo.environment["TAMAGO_DEBUG_PAIRING_CODE"] {
+                didOfferPairing = true
+                Task { _ = await connection.pair(code: code) }
+            }
         }
         #endif
         .onAppear {
             // Wires every CharacterEffect (from any call site) to real
-            // execution — see CharacterInteractionController.onEffects and
-            // TamagoConnection. One-time: RootView's identity is stable for
-            // the app's lifetime.
+            // execution. One-time: RootView's identity is stable for the app's lifetime.
             connection.attach(to: controller)
-            let monitor = GatewayReachabilityMonitor(connection: connection, controller: controller)
-            reachabilityMonitor = monitor
-            monitor.start()
+            if scenePhase == .active { becameActive() }
         }
-        // D-104: `.background` cancels back to idle (no request/speech to
-        // cancel yet in Stage A, but this alone already satisfies "leaving/
-        // re-entering the app does not corrupt state" — relaunch never
-        // resumes a transient state like `.thinking`). `.inactive` is left
-        // alone; CharacterView already pauses/shows the low-power pose for it.
+        // D-104: `.background` cancels back to idle. Link checks run only
+        // while active (task §22; D-116).
         .onChange(of: scenePhase) { _, newPhase in
-            switch newPhase {
-            case .active:
-                reachabilityMonitor?.start()
-            default:
-                // `.inactive` and `.background` both stop polling — task §22:
-                // no reason to keep a network timer alive once the display
-                // isn't live.
-                reachabilityMonitor?.stop()
+            if newPhase == .active {
+                becameActive()
+            } else {
+                connection.sceneBecameInactive()
             }
             if newPhase == .background {
                 controller.apply(.backgrounded)
             }
+        }
+    }
+
+    private func becameActive() {
+        connection.sceneBecameActive()
+        // First-run pairing: offered once per launch while unpaired.
+        if !connection.canTalk, !didOfferPairing {
+            didOfferPairing = true
+            showPairing = true
+        }
+    }
+
+    private func talk() {
+        if connection.beginTalking() == .needsPairing {
+            showPairing = true
         }
     }
 }
@@ -93,14 +109,28 @@ private struct CharacterScreen: View {
     var controller: CharacterInteractionController
     var creatureController: CreatureBehaviorController
     var isVisible: Bool
+    var onTalk: () -> Void
 
     var body: some View {
-        // D-114 / task §9: "pure black background... the Watch face should
-        // feel like a tiny dark habitat," full-bleed with no chrome. The
-        // state-name label is a debug aid, not production UI.
+        // D-114: "pure black background... a tiny dark habitat," full-bleed
+        // with no chrome. The state-name label is a debug aid, not production UI.
+        //
+        // FULL-SCREEN INVARIANT (AGENTS.md §5, D-115 addendum): the stage must
+        // equal the whole display — 162×197 pt on the SE 3 40 mm. A previous
+        // regression measured 158×131 pt because `.ignoresSafeArea()` was on
+        // the *background* only, leaving the content inside the safe area.
+        // `.ignoresSafeArea()` belongs on this ZStack. DEBUG builds measure the
+        // stage and show ✓/✗ in the diagnostics panel (StageMetrics).
         ZStack(alignment: .bottom) {
             CharacterView(state: controller.state, creatureController: creatureController, isVisible: isVisible)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #if DEBUG
+                .background(GeometryReader { geo in
+                    Color.clear
+                        .onAppear { StageMetrics.shared.record(geo.size) }
+                        .onChange(of: geo.size) { _, size in StageMetrics.shared.record(size) }
+                })
+                #endif
             #if DEBUG
             Text(controller.state.visual.rawValue)
                 .font(.footnote)
@@ -110,5 +140,31 @@ private struct CharacterScreen: View {
         }
         .background(Color.black)
         .ignoresSafeArea()
+        // CREATURE_SPEC §4: "press and hold ≥ 0.45 s anywhere" is the talk
+        // trigger. A plain tap still belongs to the creature (approach/attention).
+        .onLongPressGesture(minimumDuration: 0.45, perform: onTalk)
     }
 }
+
+#if DEBUG
+/// DEBUG-only regression guard for the full-screen invariant above.
+@MainActor
+@Observable
+final class StageMetrics {
+    static let shared = StageMetrics()
+    private(set) var stageSize: CGSize?
+    let screenSize = WKInterfaceDevice.current().screenBounds.size
+
+    var isFullScreen: Bool? {
+        guard let stageSize, stageSize.width > 0 else { return nil }
+        return stageSize.width >= screenSize.width - 0.5 && stageSize.height >= screenSize.height - 0.5
+    }
+
+    func record(_ size: CGSize) {
+        stageSize = size
+        if isFullScreen == false {
+            print("STAGE REGRESSION: creature stage \(size) is smaller than the screen \(screenSize). See AGENTS.md §5.")
+        }
+    }
+}
+#endif

@@ -18,12 +18,13 @@ struct GatewayClientTests {
     // reliable on both platforms.
     let baseURL = URL(string: "http://127.0.0.1:1")!
 
-    func makeClient(timeout: TimeInterval = 5) -> GatewayClient {
+    func makeClient(timeout: TimeInterval = 5, expectedGatewayId: String? = nil) -> GatewayClient {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
         let session = URLSession(configuration: config)
         return GatewayClient(
-            configuration: GatewayConfiguration(baseURL: baseURL, authToken: "test-token-0123456789", requestTimeout: timeout),
+            configuration: GatewayConfiguration(baseURL: baseURL, authToken: "test-token-0123456789",
+                                                requestTimeout: timeout, expectedGatewayId: expectedGatewayId),
             session: session
         )
     }
@@ -90,22 +91,69 @@ struct GatewayClientTests {
         #expect(response.answers(request))
     }
 
-    @Test func checkHealthTrueOn200() async {
-        MockURLProtocol.stub = .success(json: #"{"status":"ok"}"#, httpStatus: 200)
-        let client = makeClient()
-        #expect(await client.checkHealth() == true)
+    // MARK: probe (GET /v1/health)
+
+    @Test func probeReachableCarriesGatewayId() async {
+        MockURLProtocol.stub = .success(json: #"{"status":"ok","gatewayId":"gw-1"}"#)
+        #expect(await makeClient().probe() == .reachable(gatewayId: "gw-1"))
     }
 
-    @Test func checkHealthFalseOnNetworkFailure() async {
+    @Test func probeDistinguishesNameNotFoundFromUnreachable() async {
+        MockURLProtocol.stub = .failure(URLError(.cannotFindHost))
+        #expect(await makeClient().probe() == .notFound)
         MockURLProtocol.stub = .failure(URLError(.cannotConnectToHost))
-        let client = makeClient()
-        #expect(await client.checkHealth() == false)
+        #expect(await makeClient().probe() == .unreachable)
+        MockURLProtocol.stub = .success(json: #"{"status":"error"}"#, httpStatus: 500)
+        #expect(await makeClient().probe() == .unreachable)
     }
 
-    @Test func checkHealthFalseOnNon200() async {
-        MockURLProtocol.stub = .success(json: #"{"status":"error"}"#, httpStatus: 500)
-        let client = makeClient()
-        #expect(await client.checkHealth() == false)
+    @Test func probeFlagsADifferentGatewayThanThePairedOne() async {
+        MockURLProtocol.stub = .success(json: #"{"status":"ok","gatewayId":"someone-else"}"#)
+        let client = makeClient(expectedGatewayId: "gw-1")
+        #expect(await client.probe() == .wrongGateway(found: "someone-else"))
+    }
+
+    // MARK: exchange — do requests themselves prove reachability?
+
+    @Test func gatewaySentErrorStillReachedTheGateway() async {
+        let request = TamagoRequest(text: "slow 99999")
+        MockURLProtocol.stub = .success(json: """
+        {"protocolVersion":1,"requestId":"\(request.requestId)","status":"error","text":"x","speechText":"x",
+         "characterState":"confused","haptic":"failure","followUpExpected":false,
+         "error":{"code":"timeout","message":"slow","retryable":true}}
+        """, httpStatus: 504)
+        let exchange = await makeClient().exchange(request)
+        #expect(exchange.reachedGateway, "a gateway-sent timeout proves the Mac answered")
+        #expect(exchange.response.error?.code == .timeout)
+    }
+
+    @Test func synthesizedErrorDidNotReachTheGateway() async {
+        MockURLProtocol.stub = .failure(URLError(.timedOut))
+        let exchange = await makeClient().exchange(TamagoRequest(text: "hi"))
+        #expect(!exchange.reachedGateway)
+        #expect(exchange.response.error?.code == .timeout)
+    }
+
+    // MARK: pair (POST /v1/pair)
+
+    @Test func pairingSuccessReturnsTheGrantWithoutSendingAToken() async {
+        MockURLProtocol.stub = .success(json: #"{"protocolVersion":1,"gatewayId":"gw-1","gatewayName":"Studio","token":"secret-token-abc"}"#)
+        MockURLProtocol.capturedRequest = nil
+        let outcome = await makeClient().pair(code: "123456", deviceName: "Watch")
+        #expect(outcome == .paired(TamagoPairingGrant(gatewayId: "gw-1", gatewayName: "Studio", token: "secret-token-abc")))
+        #expect(MockURLProtocol.capturedRequest?.url?.path == "/v1/pair")
+        #expect(MockURLProtocol.capturedRequest?.value(forHTTPHeaderField: "authorization") == nil)
+    }
+
+    @Test func pairingFailuresAreClassified() async {
+        MockURLProtocol.stub = .success(json: #"{"protocolVersion":1,"error":{"code":"pairing_failed","message":"x"}}"#, httpStatus: 401)
+        #expect(await makeClient().pair(code: "000000") == .wrongCode)
+        MockURLProtocol.stub = .success(json: #"{"protocolVersion":1,"error":{"code":"pairing_closed","message":"x"}}"#, httpStatus: 410)
+        #expect(await makeClient().pair(code: "000000") == .closed)
+        MockURLProtocol.stub = .success(json: #"{"protocolVersion":1,"error":{"code":"pairing_unavailable","message":"x"}}"#, httpStatus: 404)
+        #expect(await makeClient().pair(code: "000000") == .closed)
+        MockURLProtocol.stub = .failure(URLError(.cannotFindHost))
+        #expect(await makeClient().pair(code: "000000") == .unreachable)
     }
 
     @Test func requestSendsBearerAuthorizationHeaderAndJSONBody() async {

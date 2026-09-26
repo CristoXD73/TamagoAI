@@ -31,6 +31,7 @@ let package = Package(
                 "CreatureBehaviorEngine.swift",
                 "CreatureBehaviorController.swift",
                 "GatewayTransport.swift",
+                "ConnectionModel.swift",
             ]
         ),
         .testTarget(

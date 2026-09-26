@@ -42,7 +42,11 @@ struct CharacterView: View {
             // already covers the environment half of "live".
             let liveNow = environmentIsLive && context.cadence == .live
 
-            if state.visual == .idle {
+            // CREATURE_SPEC §5.3 `disconnected`: "Otherwise its idle life
+            // continues normally. Not sad, not alarming." Until the approved
+            // glow-missing embodiment exists, offline runs the same idle
+            // habitat instead of a static pose (D-116).
+            if state.visual == .idle || state.visual == .disconnected {
                 // Keep observation writes outside body evaluation. Cadence
                 // controls drawing fidelity; the active environment gates
                 // world advancement without introducing another timer.
