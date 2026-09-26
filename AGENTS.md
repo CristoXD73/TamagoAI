@@ -92,3 +92,18 @@ and **one** bounded next task. Record physical-device observations in
 The human owner makes product decisions, approves signing, performs physical
 testing, and approves merges. Ask them only for things that are really theirs
 to decide.
+
+## 7. Visual Approval Gate (character motion)
+
+**No new user-visible character animation, movement, expression, transition, pose or interaction
+behavior goes from written spec directly into production code.** The order is:
+idea → visual prototype (GIF/MP4/storyboard, approved art, SE 3 40 mm scale) → owner review →
+revision → **owner approval** → production implementation → simulator comparison against the
+approved prototype. Full rule, exemptions and the approval register: `docs/VISUAL_APPROVAL_GATE.md`.
+
+- Engineering-only work (safe area, full-bleed, networking, performance, tests, removing debug UI)
+  is exempt.
+- Only the owner sets `APPROVED`. Never infer approval.
+- The approved reference art in `Assets/CharacterReference/` is visual ground truth: don't redesign,
+  humanize, or restyle the character.
+

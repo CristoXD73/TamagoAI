@@ -5,6 +5,13 @@
 **Naming:** The product is now called **TamagoAI**. "Apple Tamago" and "TamaWatch" in older
 docs refer to the same project. The creature itself is referred to as **Tamago** or "the octopus".
 
+**Visual identity & approval (2026-09-26, D-010):** the approved references in
+`Assets/CharacterReference/octopus-v001/` override any visual description here. In particular the eyes
+are glossy dark spheres with heavy upper lids and **no visible pupil shape**, so wherever this spec says
+"bar/round/slit pupil", read **lid aperture + gaze** (open ↔ heavy half-lid ↔ closed; gaze direction). No
+behavior in this spec may be implemented until its visual prototype is approved
+(`docs/VISUAL_APPROVAL_GATE.md`; first batch in `docs/ANIMATION_PROTOTYPE_PLAN.md`).
+
 **Rule for implementers:** Behavior described here is *intent*. Everything that depends on watchOS
 behavior (Always-On, complication refresh, frontmost duration, CoreMotion, audio) is `UNVERIFIED`
 until observed on the physical Apple Watch SE 3 and logged in `DEVICE_TEST_LOG.md`. When the device

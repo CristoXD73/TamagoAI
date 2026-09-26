@@ -11,6 +11,7 @@ adds Claude-specific notes.
 4. `docs/DECISIONS.md`: architecture decisions (Opus owns the Apple-side ones)
 5. `docs/PROTOCOL_V1.md`: the Watch ⇄ Mac contract
 5b. `docs/CREATURE_SPEC.md`: how the creature behaves (read before touching any character code)
+5c. `docs/VISUAL_APPROVAL_GATE.md` + `docs/ANIMATION_PROTOTYPE_PLAN.md`: **no character motion ships without an owner-approved visual prototype**
 6. Your role's section in `docs/handoff/TamaWatch_COMPLETE_HANDOFF.md`
 
 ## Repository map
@@ -23,6 +24,8 @@ adds Claude-specific notes.
 | `Apple/AppleTamago.xcodeproj` | Targets `TamagoWatch`, `TamagoComplication`, `TamagoPhone`, `TamagoTests` (D-101). | builds: `SIMULATOR_VERIFIED_ONLY` |
 | `Apple/WatchApp`, `Apple/iPhoneApp`, `Apple/Complication` | Placeholder sources (synchronized folders). | Watch launch: `SIMULATOR_VERIFIED_ONLY` |
 | `Apple/Config/Tamago.xcconfig` | Placeholder bundle prefix, empty team; real values go in git-ignored `Local.xcconfig`. | n/a |
+| `Assets/CharacterReference/` | **Approved character art (visual ground truth, D-010).** References only, not runtime assets. | owner-approved |
+| `docs/prototypes/`, `tools/previz/` | Animation previews for owner review + the preview-only Python rig that makes them. Not app code. | previz |
 | `docs/CREATURE_SPEC.md` | **Creature behavior/personality spec (TamagoAI octopus).** Source of truth for character behavior. | design |
 | `docs/` | Brief, architecture, decisions, protocol, reuse, tests, logs. | n/a |
 | `scripts/smoke.sh` | curl smoke test against a running gateway. | manual |

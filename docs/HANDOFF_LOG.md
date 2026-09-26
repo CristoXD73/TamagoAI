@@ -1021,3 +1021,34 @@ then Sonnet implements spec §13 MUST items 2–5 (life layer, mood variables, i
 protocol-state embodiment) on top of the D-114 engine and `CharacterFace`.
 **Do not redo:** creature personality, behavior catalogs, emotional language, familiarity system,
 anti-patterns, storyboard, priority list.
+
+---
+
+### 2026-09-26: Claude (product + creature animation director): first animation prototype plan + Visual Approval Gate
+
+**Branch:** `claude/great-volta-ogpuw8`
+**Commit(s):** the commit adding `docs/ANIMATION_PROTOTYPE_PLAN.md` (see `git log`)
+**Assigned task:** turn CREATURE_SPEC into the first animation prototype plan using the owner's approved
+character art; introduce the visual approval gate; no production character code.
+**Files added:** `docs/ANIMATION_PROTOTYPE_PLAN.md`, `docs/VISUAL_APPROVAL_GATE.md`,
+`Assets/CharacterReference/octopus-v001/` (3 owner references + `PROVENANCE.md`),
+`docs/prototypes/animation-v1/` (10 storyboards + overview; 05 Edge Inspection MP4 ×2 and GIF ×2),
+`tools/previz/` (preview-only Python rig: `engine.py`, `extract_sprites.py`, `storyboards.py`,
+`scene_edge_inspection.py`, `render_motion.py`, README).
+**Files changed:** `AGENTS.md` (§7 gate), `docs/DECISIONS.md` (D-010), `docs/CREATURE_SPEC.md` (art/eye
+supersede note), `docs/CHARACTER_ASSET_PIPELINE.md` (links), `CLAUDE.md` (map/reading order), this log.
+**Production code touched:** none (no Swift, no Xcode project, no gateway changes).
+**Upstream source reused:** none.
+**Commands run:** `python3 tools/previz/extract_sprites.py`, `python3 tools/previz/storyboards.py`,
+`python3 tools/previz/render_motion.py scene_edge_inspection 05_edge_inspection` (Pillow 12.3,
+NumPy 2.4, OpenCV 5.0, imageio-ffmpeg 7.0.2). Outputs were visually inspected frame by frame. The
+storyboard re-rendered from the repo copy of the tool is byte-identical to the reviewed one.
+**Verification:** previews are **PREVIZ** only. Nothing is implemented, so there are no
+SIMULATOR/DEVICE labels. The 12 fps GIF shows the D-102 cap visually; it doesn't measure the Watch.
+**Status:** all 10 prototypes `PROTOTYPE_READY_FOR_REVIEW` (register in `VISUAL_APPROVAL_GATE.md`).
+**Known limitations:** one separable arm in previz (visible seam at extreme bends), painted lids look
+pasted-on in close-ups, mirrored views flip lighting, turns cut between views. The art gap report lists
+what removes these.
+**Next recommended task:** the owner reviews `docs/prototypes/animation-v1/05_edge_inspection/` and the
+storyboards and records APPROVED / REVISION_REQUESTED per animation. Commission the NEEDED NOW art (N1–N4).
+**Do not:** implement any of the 10 animations, or write engineering handoffs, before owner approval.

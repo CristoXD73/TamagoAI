@@ -65,6 +65,23 @@ in Xcode (Phase 3). Physical-device results can overturn any entry.
 ---
 
 
+### D-010 Approved character art is ground truth; Visual Approval Gate for all character motion
+- **Decision (owner, 2026-09-26):** the references in `Assets/CharacterReference/octopus-v001/` define
+  TamagoAI's look (porcelain-white octopus, glossy dark eyes with heavy upper lids, spiral-tipped arms,
+  no mouth). All new user-visible character motion follows `docs/VISUAL_APPROVAL_GATE.md`: visual
+  prototype → owner approval → implementation → simulator comparison.
+- **Consequences:** CREATURE_SPEC's "horizontal bar pupil" vocabulary is superseded by **lid aperture +
+  gaze** (the art has no visible pupil shape). The first prototype batch is
+  `docs/ANIMATION_PROTOTYPE_PLAN.md` (10 animations; 05 Edge Inspection rendered as the first motion test).
+  Previews are produced with the preview-only rig `tools/previz/`, never with app code.
+- **Relationship to D-114:** the existing Stage A procedural placeholder and engine remain; they're not
+  extended with new visible behavior until the corresponding prototypes are approved. Engineering-only
+  fixes remain allowed.
+- **Art gaps** blocking quality production (layered arms, eye/lid kit, turn in-betweens, arm-curl) are
+  listed in `ANIMATION_PROTOTYPE_PLAN.md` §5.
+
+---
+
 ## Made in Phase 3 (Claude Opus, local Xcode 27.0 / watchOS 27.0 SDK)
 
 Resolves the Phase 1 "Open, for Opus" list (items 1–10 → D-101…D-110; the

@@ -4,6 +4,11 @@ Status: **UNVERIFIED** production proposal; no final art or renderer integration
 is delivered here. Follow [D-102–D-104](DECISIONS.md) and coordinate integration
 with the character/UI owner after their behavior work finishes.
 
+**Approved references (2026-09-26):** `Assets/CharacterReference/octopus-v001/` is the visual ground
+truth (D-010). The prioritized list of views/poses still to produce is the art gap report in
+[ANIMATION_PROTOTYPE_PLAN.md §5](ANIMATION_PROTOTYPE_PLAN.md). No pose enters the app before its motion
+prototype is approved ([VISUAL_APPROVAL_GATE.md](VISUAL_APPROVAL_GATE.md)).
+
 ## Art contract
 
 An original white, soft-bodied octopus AI companion, with octopus-like/alien
