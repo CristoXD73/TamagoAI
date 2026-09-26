@@ -70,7 +70,7 @@ owner on the SE 3 40 mm.
     | Target | Platform | Product / bundle ID | Sources |
     |---|---|---|---|
     | `TamagoWatch` | watchOS 27.0 | "Tamago" · `$(TAMAGO_BUNDLE_PREFIX).watchkitapp` | `Apple/WatchApp/` |
-    | `TamagoComplication` | watchOS 27.0 WidgetKit extension, embedded in the Watch app | `$(TAMAGO_BUNDLE_PREFIX).watchkitapp.complication` | `Apple/Complication/` |
+    | `TamagoComplication` | watchOS 27.0 WidgetKit extension, embedded in the Watch app | `$(TAMAGO_BUNDLE_PREFIX).watchkitapp.widget` (see D-113: the literal suffix `.complication` is rejected by Apple's bundle-ID registration API) | `Apple/Complication/` |
     | `TamagoPhone` | iOS 27.0, embeds the Watch app | "Tamago" · `$(TAMAGO_BUNDLE_PREFIX)` | `Apple/iPhoneApp/` |
 
   - Shared code is a **local Swift package, `Apple/Shared` → library `TamagoShared`**
@@ -465,3 +465,58 @@ off-LAN exposure).
   disconnected; idle/disconnected terminal responses clear request identity;
   reaction completion preserves follow-up intent until a new interaction or
   explicit cancellation/background reset.
+
+### D-113 Complication bundle-identifier repair: the literal suffix `.complication` is unregistrable
+
+- **Decision:** `TamagoComplication`'s `PRODUCT_BUNDLE_IDENTIFIER` changes from
+  `$(TAMAGO_BUNDLE_PREFIX).watchkitapp.complication` to
+  `$(TAMAGO_BUNDLE_PREFIX).watchkitapp.widget`. Nothing else about the target
+  changes: same `com.apple.product-type.app-extension` product type, same
+  `com.apple.widgetkit-extension` extension point, same embedding in
+  `TamagoWatch`, same `WKCompanionAppBundleIdentifier`/team/signing style.
+- **Reason:** every generic signed build of `TamagoWatch` (which embeds the
+  complication) failed with `xcodebuild: error: Failed Registering Bundle
+  Identifier` + `No profiles for '...complication' were found`, reproduced
+  three times against three different `TAMAGO_BUNDLE_PREFIX` values
+  (`com.example.appletamago`, `com.cristoxd73.tamawatch`,
+  `com.cristoxd73.tamawatch.c73x926`) and once more after renaming the Watch
+  app's own suffix from `.watchkitapp` to `.watch`. The unified system log
+  (`log show`, `IDEProvisioningLedgerEntry`) shows Xcode's own bundle-ID
+  lookup (`GET .../bundleIds?filter[identifier]=<id>,*`) returning
+  `"total": 0` (the identifier is globally unclaimed) immediately before the
+  create call is rejected with `409 ENTITY_ERROR.ATTRIBUTE.INVALID`,
+  `resultCode: 9400`, `"An App ID with Identifier '<id>' is not available.
+  Please enter a different string."` — for every identifier ending in the
+  literal path segment `complication`, and for no other identifier in the
+  project (base app, `.watchkitapp`, `.tests` all registered without
+  incident). Changing only the trailing segment to `widget`, with the prefix
+  and every other setting held constant, made the identical `TamagoWatch`
+  generic signed build succeed immediately. This is Apple Developer Services
+  API behavior, not a project misconfiguration and not a capability the
+  target declares (no entitlements, no App Group, no Complications capability
+  are configured anywhere in the project) — it reproduced identically whether
+  or not the identifier contained the string `watchkitapp`, ruling out that
+  substring as the cause.
+- **Alternatives:** deleting the `TamagoComplication` target (rejected: the
+  target is architecturally correct for watchOS 27 WidgetKit — see below —
+  and the assignment that found this required not deleting it without proof
+  the architecture itself was wrong, which it isn't); enrolling in the paid
+  Apple Developer Program (rejected: unnecessary, this is a naming defect,
+  not a Personal Team capability restriction — the same 409 reproduced
+  regardless of prefix and is a bundle-ID string rule, not a team-tier gate).
+- **Is the complication target architecture correct for watchOS 27?** Yes.
+  `com.apple.product-type.app-extension` + `com.apple.widgetkit-extension` +
+  `StaticConfiguration`/`TimelineProvider` (D-105) is the current,
+  non-deprecated WidgetKit architecture; there is no separate legacy
+  "WatchKit complication" target type in the watchOS 27 SDK to migrate away
+  from. Nothing about D-105's design needed to change.
+- **Risks:** if Apple's backend ever *does* accept `.complication`-suffixed
+  identifiers (e.g., after an account/API change), this decision does not
+  need to be revisited — `.watchkitapp.widget` remains valid and correct
+  either way. If a future target intentionally wants an identifier ending in
+  `complication`, expect the same registration failure and apply the same
+  fix (rename the trailing segment).
+- **Device verification required:** none beyond D-101's existing requirement
+  (signed install on the SE 3). This is a provisioning-identifier fix, not a
+  behavior change.
+- **Fallback:** none needed; this is the fix.

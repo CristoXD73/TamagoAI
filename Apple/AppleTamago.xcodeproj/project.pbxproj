@@ -518,7 +518,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp.complication";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -565,7 +565,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp.complication";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;

@@ -628,3 +628,155 @@ character/lifecycle/debug-control acceptance, recording observations in
 DEVICE_TEST_LOG before expanding the product.
 **Do not redo:** existing architecture/art direction, wire protocol, gateway,
 project/signing settings, or deferred Stage B features.
+
+---
+
+### 2026-09-26 11:30: Claude (Sonnet 5, signing/provisioning repair agent): SIGNING/PROVISIONING REPAIR — complication bundle ID unregistrable
+
+**Branch:** `claude/great-volta-ogpuw8`. **Parent commit:** `1c5cbbe` (Stage A
+audit checkpoint). Working tree was clean at start.
+
+**Assignment:** narrowly scoped repair of a signing/provisioning failure
+blocking generic signed builds; no feature work, no UI changes.
+
+**Root cause:** Apple's Developer Services bundle-ID registration API
+(`POST https://developerservices2.apple.com/services/v1/bundleIds`) rejects
+any *new* App ID whose identifier ends in the literal path segment
+`complication`, with `409 ENTITY_ERROR.ATTRIBUTE.INVALID`, `resultCode 9400`,
+`"An App ID with Identifier '<id>' is not available. Please enter a different
+string."` — even though the same API's own lookup immediately prior reports
+`"total": 0` (the string is globally unclaimed). This is independent of team
+type, bundle prefix, and whether the identifier contains `watchkitapp`. It is
+**not** a Personal Team / free-provisioning capability restriction: the
+target declares no entitlements, no App Group, and no Complications
+capability, and the identical rejection reproduced across three different
+`TAMAGO_BUNDLE_PREFIX` values and across two different parent-path spellings
+(`.watchkitapp.complication` and `.watch.complication`).
+
+**Evidence (reproduced live against the real Apple Developer Services API,
+Personal Team `PZYU9G628V`):**
+- `xcodebuild build -scheme TamagoWatch -destination 'generic/platform=watchOS' -allowProvisioningUpdates -allowProvisioningDeviceRegistration`
+  failed identically for `com.example.appletamago.watchkitapp.complication`,
+  `com.cristoxd73.tamawatch.watchkitapp.complication`,
+  `com.cristoxd73.tamawatch.c73x926.watchkitapp.complication`, and
+  `com.cristoxd73.tamawatch.c73x926.watch.complication` (after a diagnostic
+  rename of the Watch app's own suffix, later reverted as unnecessary).
+- `/usr/bin/log show --predicate 'eventMessage CONTAINS "developerservices2"'`
+  captured the raw `IDEProvisioningLedgerEntry` request/response pairs for
+  every attempt above, each showing the `bundleIds` GET returning zero matches
+  followed by the POST create call returning the 409 quoted above.
+- Every **other** identifier in the project — the base app, `<prefix>.tests`,
+  and `<prefix>.watchkitapp` / `<prefix>.watch` (the Watch app itself) —
+  registered and received profiles without incident in the same sessions
+  (confirmed via cached `.mobileprovision` files in
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`).
+- Changing **only** the complication's trailing path segment from
+  `complication` to `widget` (prefix, parent segment, product type, extension
+  point, embedding, and all other settings held constant) made the identical
+  build succeed on the first try.
+- No `~/Library/MobileDevice/Provisioning Profiles` directory existed at the
+  start of this session (i.e., no profile had ever been fully issued on this
+  Mac before this repair), and Xcode's `IDEProvisioningTeamByIdentifier`
+  confirmed the Personal Team (`isFreeProvisioningTeam = 1`) was correctly
+  registered and the certificate (`271370FE7FA04C71E206F1BF74215AD84B48F098`,
+  "Apple Development: Brandon carvajal (35N28G33R2)") was valid throughout.
+
+**Was the complication target architecture wrong for watchOS 27?** No.
+`com.apple.product-type.app-extension` + `NSExtensionPointIdentifier =
+com.apple.widgetkit-extension` + `StaticConfiguration`/`TimelineProvider`
+(D-105) is the current, correct, non-deprecated WidgetKit architecture. There
+is no separate legacy "watchOS complication" target type in the installed
+watchOS 27 SDK to migrate away from, and the target was not deleted.
+
+**Files changed**
+- `Apple/AppleTamago.xcodeproj/project.pbxproj`: `TamagoComplication`'s
+  `PRODUCT_BUNDLE_IDENTIFIER` (Debug and Release) changed from
+  `$(TAMAGO_BUNDLE_PREFIX).watchkitapp.complication` to
+  `$(TAMAGO_BUNDLE_PREFIX).watchkitapp.widget`. No other target's
+  `PRODUCT_BUNDLE_IDENTIFIER` changed (the Watch app's `.watchkitapp` suffix
+  was tried as `.watch` mid-investigation to isolate the cause, then reverted
+  — it was never the problem). No entitlements, capabilities, product type,
+  extension point, embedding phases, or Swift source changed.
+- `docs/DECISIONS.md`: added D-113 recording this root cause and repair;
+  updated D-101's `TamagoComplication` table cell to the new identifier.
+- This entry.
+- **Not touched:** `Apple/Config/Local.xcconfig` (git-ignored, untouched),
+  Protocol V1, Gateway, `CharacterStateMachine`, `CharacterView`, any
+  entitlements file (none exist in the project), signing style (stayed
+  `Automatic`), team ID.
+
+**Signed build results**
+```sh
+rm -rf /Volumes/Storage/DevCaches/TamaWatch/DerivedData && mkdir -p /Volumes/Storage/DevCaches/TamaWatch/DerivedData
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch \
+  -destination 'generic/platform=watchOS' \
+  -derivedDataPath /Volumes/Storage/DevCaches/TamaWatch/DerivedData \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone \
+  -destination 'generic/platform=iOS' \
+  -derivedDataPath /Volumes/Storage/DevCaches/TamaWatch/DerivedData \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+```
+- `TamagoWatch` (embeds `TamagoComplication` via "Embed Foundation
+  Extensions"): **BUILD SUCCEEDED**, signed with "Apple Development: Brandon
+  carvajal (35N28G33R2)" against "iOS Team Provisioning Profile:
+  com.cristoxd73.tamawatch.c73x926.watchkitapp" and a newly issued profile for
+  `...watchkitapp.widget`. `SIMULATOR_VERIFIED_ONLY` is not the right label
+  here — this is a **generic signed build**, not yet installed on hardware;
+  no `DEVICE_VERIFIED` claim is made.
+- `TamagoPhone` (embeds the Watch app): **BUILD SUCCEEDED**, signed against
+  "iOS Team Provisioning Profile: com.cristoxd73.tamawatch.c73x926".
+
+**Regression suite (unchanged code, run after the repair)**
+```sh
+swift test --package-path Apple/Shared --scratch-path .build/spm -Xswiftc -warnings-as-errors
+xcodebuild test -project Apple/AppleTamago.xcodeproj -scheme TamagoWatch \
+  -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' \
+  -derivedDataPath /Volumes/Storage/DevCaches/TamaWatch/DerivedData
+npm test --prefix Gateway
+```
+- Swift host: **93/93 passed** (`UNIT_TESTED_ONLY`), matching the audited
+  Checkpoint A baseline exactly.
+- Swift, SE 3 40 mm watchOS 27.0 simulator (`8B5287E9-BD6A-422A-B353-B8E3499AE31D`):
+  **93/93 passed** (`SIMULATOR_VERIFIED_ONLY` for the app/build path; the
+  tests themselves are `UNIT_TESTED_ONLY`).
+- Gateway: **66/66 passed** (`UNIT_TESTED_ONLY`), unaffected — no protocol,
+  Gateway, or wire-format change.
+
+**Compiler warnings:** none beyond the pre-existing, expected, informational
+`appintentsmetadataprocessor: Metadata extraction skipped, no
+AppIntents.framework dependency found` (1 occurrence in the Watch signed
+build, 2 in the Phone signed build and in the simulator test build — same
+message reported unsuppressed in prior checkpoints).
+
+**Git status:** working tree clean except the two-line `project.pbxproj`
+diff and the `docs/DECISIONS.md`/this-log documentation changes described
+above. Nothing staged, nothing committed yet by this entry (committed
+separately right after this entry lands, per the assignment's instruction not
+to skip documentation).
+
+**Remaining physical-device blocker (unrelated to this repair):** the
+physical Apple Watch SE 3 is **not yet exposed to Xcode**
+(`docs/LOCAL_ENVIRONMENT.md`/owner's own status: "connected (no DDI)" for the
+iPhone, Watch not connected at all). Generic signed builds prove the
+provisioning/signing chain end-to-end; they do not install anything on
+hardware. **We can proceed to physical Watch deployment only after** the
+Watch is paired to the iPhone, the iPhone is trusted/has Developer Mode
+enabled and a DDI (Developer Disk Image) is mounted, and both are visible to
+`xcrun devicectl list devices`. That pairing/trust step is the owner's to
+perform (AGENTS.md: "The human owner ... performs physical testing").
+
+**Unverified:** everything physical (install, launch on the SE 3 hardware,
+complication rendering on an actual watch face, Always-On/reduced luminance,
+WatchConnectivity). This repair only restores the ability to *build a signed
+binary*; it does not itself install or run anything on the physical device.
+
+**Do not redo:** the diagnosis (three-prefix reproduction + the
+`watchkitapp` vs `watch` isolation test + the `widget` leaf-suffix fix), the
+external-DerivedData clean/rebuild, or the regression re-run above.
+**Next recommended task (ONE bounded step):** owner pairs and trusts the
+physical Apple Watch SE 3 + iPhone in Xcode (Settings → Privacy & Security →
+Developer Mode on the iPhone; Watch paired and visible to
+`xcrun devicectl list devices`), then a device-targeted (not generic) signed
+install of `TamagoPhone`/`TamagoWatch` and the owner-led Stage A acceptance
+pass in `docs/DEVICE_TEST_LOG.md`.
