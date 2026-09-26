@@ -75,13 +75,21 @@ public struct GatewayExchange: Equatable, Sendable {
 
 public actor GatewayClient {
     private let configuration: GatewayConfiguration
-    private let session: URLSession
+    /// How a request is performed. Production: a URLSession. Tests inject a
+    /// stub here — watchOS doesn't honor custom `URLProtocol` classes on a
+    /// session, so protocol-level mocking only ever worked on the host.
+    public typealias Fetch = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    private let fetch: Fetch
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     public init(configuration: GatewayConfiguration, session: URLSession = GatewayClient.defaultSession) {
+        self.init(configuration: configuration, fetch: { try await session.data(for: $0) })
+    }
+
+    public init(configuration: GatewayConfiguration, fetch: @escaping Fetch) {
         self.configuration = configuration
-        self.session = session
+        self.fetch = fetch
     }
 
     /// D-107: ephemeral, no cookies or cache, fail fast rather than wait for
@@ -117,7 +125,7 @@ public actor GatewayClient {
 
         let data: Data
         do {
-            data = try await session.data(for: urlRequest).0
+            data = try await fetch(urlRequest).0
         } catch let error as URLError where error.code == .timedOut {
             return GatewayExchange(response: synthesized(for: request, code: .timeout, message: "No answer within \(Int(configuration.requestTimeout))s."), reachedGateway: false)
         } catch {
@@ -138,7 +146,7 @@ public actor GatewayClient {
         let data: Data
         let response: URLResponse
         do {
-            let result = try await session.data(for: urlRequest)
+            let result = try await fetch(urlRequest)
             data = result.0
             response = result.1
         } catch let error as URLError where error.code == .cannotFindHost || error.code == .dnsLookupFailed {
@@ -164,7 +172,7 @@ public actor GatewayClient {
         let data: Data
         let response: URLResponse
         do {
-            let result = try await session.data(for: urlRequest)
+            let result = try await fetch(urlRequest)
             data = result.0
             response = result.1
         } catch {
@@ -183,7 +191,7 @@ public actor GatewayClient {
     /// GET `/v1/protocol`, for diagnostics (provider name, gatewayId).
     public func protocolInfo() async -> TamagoProtocolInfo? {
         let url = configuration.baseURL.appendingPathComponent("v1/protocol")
-        guard let (data, _) = try? await session.data(for: URLRequest(url: url, timeoutInterval: 5)) else { return nil }
+        guard let (data, _) = try? await fetch(URLRequest(url: url, timeoutInterval: 5)) else { return nil }
         return try? decoder.decode(TamagoProtocolInfo.self, from: data)
     }
 

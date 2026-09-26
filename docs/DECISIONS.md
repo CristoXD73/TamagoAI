@@ -813,7 +813,15 @@ off-LAN exposure).
   `WKInterfaceDevice.screenBounds` and show ✓/✗ in diagnostics, printing
   `STAGE REGRESSION` on failure. An automated layout test needs a UI-test target
   or library that doesn't exist yet.
-- **Verification:** 137 host Swift tests; 79 gateway tests. Live in the SE 3 40 mm
+- **Verification:** 137/137 Swift tests on the host **and** on the watchOS 27
+  simulator (`xcodebuild test`, fresh SE 3 40 mm simulator: TEST SUCCEEDED); 79/79 gateway tests.
+- **Correction to D-115's record:** D-115 claimed `GatewayClientTests` passed on
+  the watchOS simulator, and its worklog blamed `xcodebuild test` "hangs" on a
+  worn-out simulator. Both were wrong. The tests mocked at the `URLProtocol`
+  level, which watchOS doesn't honor on a URLSession, so 9 of them hit the real
+  network and **failed** on watchOS. The apparent hang was Xcode collecting
+  diagnostics *after* those failures. `GatewayClient` now takes an injectable
+  `fetch`, which works the same on every platform. Live in the SE 3 40 mm
   simulator against a LAN-mode gateway: `tamagoai.local` resolves via the system
   resolver, pairing, Keychain persistence across relaunch, authenticated
   requests, hold → dictation sheet → request → reaction → idle, gateway stop →
