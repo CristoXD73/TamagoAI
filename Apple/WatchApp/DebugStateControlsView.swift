@@ -19,14 +19,33 @@ import TamagoShared
 struct DebugStateControlsView: View {
     var controller: CharacterInteractionController
     var creatureController: CreatureBehaviorController
+    var connection: TamagoConnection
 
     private let previewStates: [TamagoCharacterState] = [
         .idle, .listening, .acknowledging, .thinking, .toolRunning, .speaking,
         .happy, .success, .confused, .error, .disconnected, .sleeping,
     ]
 
+    /// Text sent verbatim to the real gateway's mock provider (see
+    /// `Gateway/src/providers/mock.js`) — chosen so the reaction is
+    /// unambiguous proof a real HTTP round trip happened, not the synthetic
+    /// `debugRespond` path every other button below uses.
+    private let liveGatewayCommands = ["ping", "state happy", "state confused", "tool wifi"]
+
     var body: some View {
         List {
+            Section {
+                ForEach(liveGatewayCommands, id: \.self) { command in
+                    Button("Send to gateway: \(command)") {
+                        sendToGateway(command)
+                    }
+                }
+            } header: {
+                Text("Live gateway (task §2/§6 proof)")
+            } footer: {
+                Text("Requires a running gateway (`cd Gateway && TAMAGO_ALLOW_NO_AUTH=1 npm start`) reachable at TAMAGO_GATEWAY_URL (default http://127.0.0.1:8787, works from the simulator only). Goes through the real HTTP round trip, not the previews below.")
+            }
+
             Section {
                 ForEach(previewStates, id: \.self) { target in
                     Button(target.rawValue) {
@@ -70,8 +89,39 @@ struct DebugStateControlsView: View {
             } header: {
                 Text("Current state")
             }
+
+            Section {
+                LabeledContent("Gateway") {
+                    switch connection.isReachable {
+                    case .some(true): Text("reachable").foregroundStyle(.green)
+                    case .some(false): Text("unreachable").foregroundStyle(.red)
+                    case .none: Text("unknown").foregroundStyle(.secondary)
+                    }
+                }
+                if let ms = connection.lastRoundTripMS {
+                    LabeledContent("Last round trip", value: "\(ms) ms")
+                }
+                if let id = connection.lastRequestID {
+                    Text(id).font(.caption2).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Transport diagnostics (task §21)")
+            }
         }
         .navigationTitle("Debug")
+    }
+
+    /// Drives the *real* reducer path a live voice interaction will one day
+    /// use (`.userActivated` then `.transcript`), not `debugGoTo`'s synthetic
+    /// `debugRespond` shortcut — so the resulting `.sendRequest` effect goes
+    /// out over `TamagoConnection` to whatever gateway `TAMAGO_GATEWAY_URL`
+    /// points at, and the reaction that comes back is the mock provider's
+    /// real answer.
+    private func sendToGateway(_ text: String) {
+        let now = Date()
+        controller.apply(.cancel, now: now)
+        controller.apply(.userActivated, now: now)
+        controller.apply(.transcript(text: text, requestId: UUID()), now: now)
     }
 }
 

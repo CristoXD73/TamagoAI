@@ -1192,3 +1192,44 @@ untouched by this fix).
 SE 3 (or another case size) and record the result in `docs/DEVICE_TEST_LOG.md`.
 **Do not redo:** this specific safe-area investigation; see
 `docs/AGENT_WORKLOG.md` for the full root-cause writeup and bisection detail.
+
+---
+
+### 2026-09-26: Claude Code: Watch↔Mac connectivity (D-115), repo rebrand to TamagoAI
+
+**Branch:** `claude/great-volta-ogpuw8`
+**Commit(s):** see the two commits this entry lands with (engineering, then branding/hygiene).
+**Files changed:** see `docs/AGENT_WORKLOG.md`'s matching entry for the full list; summary:
+new `GatewayClient`/`TamagoConnection`/`HapticPlayer`/`SpeechOutput`/`GatewayReachabilityMonitor`,
+`CharacterInteractionController.onEffects`, a "Live gateway" debug section, `docs/DECISIONS.md`
+D-115, `docs/ARCHITECTURE.md` security-posture update, `README.md` expansion.
+**Upstream source reused:** None.
+**Tests run (exact commands):**
+```sh
+swift test --package-path Apple/Shared --scratch-path .build/spm
+cd Apple && xcodebuild -scheme TamagoWatch -destination 'id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' build
+cd Gateway && npm test
+git diff --check
+```
+**Passed:** 122/122 Swift tests (host, several reruns); watchOS simulator build succeeds;
+Gateway's pre-existing 66/66 tests (unchanged, not this agent's work); a full manual
+end-to-end run against the live gateway with debug tracing, confirming the exact expected
+`CharacterStateMachine` transition sequence for a real network round trip (11–17ms observed).
+**Failed:** `xcodebuild test` on the watchOS simulator hung/failed in Xcode's diagnostics
+collection three times in a row (simulator/testmanagerd state, not a code failure — see
+`docs/AGENT_WORKLOG.md` "Known issues"); not resolved this session.
+**Physical-device evidence (+ label):** none. Everything is `SIMULATOR_VERIFIED_ONLY` or
+`UNIT_TESTED_ONLY`. A physical Watch cannot use loopback and has not been tried against a
+real LAN address.
+**Unverified:** audible speech (disabled by default — no way to hear simulator/device audio
+here), haptic feel, `GatewayReachabilityMonitor`'s battery cost, a clean automated
+`xcodebuild test` run for this exact batch.
+**Known risks:** the simulator used all session (`8B5287E9-...`) has been through many
+install/launch/terminate/reboot cycles and may need replacing before the next `xcodebuild test`
+attempt. Bonjour discovery, nonverbal creature sounds, and a session/memory layer beyond the
+gateway's existing dedupe were scoped but not built — see D-115.
+**Next recommended task (ONE bounded step):** owner (or next agent) runs `xcodebuild test`
+against a *freshly created* Watch simulator to get a clean automated confirmation, then
+records physical-Watch behavior in `docs/DEVICE_TEST_LOG.md` once hardware is available.
+**Do not redo:** the Watch-side transport/effect-execution architecture question — it's
+settled in D-115; extend it, don't replace it.

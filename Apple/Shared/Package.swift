@@ -30,6 +30,7 @@ let package = Package(
                 "CharacterInteractionController.swift",
                 "CreatureBehaviorEngine.swift",
                 "CreatureBehaviorController.swift",
+                "GatewayTransport.swift",
             ]
         ),
         .testTarget(

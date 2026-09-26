@@ -180,3 +180,169 @@ worklog were touched; no shared files from other agents' in-flight work were
 involved in this batch.
 
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-26T15:24:51-0400: Claude Code — Watch↔Mac connectivity, repo rebrand
+
+**Agent:** Claude Code
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `581f9f5`
+**Ending commit SHA:** recorded in a follow-up once committed (this batch
+lands as two commits — see "Checkpoint strategy" below)
+
+**Scope:** a large, multi-part owner request covering engineering
+(Watch↔Mac connectivity, haptics, speech), security/branding/repo hygiene,
+and main-branch integration. Full technical detail for the engineering half
+is in `docs/DECISIONS.md` D-115 — this entry summarizes and adds what D-115
+doesn't cover (repo/branding actions, checkpoint list, what was explicitly
+deferred).
+
+**Files changed (engineering):**
+- `Apple/Shared/GatewayTransport.swift` (new) — `GatewayClient`/`GatewayConfiguration`
+- `Apple/Shared/Tests/TamagoSharedTests/GatewayClientTests.swift` (new, 10 tests)
+- `Apple/Shared/Package.swift` — registers the new source file
+- `Apple/Shared/CharacterInteractionController.swift` — adds `onEffects` hook
+- `Apple/WatchApp/TamagoConnection.swift` (new) — effect executor, transport
+  diagnostics, speech watchdog
+- `Apple/WatchApp/HapticPlayer.swift` (new)
+- `Apple/WatchApp/SpeechOutput.swift` (new)
+- `Apple/WatchApp/GatewayReachabilityMonitor.swift` (new)
+- `Apple/WatchApp/TamagoWatchApp.swift` — wires the above into `RootView`
+- `Apple/WatchApp/DebugStateControlsView.swift` — "Live gateway" debug section
+  + transport diagnostics display
+- `docs/DECISIONS.md` (D-115), `docs/ARCHITECTURE.md` (security posture
+  update), `docs/DEVELOPMENT.md` (testing recipe), `docs/HANDOFF_LOG.md`
+
+**Files changed (branding/hygiene):** `README.md` (expanded: what it is, current
+status, architecture, character philosophy, development, roadmap,
+contributing), `.gitignore` (Python cache, `*.log`).
+
+**GitHub/repo actions taken (not a file diff — recorded here per task's own
+audit requirement):**
+- Renamed the GitHub repository `CristoXD73/faucet-repo` → `CristoXD73/TamagoAI`
+  via `gh repo rename TamagoAI --repo CristoXD73/faucet-repo`. Verified via
+  `gh repo view` before and after. Confirmed logged in as the repo owner
+  (`CristoXD73`, token scope includes `repo`) before acting — this is a
+  real, public, mostly-but-not-fully-reversible action (GitHub redirects the
+  old URL; the name itself doesn't revert on its own), taken because the
+  owner explicitly named the exact target name and gave an explicit fallback
+  instruction ("if not permitted, report as owner action") in the same
+  message, which this agent treats as the required explicit permission for a
+  GitHub account/settings change.
+- Updated the local `origin` remote to the new URL (`git remote set-url`).
+- Set repository description and 8 topics via `gh repo edit` (description:
+  "A living AI companion for Apple Watch, with a Mac-powered local
+  intelligence layer."; topics: apple-watch, watchos, swift, swiftui, ai,
+  local-ai, companion, virtual-pet).
+- Searched the full repo for "faucet" (case-insensitive, all text file
+  types): only two hits, both historical `docs/HANDOFF_LOG.md`/`docs/DECISIONS.md`
+  entries describing what the repo *was* named at an earlier point — left
+  those untouched (rewriting historical log entries would falsify the
+  record) and instead updated D-001's now-stale "still needs renaming" note
+  to point at this entry.
+
+**Work performed (engineering, condensed from D-115):** built the missing
+Watch-side half of the Mac↔Watch loop — the Mac gateway and wire protocol
+already existed and needed no changes. Added a pure-Foundation `GatewayClient`
+that executes `CharacterStateMachine`'s existing `sendRequest`/`cancelRequest`
+effects and never throws (synthesizes client-side error envelopes on any
+transport failure, per PROTOCOL_V1 §8). Added one seam
+(`CharacterInteractionController.onEffects`) so a single platform-layer
+executor (`TamagoConnection`) can react to every effect from any call site.
+Wired real haptics (`HapticPlayer`, direct `TamagoHaptic → WKHapticType` map)
+and a `GatewayReachabilityMonitor` (20s health-check poll while the scene is
+active, feeding the existing `.routeLost`/`.routeRestored` events). Found,
+live against the real gateway, that `Gateway/src/protocol.js`'s
+`buildOkResponse` defaults `speechText` to `text`, so essentially every
+response enters `.speaking` — with speech disabled by default (its default
+state; see below) this would have frozen the creature there forever without
+a completion signal, so `SpeechOutput.onFinished` fires synchronously when
+disabled, and a duration-estimate-based watchdog (D-106's own
+never-implemented requirement) covers the "enabled but the delegate never
+fires" case too.
+
+**Tests/builds actually performed:**
+- `swift test --package-path Apple/Shared` (host): 122/122 PASS, several times
+  across the session, most recently after the speech-watchdog addition.
+- `xcodebuild -scheme TamagoWatch build` (watchOS 27 simulator, SE 3 40mm):
+  BUILD SUCCEEDED, several times across the session, most recently after the
+  speech-watchdog addition.
+- `xcodebuild test` (same scheme/simulator): attempted three times; each
+  attempt hung or failed in Xcode's own diagnostics-collection phase
+  (`simctl diagnose`), not in an actual test failure — most likely
+  simulator/`testmanagerd` state left over from this session's extensive
+  manual `simctl install`/`launch`/`terminate` cycling on the same device,
+  worsened by also manually driving the simulator (taps/screenshots) while a
+  test run was in flight the first time. A full `simctl shutdown`/`boot`
+  between attempts did not resolve it. **Not resolved this session** — see
+  "Known issues."
+- **Live, manual, end-to-end verification** against the real gateway
+  (`TAMAGO_ALLOW_NO_AUTH=1 npm start`) on the booted SE 3 40mm simulator,
+  with full debug tracing (temporary `print` statements in
+  `CharacterInteractionController.apply` and `TamagoConnection`, removed
+  before commit): confirmed the exact expected sequence — `cancel` →
+  `userActivated` → `transcript` → `sendRequest` effect → real HTTP request
+  received by the gateway (matched by request ID in the gateway's own JSON
+  log) → real response decoded → `.speaking` with the correct
+  `pendingReaction` → the new speech-completion fix firing → settling on the
+  gateway's actual answer. Repeated across the `ping`, `state happy`, and
+  `state confused` mock commands. Round-trip times of 11–17ms observed and
+  cross-checked against the gateway's own per-request log line.
+- `Gateway`: `npm test` → 66/66 PASS (pre-existing suite, unchanged by this
+  session — attributed to whoever wrote it, not claimed as this agent's own
+  test-writing work).
+- `git diff --check`: clean.
+
+**Things NOT verified:**
+- Anything on a physical Apple Watch. Everything above is
+  `SIMULATOR_VERIFIED_ONLY` or `UNIT_TESTED_ONLY`.
+- A physical Watch reaching a Mac over a real LAN address (only loopback,
+  from the simulator, was exercised).
+- Audible speech output — `SpeechOutput.isEnabled` defaults to `false`
+  precisely because this session cannot hear simulator or device audio.
+- Haptic *feel* — the WatchKit call is confirmed reached, not confirmed felt.
+- `GatewayReachabilityMonitor`'s battery cost (task's own §22 ask) — no
+  physical-device energy measurement was possible here.
+- A clean, fully-automated `xcodebuild test` run on the watchOS simulator for
+  this batch (see above) — host tests cover the identical pure-logic code
+  that the simulator target compiles, and the manual E2E run exercised the
+  platform-specific code the host can't (URLSession on watchOS, WatchKit,
+  AVSpeechSynthesizer), but neither is a substitute for a clean automated
+  simulator test-run confirmation.
+
+**Known issues:**
+- `xcodebuild test` unreliability on this simulator (see above). Recommended
+  next step: a fresh simulator instance (`xcrun simctl create`) rather than
+  continuing to reuse `8B5287E9-BD6A-422A-B353-B8E3499AE31D`, which has now
+  been through many hours of install/launch/terminate/reboot cycles across
+  this session.
+- Bonjour/mDNS discovery, nonverbal creature sounds, and a
+  session/memory layer beyond the gateway's existing request-ID dedupe were
+  scoped but **not built** this pass — see D-115's "Not built this pass" for
+  the reasoning (verifiability and asset-availability, not time alone).
+- The `docs/tamagoai-presentation` branch (an earlier, now-superseded
+  rebrand-only branch, last commit `77bf80e`) still exists on `origin` and
+  was deliberately left untouched — it predates this branch's animation
+  prototype and Watch-fix work and would regress the repo if merged as-is.
+  Recommend the owner delete it once confirmed unneeded, or merge
+  cherry-picked ideas manually; this agent did not decide that unilaterally.
+
+**Cross-agent impact:** none of Codex's uncommitted `3D/` work or in-progress
+`docs/HANDOFF_LOG.md` entries were touched or re-reconciled in this batch
+(no new fast-forward was needed — this branch stayed at `581f9f5` plus this
+batch's own commits, with `3D/` still present, untracked, exactly as Codex
+left it). The GitHub repo rename and remote URL change affect every
+collaborator/agent working against this remote going forward — anyone with
+`faucet-repo` hardcoded in a local clone's remote will need to update it
+(GitHub's redirect covers `git clone`/`fetch`/`push` against the old URL
+too, per GitHub's own rename behavior, but a hardcoded API/webhook URL
+elsewhere would not redirect).
+
+**Checkpoint strategy (task §25):** this batch lands as two commits rather
+than one: (1) engineering — transport, haptics, speech, their tests, and the
+docs describing them; (2) branding/hygiene — README restructure and
+`.gitignore`. The GitHub repo rename and metadata are not file-diff
+commits; they're recorded here and in D-001's updated note.
+
+**Signed-by:** Claude Code

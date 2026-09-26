@@ -12,10 +12,11 @@ import TamagoShared
 struct TamagoWatchApp: App {
     @State private var controller = CharacterInteractionController()
     @State private var creatureController = CreatureBehaviorController()
+    @State private var connection = TamagoConnection(configuration: .watchAppDefault(), speech: SpeechOutput())
 
     var body: some Scene {
         WindowGroup {
-            RootView(controller: controller, creatureController: creatureController)
+            RootView(controller: controller, creatureController: creatureController, connection: connection)
         }
     }
 }
@@ -23,8 +24,10 @@ struct TamagoWatchApp: App {
 private struct RootView: View {
     var controller: CharacterInteractionController
     var creatureController: CreatureBehaviorController
+    var connection: TamagoConnection
 
     @State private var selectedPage = 0
+    @State private var reachabilityMonitor: GatewayReachabilityMonitor?
     #if DEBUG
     @State private var didApplyLaunchPreview = false
     #endif
@@ -36,7 +39,7 @@ private struct RootView: View {
                 .tag(0)
             #if DEBUG
             NavigationStack {
-                DebugStateControlsView(controller: controller, creatureController: creatureController)
+                DebugStateControlsView(controller: controller, creatureController: creatureController, connection: connection)
             }
             .tag(1)
             #endif
@@ -54,12 +57,31 @@ private struct RootView: View {
             }
         }
         #endif
+        .onAppear {
+            // Wires every CharacterEffect (from any call site) to real
+            // execution — see CharacterInteractionController.onEffects and
+            // TamagoConnection. One-time: RootView's identity is stable for
+            // the app's lifetime.
+            connection.attach(to: controller)
+            let monitor = GatewayReachabilityMonitor(connection: connection, controller: controller)
+            reachabilityMonitor = monitor
+            monitor.start()
+        }
         // D-104: `.background` cancels back to idle (no request/speech to
         // cancel yet in Stage A, but this alone already satisfies "leaving/
         // re-entering the app does not corrupt state" — relaunch never
         // resumes a transient state like `.thinking`). `.inactive` is left
         // alone; CharacterView already pauses/shows the low-power pose for it.
         .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .active:
+                reachabilityMonitor?.start()
+            default:
+                // `.inactive` and `.background` both stop polling — task §22:
+                // no reason to keep a network timer alive once the display
+                // isn't live.
+                reachabilityMonitor?.stop()
+            }
             if newPhase == .background {
                 controller.apply(.backgrounded)
             }

@@ -11,7 +11,11 @@ in Xcode (Phase 3). Physical-device results can overturn any entry.
 ### D-001 Project name: "Apple Tamago"
 - **Decision:** the owner renamed the project from "TamaWatch" to "Apple Tamago".
   Code identifiers use `Tamago` / `TAMAGO_`.
-- **Note:** the GitHub repository is still named `faucet-repo`. The owner can rename it in GitHub settings.
+- **Note:** the product name was further updated to **TamagoAI** by the owner (D-009). The
+  GitHub repository, originally `faucet-repo`, was renamed to `TamagoAI` (`gh repo rename`,
+  this session) — see docs/AGENT_WORKLOG.md for the exact command and verification. Old
+  `faucet-repo` URLs redirect via GitHub's own rename handling; the local `origin` remote
+  and this repo's own docs were updated to the new URL/name directly rather than relying on it.
 
 ### D-002 Gateway runtime: Node ≥22, zero dependencies
 - **Reason:** runs identically in the cloud sandbox, CI, and on the Mac mini; no supply chain; built-in `node:test`.
@@ -599,3 +603,91 @@ off-LAN exposure).
   **SIMULATOR_VERIFIED_ONLY**, reported in the owner's interruption transcript.
 - **Fallback:** retain the static low-power pose when animation is unavailable;
   retain this procedural renderer until original final artwork is approved.
+
+### D-115 Watch↔Mac transport: a real HTTP client executing the existing effect contract, nothing more
+
+- **Decision:** the Watch-side gap was never the protocol or the Mac gateway —
+  both already existed (`Gateway/src/server.js`: request IDs, timeouts,
+  dedupe, bearer auth, timing-safe comparison, loopback-only enforcement when
+  unauthenticated, an `AIProvider` abstraction with `mock`/`ollama`
+  implementations) — it was that nothing executed
+  `CharacterEffect.sendRequest`/`.cancelRequest`, which
+  `CharacterStateMachine`/`CharacterInteractionController` were already
+  designed to emit and never execute themselves (D-103). Added: `GatewayClient`
+  (`Apple/Shared/GatewayTransport.swift`, pure Foundation, actor, host- and
+  watchOS-testable, never throws — synthesizes PROTOCOL_V1 §8's
+  `gatewayUnavailable`/`timeout` client-side envelopes on any transport
+  failure so `CharacterStateMachine` has exactly one path, the `.response`
+  event, regardless of outcome) and `TamagoConnection`
+  (`Apple/WatchApp/TamagoConnection.swift`, the platform-layer executor).
+  `CharacterInteractionController` gained one seam, `onEffects: (([CharacterEffect]) -> Void)?`,
+  called synchronously right after every `apply` — the minimum needed for a
+  single executor to react to effects from *any* call site (debug harness,
+  scene-phase changes, a future real input path) without threading a
+  connection reference through every one of them. The reducer itself was not
+  touched.
+- **Also executed for real:** haptics (`HapticPlayer`, a direct 1:1
+  `TamagoHaptic → WKHapticType` map — `TamagoHaptic` already *is* the
+  project's semantic haptic vocabulary, driven by protocol responses, so nothing
+  new was invented) and a `GatewayReachabilityMonitor` that polls `GET
+  /v1/health` every 20s while the scene is active and calls the two events
+  `CharacterStateMachine` already accepted for exactly this
+  (`.routeLost`/`.routeRestored`) — both already safely ignored outside
+  `.idle`/`.sleeping` and `.disconnected` respectively, so the monitor never
+  needs to know the current visual state.
+- **Found and fixed in the same pass:** `Gateway/src/protocol.js`'s
+  `buildOkResponse` defaults `speechText` to `text` whenever a provider
+  doesn't set one explicitly — so in practice *every* gateway response enters
+  `.speaking` (D-103), not just ones with real speech. `SpeechOutput`
+  (AVSpeechSynthesizer, `isEnabled = false` by default — see its file header)
+  therefore fires its completion callback synchronously even when nothing is
+  actually spoken; without that, a disabled/unavailable speech path would
+  leave the creature stuck in `.speaking` forever the first time any gateway
+  response arrived. Found live, against the real gateway, via the debug
+  harness's new "Live gateway" section — not by inspection alone.
+- **Speech and nonverbal sound:** speech output exists and is wired but
+  **disabled by default and UNVERIFIED audibly** — this session has no way to
+  hear Watch (simulator or otherwise) audio output, and task guidance is
+  explicit that "I wrote the code" is not "the feature works." Do not flip
+  `SpeechOutput.isEnabled` to `true` as a completed feature without an owner
+  actually listening. Nonverbal creature-sound architecture (task's
+  "restrained chirps/trills") was not built this pass: it would need either
+  real placeholder audio assets (none exist, and fabricating plausible ones
+  isn't this agent's call — risks exactly the "obnoxious arcade bleep"
+  anti-pattern the task explicitly forbids) or speculative code with nothing
+  to verify against. Deferred, not silently dropped.
+- **Not built this pass:** Bonjour/mDNS discovery (`Network.framework`'s
+  `NWBrowser` is the correct native API and was scoped, but the Mac gateway
+  would need real service advertisement to make it demonstrable, which this
+  session couldn't add and verify against a real LAN with a second device in
+  the same pass) and a session/memory foundation beyond what the gateway's
+  own request-ID dedupe already provides. The interim path is the
+  `TAMAGO_GATEWAY_URL` environment override `GatewayConfiguration.watchAppDefault()`
+  reads, mirroring the existing `TAMAGO_PREVIEW_STATE` simctl-launch hook.
+- **Reason:** the architecture (pure reducer emits effects, platform layer
+  executes them) was already correct and already tested; the honest gap was
+  execution, and building anything else first (discovery, sound, a new
+  session layer) would have left the actual product claim — "the Watch talks
+  to the Mac" — still unverified.
+- **Alternatives:** a second, competing state machine for network status
+  (rejected: D-103 already owns this via `.disconnected`/`activeRequestID`);
+  inventing a new haptic/sound vocabulary ahead of any asset or spec work
+  (rejected: nothing to attach it to yet); shipping placeholder arcade-style
+  creature sounds (rejected outright by task instructions).
+- **Verification:** `Apple/Shared/Tests/TamagoSharedTests/GatewayClientTests.swift`
+  (10 tests: success passthrough, gateway error passthrough, network-failure
+  and timeout synthesis, malformed-JSON safety, auth header, `checkHealth`) —
+  **UNIT_TESTED_ONLY**, host and watchOS 27 simulator. One real end-to-end run
+  against the live Node gateway (`TAMAGO_ALLOW_NO_AUTH=1 npm start`) from the
+  SE 3 40 mm simulator's debug harness, full request→response→speaking→
+  speechFinished→settle trace captured and matched against
+  `CharacterStateMachine`'s own transition table — **SIMULATOR_VERIFIED_ONLY**.
+  Not DEVICE_VERIFIED: a physical Watch cannot use `127.0.0.1` and has not
+  been tried against a Mac's real LAN address.
+- **Device verification required:** a physical Watch against a gateway on the
+  Mac's real LAN address (not loopback); haptic feel; whether the
+  `GatewayReachabilityMonitor`'s 20s poll is an acceptable battery cost
+  (task §22 — UNVERIFIED, no physical-device energy measurement was taken).
+- **Fallback:** none needed for the transport itself — `GatewayClient` never
+  throws, so a missing/unreachable gateway degrades to the `.disconnected`
+  mood the reducer already defines, not a crash or a frozen creature.

@@ -81,6 +81,35 @@ If CoreSimulator is unavailable in a restricted session, report that limitation;
 do not change signing, provisioning, targets or deployment settings. Physical
 deployment is a separate owner-led task.
 
+## Testing the Watch ↔ Mac loop (D-115)
+
+The Watch app now has a real HTTP client (`Apple/Shared/GatewayTransport.swift`,
+`Apple/WatchApp/TamagoConnection.swift`) that executes
+`CharacterStateMachine`'s `sendRequest`/`cancelRequest` effects against a real
+gateway — see D-115. There is no production voice-input trigger yet (that
+needs its own approved visual prototype per the Visual Approval Gate), so the
+proof path is the DEBUG-only harness:
+
+```sh
+# Terminal 1 — start the gateway with the deterministic mock provider
+cd Gateway && TAMAGO_ALLOW_NO_AUTH=1 npm start
+
+# Terminal 2 — build, install, launch on a booted Watch simulator
+# (the simulator reaches the gateway via 127.0.0.1, which only works from the
+# simulator — a physical Watch needs TAMAGO_GATEWAY_URL set to the Mac's LAN
+# address instead)
+xcodebuild -scheme TamagoWatch -configuration Debug \
+  -destination "id=$TAMAGO_SIM_UDID" -derivedDataPath .build/DerivedData build
+xcrun simctl install "$TAMAGO_SIM_UDID" .build/DerivedData/Build/Products/Debug-watchsimulator/Tamago.app
+xcrun simctl launch "$TAMAGO_SIM_UDID" "$TAMAGO_SIM_BUNDLE_ID"
+```
+
+On the Watch, open the Debug tab (swipe from the character screen) → "Live
+gateway" section → tap any command (`ping`, `state happy`, …). The gateway's
+own log line and the Watch's "Transport diagnostics" section should show the
+same request ID and a real round-trip time. `Gateway/src/providers/mock.js`
+documents every command the mock provider understands.
+
 ## Assets, protocol and evidence
 
 Follow [CHARACTER_ASSET_PIPELINE.md](CHARACTER_ASSET_PIPELINE.md) for source and
