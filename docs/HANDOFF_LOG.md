@@ -124,3 +124,151 @@ To give Swift a live server: `cd Gateway && TAMAGO_ALLOW_NO_AUTH=1 npm start`
 (simulator, loopback) or
 `TAMAGO_TOKEN=$(openssl rand -hex 24) TAMAGO_HOST=0.0.0.0 npm start` (physical
 Watch on the same Wi-Fi; keep the token out of Git).
+
+---
+
+### 2026-09-26: Claude Opus (local Xcode architect): Phase 3 architecture + compiled Xcode foundation
+
+**Branch:** `claude/great-volta-ogpuw8`
+
+**Commit:** `39ab886` (all work). This log entry lands in the commit right after it.
+
+**Environment:** Xcode 27.0 (27A266a), Swift 6.4, watchOS/iOS 27.0 SDKs, macOS 27.0 arm64.
+Full record: `docs/LOCAL_ENVIRONMENT.md`. Physical Watch/iPhone **not connected**.
+
+**Architecture decisions** (`docs/DECISIONS.md` D-101…D-111; all Phase 1 open items resolved)
+- D-101 Targets: one Xcode project (synchronized folders) with `TamagoWatch`,
+  `TamagoComplication`, `TamagoPhone`, and `TamagoTests`. `Apple/Shared` is a local
+  Swift package `TamagoShared`. watchOS/iOS 27.0. No XcodeGen. Placeholder bundle
+  prefix `com.example.appletamago`, no team (owner sets both in git-ignored `Apple/Config/Local.xcconfig`).
+- D-102 Renderer: SwiftUI `TimelineView(.animation(minimumInterval: 1/12, paused: !isLive))`
+  + one asset-catalog image per frame + `SpriteAnimationClock`. When not live
+  (inactive, reduced luminance, Reduce Motion, cadence ≠ live), it pauses and shows `lowPowerFrame`. SpriteKit is the fallback.
+- D-103 State machine: a pure reducer in `TamagoShared` over `TamagoCharacterState`
+  + `activeRequestID`, with effects out. Full transition table. **`happy` stays
+  separate from `success`.** Stale responses are dropped inside the reducer. Render modes are not states.
+- D-104 Lifecycle: `.inactive` pauses animation but keeps the request and speech;
+  `.background` cancels to `idle`. No keep-alive of any kind
+  (`frontmostTimeoutExtended` is "No longer supported" in the SDK). Return to Clock
+  is the owner's setting. Transient states are never restored.
+- D-105 Complication: mood snapshot (6 moods) via App Group, single-entry
+  `.never` timeline, reloaded only on mood change, `tamago://open`. App Group
+  deferred to Phase 6 (needs the team).
+- D-106 Voice: **`Speech.framework` is absent from the watchOS 27 SDK**, so V1 input is
+  system dictation via text input. TTS is `AVSpeechSynthesizer` with delegate + watchdog.
+  Audio → Mac STT is a protocol v2 item.
+- D-107 Transport: `TamagoTransport.send` always returns an envelope and throws only
+  `CancellationError`. `TransportRouter` actor: direct first, one same-ID relay
+  fallback only on pre-HTTP connection failure, no retry loops. 25/30 s timeouts.
+  `NSAllowsLocalNetworking` (already in the Watch `Info.plist`).
+- D-108 WC: `sendMessageData` for relay (exact v1 JSON both ways). Token only via
+  user-initiated `sendMessage` into the Watch Keychain. `applicationContext` for
+  non-secret config. `transferUserInfo`/`transferFile` unused in V1.
+- D-109 Security: token in the Keychain (`AfterFirstUnlockThisDeviceOnly`,
+  non-synchronizable) on both devices. The iPhone owns config. Never commit team/prefix/token/IPs.
+- D-111 Upstream: W1 approved (with a fix), W2/W3 amended, Q6 promoted to the V1
+  voice path, Q10 rejected as a tool. All other rows approved.
+
+**Targets created** (in `Apple/AppleTamago.xcodeproj`)
+
+| Target | Type | Result |
+|---|---|---|
+| `TamagoWatch` | watchOS 27 app, "Tamago", `…watchkitapp`, runs independently | builds; launches on SE 3 40 mm sim: **SIMULATOR_VERIFIED_ONLY** |
+| `TamagoComplication` | watchOS WidgetKit extension in `Tamago.app/PlugIns` | builds + embedded: **SIMULATOR_VERIFIED_ONLY** (never placed on a face) |
+| `TamagoPhone` | iOS 27 app, embeds `Watch/Tamago.app` | builds for iPhone 17 sim: **SIMULATOR_VERIFIED_ONLY** (not launched) |
+| `TamagoTests` | hostless watchOS unit-test bundle (same files as the package's `TamagoSharedTests`) | 43/43 pass |
+
+**Files changed**
+- New: `docs/LOCAL_ENVIRONMENT.md`, `Apple/AppleTamago.xcodeproj/` (pbxproj + 2 shared schemes),
+  `Apple/Config/Tamago.xcconfig`, `Apple/Shared/Package.swift`,
+  `Apple/Shared/Tests/TamagoSharedTests/{FixtureLoader,ProtocolFixtureTests,SpriteAnimationClockTests}.swift`,
+  `Apple/WatchApp/{TamagoWatchApp.swift,Info.plist}`, `Apple/Complication/{TamagoComplication.swift,Info.plist}`,
+  `Apple/iPhoneApp/TamagoPhoneApp.swift`
+- Modified: `Apple/Shared/SpriteAnimationClock.swift` (defect fix, see below),
+  `Apple/Shared/TamagoProtocolV1.swift` (header comment only), `docs/DECISIONS.md`,
+  `docs/ACCEPTANCE_TESTS.md`, `docs/PROTOCOL_V1.md` (status cell only),
+  `docs/UPSTREAM_REUSE.md`, `CLAUDE.md`, `README.md`, `Apple/**/README.md`, `.gitignore`
+- **Not touched:** `Gateway/`, `Tests/Fixtures/`, Protocol V1 wire format.
+
+**Swift compilation:** both Cloud files compiled **unmodified** under Swift 6.4 /
+Swift 6 language mode with zero warnings (`-warnings-as-errors`). `TamagoProtocolV1.swift`
+logic is unchanged and passes every fixture. **One genuine defect was found in
+`SpriteAnimationClock`** and demonstrated by a test before fixing it: `Int(elapsed * 1000)`
+crashed (`Fatal error: Double value cannot be converted to Int because it is either
+infinite or NaN`) and would overflow 32-bit `Int` (arm64_32 Watch) after ~24.8 days
+elapsed. Fixed minimally: non-finite/negative → start, and loop phase computed in `Double`.
+Timing semantics are otherwise unchanged.
+
+**Protocol defects found:** none. Swift decodes all 21 manifest entries exactly
+as the gateway produces them. Swift enums match `protocol-info.json` exactly.
+
+**Build commands (exact, from the repo root)**
+```sh
+(cd Apple && xcodebuild build -project AppleTamago.xcodeproj -scheme TamagoWatch \
+  -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' \
+  -derivedDataPath ../.build/DerivedData)
+(cd Apple && xcodebuild build -project AppleTamago.xcodeproj -scheme TamagoPhone \
+  -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath ../.build/DerivedData)
+xcrun simctl boot 8B5287E9-BD6A-422A-B353-B8E3499AE31D
+xcrun simctl install 8B5287E9-BD6A-422A-B353-B8E3499AE31D .build/DerivedData/Build/Products/Debug-watchsimulator/Tamago.app
+xcrun simctl launch 8B5287E9-BD6A-422A-B353-B8E3499AE31D com.example.appletamago.watchkitapp
+```
+
+**Test commands (exact) and results**
+```sh
+(cd Apple/Shared && swift test --scratch-path ../../.build/spm -Xswiftc -warnings-as-errors)   # host macOS
+(cd Apple && xcodebuild test -project AppleTamago.xcodeproj -scheme TamagoWatch \
+  -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' \
+  -derivedDataPath ../.build/DerivedData)                                                   # SE 3 40 mm
+(cd Apple/Shared && xcodebuild test -scheme TamagoShared \
+  -destination 'platform=watchOS Simulator,id=8B5287E9-BD6A-422A-B353-B8E3499AE31D' \
+  -derivedDataPath ../../.build/DerivedData)                                                # package scheme, SE 3 40 mm
+(cd Gateway && npm test)                                                                    # regression check only
+```
+- Swift: **43/43 passed** in each of the three runs (Swift Testing; 22 protocol
+  tests incl. parameterized cases over all 21 fixtures, 21 `SpriteAnimationClock`
+  tests). `UNIT_TESTED_ONLY`.
+- Gateway: 66/66 on local Node v26.9.0 (unchanged code).
+- Simulator: SE 3 40 mm (watchOS 27.0) builds, runs the tests, and launches the
+  placeholder app ("Tamago / protocol v1 · idle", which proves `TamagoShared` links). `SIMULATOR_VERIFIED_ONLY`.
+
+**Warnings:** no compiler warnings in any target. The only build-log warning is
+Apple's `appintentsmetadataprocessor: Metadata extraction skipped, no AppIntents.framework dependency found` (informational).
+
+**Upstream source reused:** none new. W1 (WatchPet sprite timing) was modified
+further (the fix), and its header + `UPSTREAM_REUSE.md` attribution record are updated.
+
+**Unverified (`UNVERIFIED`)**
+- Everything on the physical Watch/iPhone: signing, install, Always-On/reduced
+  luminance, scene-phase sequence, Return to Clock, complication on a face, voice,
+  TTS, haptics, WatchConnectivity, LAN HTTP from the Watch (the highest risk; D-107).
+- The iPhone app was built but not launched. The complication was never rendered on a face.
+- The hand-authored `project.pbxproj` has only been exercised by `xcodebuild`. The
+  first open in the Xcode GUI may rewrite it (commit that normalization separately).
+- Fixture tests read the repo via `#filePath`. They won't run on a physical device (by design).
+
+**Storage:** DerivedData and SwiftPM build products go to `/Volumes/Storage/Projects/TamaWatch/.build/`
+(485 MB, git-ignored). `~/Library/Developer/Xcode/DerivedData` stays at 32 KB. Internal
+SSD growth: the SE 3 40 mm simulator's device data after first boot (+1.1 GiB in
+`~/Library/Developer/CoreSimulator/Devices/8B52…`) plus ~0.3 GiB of temp files.
+Internal free space went from ~33 GiB to ~30 GiB (df, includes unrelated system activity).
+Nothing was relocated or symlinked.
+
+**Known risks:** LAN HTTP/`.local` from watchOS (D-107). System dictation UX
+covers the character (D-106). App Group + signing need the owner's team (D-101/D-105).
+
+**Next recommended task (Claude Sonnet, Phase 4 Stage A, ONE bounded step):**
+1. Owner first: create `Apple/Config/Local.xcconfig` with the real
+   `TAMAGO_BUNDLE_PREFIX` and `DEVELOPMENT_TEAM`, and connect the SE 3 + iPhone to Xcode.
+2. Sonnet: implement `CharacterStateMachine` (pure reducer, D-103 table, effects
+   out) in `Apple/Shared/` with Swift Testing reducer tests (stale-response drop,
+   cancel → idle, each reaction → idle). Then build `CharacterView` in `Apple/WatchApp/`
+   exactly per D-102 with **original placeholder frames** (a few simple shapes per
+   state in an asset catalog) and a debug control to step through idle / listening /
+   thinking / speaking / success / error / disconnected. No networking, voice, TTS,
+   or complication work.
+3. Stop when it's installed on the physical Watch and the owner has run the
+   AC C checks and recorded results in `DEVICE_TEST_LOG.md`.
+
+**Do not redo:** D-101…D-111, the Xcode project/targets, the package layout,
+the fixture and clock tests, the clock fix, `docs/LOCAL_ENVIRONMENT.md`.
