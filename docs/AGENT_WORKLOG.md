@@ -698,3 +698,30 @@ persisted-turn format now includes placeholders). Protocol V1 unchanged. The LAN
 restarted with the new code (state in `/Volumes/Storage/AI/TamagoAI`, AGENTS.md §9).
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T00:58:25-04:00: Claude Code — Swift fixture tests updated for the nonverbal reply (were failing)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `c9c8add`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/Shared/Tests/TamagoSharedTests/ProtocolFixtureTests.swift`,
+`Apple/Shared/Tests/TamagoSharedTests/CharacterStateMachineTests.swift`, this file.
+
+**Work performed:** the cloud Brain milestone (`9d6148c`) added `responses/ok-nonverbal.json` and PROTOCOL_V1
+§5.1 without running Swift (no toolchain there). On this Mac the Swift suite failed with 4 issues: the
+manifest count (21 → 22), no expected values for the new fixture, and a rule "text is empty only for
+accepted", which §5.1 relaxes for a nonverbal `ok`. The decoder itself was fine. Test-only fix, plus one new
+test that runs the real fixture through `CharacterStateMachine` (reaction `happy`, haptic `click`, no `.speak`).
+
+**Tests/builds actually performed (by me):** `swift test --scratch-path ../../.build/spm` → 138/138;
+`xcodebuild test -scheme TamagoWatch` on the watchOS 27 simulator (TamagoAI Test SE3 40mm) → 138/138, TEST SUCCEEDED.
+
+**Things NOT verified:** the nonverbal reply on the physical Watch.
+
+**Known issues:** none.
+
+**Cross-agent impact:** closes the "Swift fixture tests against ok-nonverbal.json" item the cloud session left
+unverified; no production Swift touched.
+
+**Signed-by:** Claude Code

@@ -13,7 +13,7 @@ struct ProtocolFixtureTests {
     @Test func manifestIsComplete() throws {
         let manifest = try FixtureLoader.manifest()
         #expect(manifest.protocolVersion == TamagoProtocol.version)
-        #expect(manifest.fixtures.count == 21)
+        #expect(manifest.fixtures.count == 22)
         #expect(Set(manifest.fixtures.map(\.kind)) == ["request", "response", "protocolInfo"])
 
         for entry in manifest.fixtures {
@@ -107,8 +107,12 @@ struct ProtocolFixtureTests {
             #expect(!response.text.isEmpty)
         }
 
-        // Text is empty only for `accepted`.
-        #expect(response.text.isEmpty == (response.status == .accepted))
+        // Text is empty only for `accepted`, and for a nonverbal `ok` reply, which
+        // leaves both text and speechText empty (PROTOCOL_V1 §5.1).
+        if response.status == .accepted { #expect(response.text.isEmpty) }
+        if response.text.isEmpty {
+            #expect(response.status == .accepted || (response.status == .ok && response.speechText.isEmpty))
+        }
 
         // requestId is null only for errors raised before a UUID was read.
         if response.requestId == nil {
@@ -138,6 +142,7 @@ struct ProtocolFixtureTests {
         "responses/ok-happy.json": (.ok, .happy, .success, nil, false),
         "responses/ok-tool-success.json": (.ok, .success, .success, nil, false),
         "responses/ok-follow-up.json": (.ok, .confused, .notification, nil, true),
+        "responses/ok-nonverbal.json": (.ok, .happy, .click, nil, false),
         "responses/error-timeout.json": (.error, .confused, .failure, .timeout, false),
         "responses/error-invalid-request-malformed.json": (.error, .confused, .failure, .invalidRequest, false),
         "responses/error-invalid-request-schema.json": (.error, .confused, .failure, .invalidRequest, false),

@@ -309,6 +309,16 @@ struct CharacterStateMachineTests {
         #expect(effects == [.playHaptic(.notification)])
     }
 
+    /// The brain's nonverbal reply ("Thanks." → a gesture), from the gateway-generated
+    /// fixture: a reaction and a haptic, never an empty `.speak` (PROTOCOL_V1 §5.1).
+    @Test func nonverbalFixtureReactsWithHapticAndNoSpeech() throws {
+        let r = try JSONDecoder().decode(TamagoResponse.self, from: FixtureLoader.data("responses/ok-nonverbal.json"))
+        let original = state(.thinking, activeRequestID: try #require(r.requestId))
+        let (next, effects) = reduce(original, .response(r), now: t1)
+        #expect(next.visual == .happy)
+        #expect(effects == [.playHaptic(.click)])
+    }
+
     @Test func reactionCharacterStateThatIsNotAReactionStateFallsBackToIdle() {
         // Defensive: the gateway is only ever supposed to send reaction states,
         // and unknown wire values already decode as `.idle` upstream, but the
