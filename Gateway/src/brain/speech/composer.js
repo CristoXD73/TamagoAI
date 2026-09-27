@@ -42,6 +42,12 @@ export function composeSpeech(raw, profile = TAMAGO_PROFILE) {
   const addressed = s.replace(/\b(the )?owner's\b/gi, (m) => (m[0] === m[0].toUpperCase() ? 'Your' : 'your'));
   if (addressed !== s) changed.push('addressed');
   s = addressed;
+  // gemma4 writes whole replies in lower case ("your dog is named pixel."): sentence starts and "i" get
+  // their capitals back. Names inside a sentence are left alone (R1 eval, 2026-09-27).
+  const capped = s.replace(/(^|[.!?]\s+)(\p{Ll})/gu, (_, lead, c) => lead + c.toUpperCase())
+    .replace(/\bi(?=\s|['’]|[.,!?]|$)/g, 'I');
+  if (capped !== s) changed.push('capitalized');
+  s = capped;
 
   const text = truncate(s, profile.communication.maxTextChars);
   let speech = sentences(s).slice(0, 2).join(' ');

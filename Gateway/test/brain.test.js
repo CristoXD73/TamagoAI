@@ -452,6 +452,9 @@ test('intent schema validates, rejects unknown enums, and maps to V1 reaction st
 });
 
 test('speech composer: short, spoken, never an assistant', () => {
+  assert.equal(composeSpeech('i am calm. i am watching you.').speech, 'I am calm. I am watching you.');
+  assert.equal(composeSpeech("your dog is named pixel. i'm sure.").speech, "Your dog is named pixel. I'm sure.");
+  assert.equal(composeSpeech('Its iris is blue.').speech, 'Its iris is blue.', 'words that merely contain an i stay put');
   const r = composeSpeech('Great question! The **Jellyfin** server is running on port 8096 and looks healthy. It restarted at 3pm. ' +
     'Everything else is fine. Let me know if you need anything else! 😊');
   assert.doesNotMatch(r.speech, /great question|let me know|\*|😊/i);
@@ -511,6 +514,7 @@ test('ollama reasoner: structured-output request, fast vs smart model routing', 
     assert.equal(chats[1].body.model, 'big');
     assert.equal(chats[0].body.stream, false);
     assert.equal(chats[0].body.format.type, 'object');
+    assert.equal(chats[0].body.think, false, 'no hidden thinking on a Watch turn');
     assert.match(chats[0].body.messages[1].content, /OWNER SAYS: What is an octopus\?/);
     brain.close();
   } finally {
@@ -568,6 +572,7 @@ test('ollama reasoner: warm() loads the fast model with the real call options, a
   assert.equal(warmCalls[0].body.options.num_ctx, 4096, 'same context size as real calls, or Ollama reloads');
   assert.equal(warmCalls[0].body.options.num_predict, 1);
   assert.equal(warmCalls[0].body.keep_alive, '60m');
+  assert.equal(warmCalls[0].body.think, false, 'warm-up matches real calls');
   assert.match(renderSystemPrompt(), /Never answer a request with just "No"/);
 });
 

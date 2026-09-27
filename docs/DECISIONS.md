@@ -1061,3 +1061,33 @@ Heard on the Watch: UNVERIFIED until the owner listens.
   charm"), not a Watch utility. Watch chrome is kept to a minimum.
 - Verified in the watchOS simulator (SE 3 40 mm): the loop plays, no clock, and a hold reaches the app. Also in the
   iOS simulator (iPhone 18 Pro). Not yet on the owner's devices.
+
+### D-125 The local brain: Gemma 4 12B, or Qwen 3.5 9B while Xcode runs
+
+- **Evidence:** docs/BRAIN_EVAL.md "R1".
+  - Spoken relay commands understood: Gemma 4 12B QAT 39/40, Qwen 3.5 9B 35/40, Granite 4.1 8B 29/40,
+    llama3.2:3b 21/40.
+  - Both Gemma and Qwen: valid JSON on every conversation turn, nothing invented.
+  - Gemma gave the better facts, at a median 4.8 s against Qwen's 3.2 s.
+- **Memory:** Gemma needs ~7.6 GB. The owner: "xcode wont always be running". With Xcode or simulators open, this
+  16 GB Mac swaps, so `scripts/tamago-up.sh` picks Qwen then and Gemma otherwise. `OLLAMA_MODEL` overrides.
+- **Also:**
+  - Every Ollama request sends `think: false`. Hidden reasoning costs seconds a Watch reply can't spare.
+  - The speech composer restores capitals, because Gemma answers in lower case.
+- Replaces D-118's llama3.2:3b, which was always meant as a stand-in.
+
+### D-126 The waiting moment: a thinking sound and a waiting sign the owner picks
+
+- **Owner, 2026-09-27:**
+  - Asked for thinking sounds "that come pre loaded to the ai voice so it will randomly give you one as soon as you
+    finish talking so you know it heard you", plus a waiting animation shown before building.
+  - Reviewed 20 Kokoro clips and 4 animated options on a private preview page.
+  - Kept sounds **04 "Let's see...", 05 "Well, if you put it that way...", 08 "Right...", 11 "One sec.",
+    15 "Give me a moment.", 20 "Let me think about that."**
+  - Waiting signs: "**B and D keep both and we will make it so you can pick**" (B: three dots under the tentacles;
+    D: ripples spreading from the head).
+- **Decision:**
+  - **Sounds:** the six clips ship inside the Watch app (Kokoro af_heart 0.9×, AAC). One plays at random the moment
+    the owner releases the hold, never the same twice in a row.
+  - **Waiting sign:** shows until the answer starts, then fades. The owner chooses B or D in the app's settings.
+  - **Approval:** this is Visual Approval Gate #13, approved by owner direction from the preview.

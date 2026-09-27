@@ -6,7 +6,7 @@
 # 1. Checks the Storage disk is mounted (AGENTS.md §9) and stops if it isn't.
 # 2. Starts Ollama on 127.0.0.1 with its models on Storage, unless it's running.
 # 3. Runs the gateway in THIS terminal for the Watch on the home LAN: brain +
-#    llama3.2:3b, Apple on-device transcription, the owner's Kokoro voice
+#    Gemma 4 12B or Qwen 3.5 9B (see below), Apple on-device transcription, the owner's Kokoro voice
 #    (af_heart, 0.9x), and the live view (TAMAGO_MONITOR=1): every message
 #    heard, every answer, every voice clip, as it happens. Ctrl-C stops it.
 #
@@ -49,7 +49,18 @@ fi
 # ---- the gateway, in the foreground with the live view
 export TAMAGO_HOST="${TAMAGO_HOST:-0.0.0.0}"
 export TAMAGO_PROVIDER="${TAMAGO_PROVIDER:-brain}"
-export OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.2:3b}"
+# The brain's model (R1, D-125). Gemma 4 12B understands best, but needs ~7.6 GB: with Xcode or the
+# simulators open, this 16 GB Mac swaps, so the lighter Qwen 3.5 9B (~5.5 GB) takes over. Set OLLAMA_MODEL to force one.
+if [[ -z "${OLLAMA_MODEL:-}" ]]; then
+  if pgrep -xq Xcode || pgrep -xq Simulator || xcrun simctl list devices booted 2>/dev/null | grep -q Booted; then
+    OLLAMA_MODEL=qwen3.5:9b
+    echo "tamago-up: Xcode or the Simulator is open, so the brain uses $OLLAMA_MODEL (lighter)."
+  else
+    OLLAMA_MODEL=gemma4:12b-it-qat
+    echo "tamago-up: the brain uses $OLLAMA_MODEL."
+  fi
+fi
+export OLLAMA_MODEL
 export TAMAGO_TTS="${TAMAGO_TTS:-kokoro}"
 export TAMAGO_TTS_VOICE="${TAMAGO_TTS_VOICE:-af_heart}"
 export TAMAGO_TTS_SPEED="${TAMAGO_TTS_SPEED:-0.9}"

@@ -140,11 +140,13 @@ The relay remembers "Claude unavailable until 3:00 PM" and doesn't send it new w
 **The chain:**
 1. The agent you asked.
 2. The other coding agent (Claude ⇄ Codex).
-3. **Last: ChatGPT chat** (decision 1).
+3. **ChatGPT chat** (decision 1). It shares Codex's allowance, so it's skipped when Codex is out (§6b).
    - It can't edit the project, so it gets the baton to think with: finish the plan, answer the open question,
      write the next steps.
    - Its answer is saved to the task and read to you in short.
    - When a coding agent's credits come back, the task resumes there with ChatGPT's notes added to the baton.
+4. **Last, always there: Tamago's own brain** (§6b). It keeps the baton, answers "where are we?", and restarts the
+   task when an agent's credits return.
 
 **Supervision: the relay keeps an eye on whoever holds the task.**
 - **What it watches for:**
@@ -178,6 +180,24 @@ This matches the repo's own handoff habit (AGENT_WORKLOG / HANDOFF_LOG) and make
 **Adopting a session the relay didn't start**, such as an interactive session like this one: later (R4+). The
 relay reads that agent's session file (Claude Code keeps them in `~/.claude/projects/`, Codex in
 `~/.codex/sessions/`) plus the git state to build the same baton. The format is verified in R0.
+
+## 6b. Who goes first: the order of the AIs (owner, 2026-09-27)
+
+| Kind of task | 1st | 2nd | 3rd | Last (always there) |
+|---|---|---|---|---|
+| **Change the project** ("fix", "add", "rename", "update") | **Claude Code**: strongest at long coding work here, reads CLAUDE.md, reports its usage live | **Codex**: same repo, reads AGENTS.md; the relay commits for it | **ChatGPT chat** (Codex answer mode): can't edit; turns the baton into a plan and next steps | **Tamago's own brain** (Gemma / Qwen on this Mac): keeps the baton, tells you where things stand, restarts the task when an agent's credits come back |
+| **Just a question** ("ask … why", "explain", "check") | **ChatGPT chat**: fastest (about 7 s), read-only | **Claude** read-only | **Codex** read-only | **Tamago's own brain**: answers what it can, says honestly what it can't |
+
+**Rules for the order:**
+- **If you name an agent,** it goes first, then the rest in the order above.
+- **An agent is skipped** when its own usage report says ≥ 95 % used, or when it's marked out until a reset time.
+- **ChatGPT chat shares Codex's allowance.** It runs through Codex, so when Codex is out, ChatGPT chat is out too.
+  That's why the last stop is Tamago's own brain, which never runs out.
+- **When everyone is out:**
+  - Tamago says so in one sentence, with the earliest reset time: "Everyone's out. Claude's back at 10."
+  - It parks the task and restarts it then, with the baton.
+- **Every handoff is announced afterwards** (automatic transfer, decision 2). The dashboard shows the whole chain
+  for each task.
 
 ## 7. Phases
 

@@ -12,6 +12,9 @@ const WARM_EVERY_MS = 60_000;
 // question after idle. Keep it loaded longer, and warm it when the Watch checks in.
 const KEEP_ALIVE = '60m';
 const CHAT_OPTIONS = { num_ctx: 4096 };   // warm-ups must match, or Ollama reloads the model
+// Newer models (qwen3.5, gemma4, granite4.1) can "think" before answering: seconds of hidden text on a Watch
+// turn. Tamago's replies are two short sentences, so thinking is off; non-thinking models accept the flag.
+const THINK = false;
 
 export function createOllamaReasoner({
   baseUrl = 'http://127.0.0.1:11434', fastModel, smartModel, fetchImpl = fetch, now = Date.now,
@@ -30,7 +33,7 @@ export function createOllamaReasoner({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model, messages, stream: false, format: INTENT_JSON_SCHEMA, keep_alive: KEEP_ALIVE,
+          model, messages, stream: false, format: INTENT_JSON_SCHEMA, keep_alive: KEEP_ALIVE, think: THINK,
           options: { temperature, ...CHAT_OPTIONS },
         }),
         signal,
@@ -67,7 +70,7 @@ export function createOllamaReasoner({
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ model: fastModel, messages: [{ role: 'user', content: 'hi' }], stream: false,
-            keep_alive: KEEP_ALIVE, options: { ...CHAT_OPTIONS, num_predict: 1 } }),
+            keep_alive: KEEP_ALIVE, think: THINK, options: { ...CHAT_OPTIONS, num_predict: 1 } }),
         });
         return r.ok;
       } catch {

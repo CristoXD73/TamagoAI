@@ -65,3 +65,26 @@ yet.`; "Why do octopuses change color?" → `Octopuses change color to hide, com
 - Quality over days of real use; memory growth; the relationship model over real days.
 - The physical Watch path (TestFlight pending; see HANDOFF).
 - The legacy `TAMAGO_PROVIDER=ollama` provider (`src/providers/ollama.js`): not run; still `UNVERIFIED_LOCAL_PROVIDER`.
+
+## R1 (relay plan): a stronger local brain, 2026-09-27
+
+Same Mac (16 GB). Thinking is off in every request (`think: false`). Two tests:
+- **Command understanding:** `node scripts/relay-intent-eval.js`, 40 spoken relay commands.
+- **Conversation:** `scripts/brain-eval.js`, the same 27-turn script as above.
+
+Raw runs are in `/Volumes/Storage/AI/tamago-eval/r1/`.
+
+| Model | Download | In memory | Commands understood | Command time (median / p90) | Conversation: model turn median | Notes |
+|---|---|---|---|---|---|---|
+| llama3.2:3b (before) | 2.0 GB | 2.3 GB | 21 / 40 | 1.0 / 1.6 s | ~1.0 s | "Thanks." read as a task; "why…" read as an answer |
+| granite4.1:8b | 5.3 GB | 5.9 GB | 29 / 40 | 2.2 / 2.6 s | not run | misses pause/stop/resume, answers, handoffs |
+| **qwen3.5:9b** | 6.6 GB | 5.5 GB | **35 / 40** | 3.0 / 3.4 s | 3.2 s (11/11 valid, 0 errors) | misses: "option two" kept verbatim, cancel → task, "carry on", resume → task, "why…" → answer |
+| **gemma4:12b-it-qat** | 7.2 GB | 7.6 GB | **39 / 40** | 3.2 / 3.8 s | 4.8 s (11/11 valid, 0 errors; 15.7 s cold under memory pressure) | best answers: three hearts right, real facts, nothing invented; writes in lower case (the composer now restores capitals) |
+
+**Memory:** with Gemma loaded next to Xcode and the simulators, swap reached 6.6 GB and free memory 150 MB.
+
+**Decision (D-125):**
+- Gemma 4 12B is the brain when the Mac isn't also building apps.
+- `scripts/tamago-up.sh` switches to Qwen 3.5 9B when Xcode, the Simulator app or a booted simulator is running.
+- `OLLAMA_MODEL` still forces either.
+- The fixed phrases the models miss ("cancel", "carry on", "option two") get deterministic rules in R2.
