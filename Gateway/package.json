@@ -14,6 +14,7 @@
     "test": "node --test",
     "fixtures": "node scripts/generate-fixtures.js",
     "brain": "node bin/tamago.js brain",
+    "voice-samples": "node scripts/voice-samples.js",
     "build:transcriber": "mkdir -p tools/transcribe/.build && swiftc -O tools/transcribe/transcribe.swift -o tools/transcribe/.build/transcribe"
   },
   "bin": {

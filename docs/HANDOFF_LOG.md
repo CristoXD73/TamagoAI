@@ -1319,3 +1319,38 @@ hold gesture's feel on hardware; why `.local` fails on the Watch.
 speak, release; report whether you hear the answer. Reserve 192.168.0.74 for the Mac in the router (DHCP reservation).
 **Next recommended task (ONE):** verify build 6 on the Watch with the owner and record it in DEVICE_TEST_LOG.md.
 **Do not redo:** the transcriber helper, `/v1/audio`, voice + caption decision (D-119/D-120).
+
+---
+
+### 2026-09-27: Claude Code (cloud): natural local voice: Mac synthesizes, Watch plays (D-121)
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commits:**
+- `ebc30e2`: research
+- `7c5d441`: gateway `speechAudio` + `GET /v1/speech`, V1 §16, D-121
+- `90b8c9e`: Watch Swift
+- the commit with this entry: setup kit + listening page
+
+**Done:**
+- `docs/VOICE_RESEARCH.md`: Kokoro-82M via sherpa-onnx is primary, KittenTTS the fallback, macOS `say` the baseline. All Apache-2.0 except `say`.
+  Non-commercial options are marked not eligible. OpenAI-named voices are excluded.
+- Gateway (zero deps): background synthesis through `tools/tts/tamago-tts`; audio fetched once, bounded, never logged. Text never waits.
+- Watch: fetch within 2.5 s, else the built-in voice.
+- `tools/tts/setup.sh` and `npm run voice-samples` (listening page).
+
+**Tests:** gateway `npm test` 132 pass / 0 fail / 2 skipped. Speech tests use a stub synthesizer and the real helper script with fake binaries.
+**Verified by the local agent, not me (worklog 2026-09-27T03:02):** after one fix (`2dd5d58`: `AVFileType` → its string value),
+the Swift compiles. `swift test` passes 147/147 and the TamagoWatch simulator build succeeds.
+**Unverified:**
+- Mac voice playback on the Watch (never run)
+- setup.sh downloads, sherpa-onnx flags, Kokoro speaker ids, afconvert output, every timing, size and RAM number
+- how it sounds
+
+**Next recommended task (ONE), local agent on the owner's Mac:**
+1. `cd Gateway && tools/tts/setup.sh`, then `TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts npm run voice-samples`. Fix any asset-name, flag or
+   speaker-id mismatch the self-test or the page shows.
+2. The owner listens to `/Volumes/Storage/AI/tts/samples/index.html` and picks a voice and speed by ear.
+3. Restart the LAN gateway with `TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=<pick> TAMAGO_TTS_SPEED=<pick>`.
+4. Ship a TestFlight build. The owner holds to talk and says whether they hear the new voice. Record it in `docs/DEVICE_TEST_LOG.md`, with measured
+   synthesis ms, KB and engine RAM against the budgets.
+
+**Do not redo:** the engine research and licensing; the §16 contract; the fallback rules.

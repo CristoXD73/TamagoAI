@@ -185,3 +185,35 @@ workflow environment variables, so no bundle ID or team ID is ever committed.
 
 Local archives (`xcodebuild archive … CURRENT_PROJECT_VERSION=<n>`, then `-exportArchive` with
 `destination=upload`) keep working alongside it.
+
+## Natural voice: the Mac speaks for Tamago (D-121, PROTOCOL_V1 §16)
+
+The gateway can synthesize each reply with a local neural voice (Kokoro-82M via sherpa-onnx; KittenTTS as the
+lighter fallback). The Watch fetches and plays it, and falls back to its own voice on any problem. It's local
+only: no cloud, no keys, no cloning. Research and licenses: [`VOICE_RESEARCH.md`](VOICE_RESEARCH.md).
+**Status: UNVERIFIED** until it's run on the Mac and heard on the Watch.
+
+```sh
+cd Gateway
+tools/tts/setup.sh                      # asks before each download; installs to /Volumes/Storage/AI/tts (≈ 450 MB est.)
+tools/tts/setup.sh --kitten             # also the lighter fallback engine
+tools/tts/setup.sh --selftest           # check the install, time one clip
+
+export TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts
+npm run voice-samples                   # 6 lines × every installed voice × 2 speeds, with times and sizes
+open /Volumes/Storage/AI/tts/samples/index.html   # listen, press "Choose this one", tell your agent the line
+
+TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=af_heart TAMAGO_TTS_SPEED=1.0 npm start   # the gateway prints "voice output: …"
+```
+
+- `TAMAGO_TTS=off` (default) turns it off, and replies carry no `speechAudio`. `say` uses an Apple voice
+  instead (personal-use baseline).
+- Budgets to check with the samples:
+  - ≤ ~1 s synthesis for a short reply
+  - ≤ ~60 KB per reply
+  - ≤ 1 GB engine RAM
+  - the Watch waits at most 2.5 s for the audio
+- Each reply is one helper process, so the time includes loading the model. If that alone blows the 1 s budget,
+  the next step is a persistent engine process, not a different voice.
+- Logs show `speech_synth` with the request ID, engine, voice, bytes and milliseconds. They never include text or
+  audio.

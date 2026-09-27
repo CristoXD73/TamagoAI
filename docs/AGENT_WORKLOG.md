@@ -1008,3 +1008,28 @@ real-engine TTS test: engine not installed yet); `swift test` → 147/147; Tamag
 **Known issues:** none new.
 **Cross-agent impact:** fixes the cloud agent's UNVERIFIED Swift so Xcode Cloud archives of this branch can build.
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T07:03:27+0000: Claude Code (cloud) — natural voice, part 4: setup kit + listening page
+
+**Agent:** Claude Code (cloud; not macOS; GitHub release downloads blocked)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `90b8c9e` · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- new: `Gateway/tools/tts/setup.sh`, `Gateway/scripts/voice-samples.js`
+- `Gateway/package.json` (`voice-samples` script)
+- `docs/DEVELOPMENT.md` (Natural voice section), `docs/HANDOFF_LOG.md`, this file
+
+**Work performed:**
+- setup.sh installs the sherpa-onnx runtime and Kokoro (Kitten optional) to `$TAMAGO_TTS_MODEL_DIR` (default `/Volumes/Storage/AI/tts`). It refuses
+  if Storage isn't mounted, prints each download's URL, size and license, and asks first. It keeps a SHA-256 trust-on-first-use lock file and runs a
+  `--selftest`.
+- voice-samples.js renders 6 lines × installed voices × 2 speeds through the gateway's own helper, measures ms and bytes, and writes
+  `results.json` + `index.html`. The page has a "Choose this one" button that shows the env line to give the agent.
+
+**Tests/builds actually performed (by me):** `bash -n setup.sh`; setup.sh refuses on Linux as designed. voice-samples.js ran end to end against a
+fake helper (72 clips, page rendered and screenshotted in headless Chromium). `npm test`: 132 pass / 0 fail / 2 skipped.
+**Things NOT verified:** setup.sh has never downloaded anything. The release asset names, the archive layout, checksums, and all real timings and
+sizes are unverified.
+**Cross-agent impact:** none beyond the new npm script.
+**Signed-by:** Claude Code (cloud)
