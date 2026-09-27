@@ -623,3 +623,39 @@ and one xcconfig line. Brain F is paused mid-run (the uncommitted `Gateway/scrip
 of this commit).
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T00:29:19-04:00: Claude Code — Watch icon sizes, TestFlight readiness audit
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `5073a2f`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/WatchApp/Assets.xcassets/AppIcon.appiconset/*` (single-size replaced with every
+watchOS role/size plus the 1024 marketing icon, all rendered from the same approved-art icon),
+`Apple/WatchApp/Info.plist` (`NSLocalNetworkUsageDescription`), `Apple/Config/Tamago.xcconfig`
+(`INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`), this file.
+
+**Work performed:** the owner saw a generic placeholder for Tamago in the iPhone's Watch app. The Watch bundle
+did contain the icon, but only as one 1024 image; the Watch app on iPhone relies on prerendered sizes
+(companionSettings etc.), so every size is now explicit. TestFlight readiness audit of the built bundles:
+versions match across app, Watch app and complication (0.1.0; the build number is set at archive time);
+`WKApplication`, `WKCompanionAppBundleIdentifier` and `WKRunsIndependentlyOfCompanionApp` are present;
+the complication is embedded; arm64 is the watchOS 27 standard arch (no arm64_32 needed); export compliance
+is now declared; a local-network usage string was added for the Watch.
+The owner confirmed that openPocketCine reached the Watch through TestFlight, and Xcode can't see the Watch,
+so TestFlight is the install route (no Watch UDID needed).
+
+**Tests/builds actually performed (by me):** Release `generic/platform=iOS` build → succeeded, only the
+benign AppIntents metadata warnings; `assetutil --info` on the Watch `Assets.car` shows the sizes,
+including 58/87 px companion icons; `plutil -p` shows the new keys; Debug device build, uninstall and
+reinstall on the owner's iPhone; `xcodebuild archive ... CURRENT_PROJECT_VERSION=2` → ARCHIVE SUCCEEDED
+(`.build/Archives/Tamago-0.1.0-2.xcarchive`, git-ignored, on Storage).
+
+**Things NOT verified:** that the iPhone's Watch app now shows the icon (awaiting the owner); the TestFlight
+upload (needs the App Store Connect app record); anything running on the Watch.
+
+**Known issues:** none new.
+
+**Cross-agent impact:** Watch icon asset layout changed; no Swift or `.pbxproj` edits.
+
+**Signed-by:** Claude Code
