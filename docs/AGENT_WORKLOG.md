@@ -760,3 +760,36 @@ resolution on watchOS, local-network access for the app, the Watch's actual Wi-F
 other caller; all in-repo callers updated).
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T01:54:03-04:00: Claude Code — first real Watch loop; voice + caption; floating hero art (builds 4 and 5)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `3ff17b4`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `Apple/WatchApp/FloatingCreature.swift`, new `Apple/WatchApp/Assets.xcassets/Creature.imageset`
+(approved art, unchanged), `Apple/WatchApp/TamagoWatchApp.swift` (screen uses FloatingCreature + caption),
+`Apple/WatchApp/TamagoConnection.swift` (caption), `Apple/WatchApp/SpeechOutput.swift` (on by default, audio
+session off-main, speech log lines), `docs/DECISIONS.md` (D-119), `docs/VISUAL_APPROVAL_GATE.md` (#11),
+`Assets/CharacterReference/octopus-v001/PROVENANCE.md`, `docs/DEVICE_TEST_LOG.md`, this file.
+
+**Work performed:** after the owner paired build 3 by address, the loop worked on the real Watch (gateway log +
+brain traces: "My dog is named pixel" → "Got it.", "Whats my dogs name" → "Pixel", 4.4 s with a cold model), but
+the owner perceived nothing. Implemented D-119 (spoken + captioned answers, floating approved art). Found and
+fixed an AVAudioSession main-thread hang risk flagged by the runtime in the simulator log. While the owner
+was in Game Mode, the Xcode app was found suspended (state T) and blocked `xcodebuild` through file
+coordination; resumed only Xcode (`kill -CONT`); many other apps remain suspended and were left alone.
+
+**Tests/builds actually performed (by me):** `xcodebuild build` (TamagoWatch, simulator) → succeeded;
+simulator loop against a loopback test gateway (:8788, eval DB, real llama3.2:3b): hold → system input sheet (mic
+button present, on-device recognition preheated) → suggestion → listening → thinking → speaking with caption
+"Pixel" → Tamago log "speech started (5 chars)" / "speech finished"; archives + uploads of builds 4 and 5 → Upload
+succeeded.
+
+**Things NOT verified:** audibility on the Watch; real dictation on the owner's Watch; builds 4/5 on the device.
+
+**Known issues:** typed IP pairing breaks if the Mac's address changes.
+
+**Cross-agent impact:** the on-screen creature changed (owner-approved); CharacterView remains but is unused on screen.
+
+**Signed-by:** Claude Code

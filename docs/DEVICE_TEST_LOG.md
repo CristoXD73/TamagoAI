@@ -49,3 +49,16 @@ Mac gateway: LAN mode, `TAMAGO_PROVIDER=brain` with `llama3.2:3b`, advertising `
 
 Conclusion so far: the LAN and mDNS work for Wi-Fi clients; the Watch app's request never reaches the Mac.
 Next: build 3 shows the exact failure reason and allows typing the Mac's address.
+
+## 2026-09-27 01:25–01:30 EDT — build 3, paired by address
+
+| Step | Result |
+|---|---|
+| Pair with "Use Mac address" 192.168.0.74 + code | **Paired** (gateway log `pair: ok`, device "Apple Watch") |
+| Input | The system sheet offered typing; the owner typed (dictation not used) |
+| "My dog is named pixel" | Gateway 70 ms, brain "Got it." (rule) |
+| "Whats my dogs name" | Gateway 4.4 s (cold model), brain "Pixel" |
+| What the owner perceived | No words (speech off, no caption in that build); one reaction |
+
+`DEVICE_VERIFIED` (owner-observed + gateway evidence): physical Watch → Mac → Watch round trip over HTTP by IP.
+Not verified: `tamagoai.local` from the Watch (fails), speech, dictation.

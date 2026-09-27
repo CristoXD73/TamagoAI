@@ -875,3 +875,26 @@ off-LAN exposure).
   7–8B models now (owner's call; the eval script makes the comparison a one-command job later).
 - **Verification:** real-model behavior verified with `llama3.2:3b` only; logic `UNIT_TESTED_ONLY` (108 gateway
   tests). The legacy `TAMAGO_PROVIDER=ollama` provider is still `UNVERIFIED_LOCAL_PROVIDER`.
+
+### D-119 First physical-Watch run: answers are spoken and captioned; the approved art floats; pair by address
+
+- **Evidence (owner's SE 3, TestFlight build 2–3, 2026-09-27):** the Watch→Mac→Watch loop worked (the brain
+  answered "Got it." and "Pixel" correctly), but the owner saw and heard nothing: speech was off by default and
+  the creature screen shows no text. Pairing by `tamagoai.local` never reached the Mac (Bluetooth on or off),
+  while pairing by the typed address `192.168.0.74` succeeded. The system input sheet showed a keyboard, not
+  dictation, on the owner's Watch.
+- **Decision (owner asked Claude to decide voice vs text):** replies are **spoken** (`SpeechOutput.isEnabled =
+  true`, `.playback`/`.voicePrompt` audio session activated off the main thread) **and shown as a small caption**
+  under the creature while speaking (plain text, no bubble), so an answer is never lost when the Watch is muted.
+- **Decision (owner direction):** the on-screen creature is the approved hero art (`ref_hero_q34.jpg`,
+  unchanged) on black with a barely-there float (±2.5 pt, ~4.8 s), paused in Always-On, off-page and with Reduce
+  Motion. Recorded as APPROVED in the Visual Approval Gate register (#11). The procedural `CharacterView` (D-114)
+  stays in the repo, off screen.
+- **Pairing:** the pairing sheet accepts a typed Mac address (kept with the pairing) and shows the actual failure
+  reason. `tamagoai.local` stays the default; why it fails on the Watch is still open (TN3135-class behavior).
+- **Voice input:** WatchKit's `.plain` input sheet on watchOS 27 opens with a microphone button, not straight into
+  dictation (seen in the simulator, where it also preheats on-device recognition). The owner must tap the mic;
+  if it's missing, dictation is off in the Watch's settings. A true hold-to-talk (record on the Watch, transcribe
+  on the Mac) needs an audio upload in the protocol and the owner's agreement; not built.
+- **Verification:** `SIMULATOR_VERIFIED_ONLY` for caption + speech start/finish (Tamago's own `speech` log lines);
+  audibility on the Watch speaker UNVERIFIED.

@@ -1,5 +1,9 @@
 // SpeechOutput.swift
 //
+// D-119 (owner, 2026-09-27): answers are spoken by default. The owner heard
+// nothing on the first physical-Watch run because this was off. Audio plays
+// in a `.playback` / `.voicePrompt` session, activated only while speaking.
+//
 // VERIFICATION: compiles and runs against the watchOS 27 SDK
 // (AVSpeechSynthesizer has been part of AVFAudio on watchOS since watchOS 6;
 // confirmed by successful compilation and simulator launch in this session —
@@ -26,13 +30,14 @@
 
 import AVFAudio
 import Observation
+import OSLog
 import TamagoShared
 
 @MainActor
 @Observable
 final class SpeechOutput: NSObject, AVSpeechSynthesizerDelegate {
-    /// Conservative default — see file header. Flip explicitly, don't infer.
-    var isEnabled: Bool = false
+    /// On by owner decision (D-119). Audibility on the SE 3: UNVERIFIED until heard.
+    var isEnabled: Bool = true
     var rate: Float = AVSpeechUtteranceDefaultSpeechRate
     var pitchMultiplier: Float = 1.0
     /// Set by TamagoConnection to feed `.speechFinished` back into the
@@ -41,6 +46,7 @@ final class SpeechOutput: NSObject, AVSpeechSynthesizerDelegate {
     @ObservationIgnored var onFinished: (() -> Void)?
 
     @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
+    private nonisolated static let log = Logger(subsystem: "ai.tamago.watch", category: "speech")
 
     override init() {
         super.init()
@@ -58,7 +64,27 @@ final class SpeechOutput: NSObject, AVSpeechSynthesizerDelegate {
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = rate
         utterance.pitchMultiplier = pitchMultiplier
-        synthesizer.speak(utterance)
+        // Activating the session can block; the runtime flags it as a hang
+        // risk on the main thread (seen in the simulator log). Do it off-main,
+        // then speak.
+        Task { [synthesizer] in
+            await Task.detached(priority: .userInitiated) {
+                let session = AVAudioSession.sharedInstance()
+                do {
+                    try session.setCategory(.playback, mode: .voicePrompt)
+                    try session.setActive(true)
+                } catch {
+                    Self.log.error("audio session activation failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }.value
+            synthesizer.speak(utterance)
+        }
+    }
+
+    private nonisolated static func deactivateSession() {
+        Task.detached(priority: .utility) {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     func stop() {
@@ -66,11 +92,19 @@ final class SpeechOutput: NSObject, AVSpeechSynthesizerDelegate {
         synthesizer.stopSpeaking(at: .immediate)
     }
 
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        Self.log.info("speech started (\(utterance.speechString.count, privacy: .public) chars)")
+    }
+
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Self.log.info("speech finished")
+        Self.deactivateSession()
         Task { @MainActor [weak self] in self?.onFinished?() }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Self.log.info("speech cancelled")
+        Self.deactivateSession()
         Task { @MainActor [weak self] in self?.onFinished?() }
     }
 }

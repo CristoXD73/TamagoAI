@@ -57,6 +57,7 @@ is compared side by side with the approved prototype, and the owner signs off.
 | 08 | Wrong-Edge Return | storyboard `sb08` | PROTOTYPE_READY_FOR_REVIEW | |
 | 09 | Touch Reaction | storyboard `sb09` | PROTOTYPE_READY_FOR_REVIEW | |
 | 10 | Glass Moment | storyboard `sb10` | PROTOTYPE_READY_FOR_REVIEW | |
+| 11 | Hero float (approved art, ±2.5 pt bob, ~4.8 s) | none needed: owner's explicit instruction, 2026-09-27 | **APPROVED (owner direction)** | "use a high quality picture of my octopus suspended in that black and give it a light floating up and down animation where it barely moves" (D-119). Replaces the procedural creature on screen for now. |
 
 Existing Stage A character behavior (D-114) predates this gate. It stays as is and isn't expanded until the
 replacement animations are approved. Engineering-only fixes to it remain allowed.

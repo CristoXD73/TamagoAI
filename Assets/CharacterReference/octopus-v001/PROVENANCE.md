@@ -19,3 +19,5 @@ These images are visual ground truth: do not redesign, humanize, or restyle the 
   (`Apple/iPhoneApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png`, `Apple/WatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png`;
   the Watch version is smaller so the whole octopus fits inside the circular mask). A final, purpose-drawn
   icon can replace these later.
+- **Runtime exception (owner, 2026-09-27, D-119):** the owner directed that `ref_hero_q34.jpg` be the creature on
+  the Watch, floating gently on black. It ships unchanged as `Apple/WatchApp/Assets.xcassets/Creature.imageset/Creature.jpg`.

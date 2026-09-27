@@ -52,6 +52,10 @@ final class TamagoConnection {
     @ObservationIgnored private weak var controller: CharacterInteractionController?
     @ObservationIgnored private var inFlightTask: Task<Void, Never>?
     @ObservationIgnored private var speechWatchdog: Task<Void, Never>?
+    /// Tamago's latest answer, shown under the creature while it speaks and a
+    /// little after (D-119), then cleared.
+    private(set) var caption: String?
+    @ObservationIgnored private var captionClear: Task<Void, Never>?
     @ObservationIgnored private var probeTask: Task<Void, Never>?
     @ObservationIgnored private var beat: Task<Void, Never>?
     @ObservationIgnored private var isActive = false
@@ -157,6 +161,17 @@ final class TamagoConnection {
         return outcome
     }
 
+    private func showCaption(_ text: String) {
+        caption = text
+        captionClear?.cancel()
+        let seconds = max(3.0, Double(text.count) / 12.0) + 1.5
+        captionClear = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.caption = nil
+        }
+    }
+
     func unpair() {
         PairingStore.clear()
         reconfigure(GatewayConfiguration(baseURL: GatewayConfiguration.wellKnownBaseURL), credential: .unpaired)
@@ -208,6 +223,7 @@ final class TamagoConnection {
                 HapticPlayer.play(haptic)
 
             case let .speak(text):
+                showCaption(text)
                 speech.speak(text)
                 // D-106's watchdog: if the synthesizer's delegate never fires,
                 // don't leave `.speaking` stuck. A late/duplicate call is
