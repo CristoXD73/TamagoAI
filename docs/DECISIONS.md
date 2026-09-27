@@ -833,3 +833,22 @@ off-LAN exposure).
   Wi-Fi *and* while proxied through the iPhone (turn iPhone Wi-Fi and Bluetooth
   off in Settings, per TN3135), real dictation, audible speech and sounds with
   silent mode on and off, haptics, and energy.
+
+### D-117 Tamago Brain: the LLM is one component inside Tamago, behind Protocol V1
+
+- **Decision (owner direction, 2026-09-27):** the Mac becomes the Tamago Brain (`Gateway/src/brain/`,
+  `TAMAGO_PROVIDER=brain`). An Interaction Orchestrator owns each interaction: deterministic classification
+  and routing (`rule` / `fast` / `smart`), a personality **profile as data**, a structured **TamagoIntent**
+  (silence allowed), a speech composer, sessions, SQLite memory behind a **write gate**, and a deterministic,
+  never-decreasing familiarity model. Design and status: `docs/BRAIN_ARCHITECTURE.md`.
+- **Protocol:** V1 stays the external contract. One backward-compatible clarification: nonverbal replies
+  (`text` and `speechText` empty, §5.1), which `CharacterStateMachine` already handled. No V2 until the Watch
+  needs a new semantic.
+- **Storage:** built-in `node:sqlite` with FTS5, keeping zero npm dependencies (D-002). Needs Node ≥ 22.13 for
+  the brain only; the mock and legacy Ollama providers still run on older Node.
+- **Alternatives rejected:** a bigger system prompt (behavior drifts with the model); a vector DB up front
+  (unneeded at this scale); letting the model write memory directly (privacy, junk); background LLM loops (battery, cost).
+- **Verification:** `UNIT_TESTED_ONLY` (101 gateway tests, including the brain against a deterministic reasoner
+  and a stubbed Ollama). The real Ollama reasoner stays `UNVERIFIED_LOCAL_PROVIDER` until Brain F runs on the owner's Mac.
+- **Not built:** tools (Brain E), LLM consolidation, embeddings.
+

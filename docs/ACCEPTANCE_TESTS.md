@@ -97,3 +97,17 @@ acknowledgment, speech and reaction completion drivers remain absent by the
 Stage A boundary; debug states intentionally hold. This is not physical-device
 acceptance. Release ignores `TAMAGO_PREVIEW_STATE` and shows no debug page:
 SIMULATOR_VERIFIED_ONLY. See HANDOFF_LOG for commands, defects and remaining gaps.
+
+## K. Tamago Brain (Mac, D-117)
+| Item | Status |
+|---|---|
+| Learns a stated fact, survives a restart, recalls it | UNIT_TESTED_ONLY (deterministic reasoner) |
+| "Thanks." → nonverbal V1 envelope | UNIT_TESTED_ONLY (+ real gateway process, curl) |
+| Secrets / "don't remember" never stored, and Tamago says so | UNIT_TESTED_ONLY |
+| Forget by voice and CLI | UNIT_TESTED_ONLY |
+| Familiarity by days, never decreasing | UNIT_TESTED_ONLY |
+| Aborted interaction commits nothing | UNIT_TESTED_ONLY |
+| Ollama structured outputs, repair, fallback | UNIT_TESTED_ONLY (stubbed) · real: UNVERIFIED_LOCAL_PROVIDER |
+| Latency/quality of real local models on the owner's Mac | UNVERIFIED (Brain F) |
+| Nonverbal envelope on the physical Watch (no speech, haptic plays) | UNVERIFIED |
+

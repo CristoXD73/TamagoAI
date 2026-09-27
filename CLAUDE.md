@@ -20,6 +20,7 @@ adds Claude-specific notes.
 | Path | What | Verified how |
 |---|---|---|
 | `Gateway/` | Node ≥22 Mac gateway, zero dependencies. `npm test`, `npm start`. | `UNIT_TESTED_ONLY` (CI + cloud) |
+| `Gateway/src/brain/` | **Tamago Brain** (orchestrator, memory, familiarity, routing; `TAMAGO_PROVIDER=brain`). Design: `docs/BRAIN_ARCHITECTURE.md`. | `UNIT_TESTED_ONLY`; Ollama `UNVERIFIED_LOCAL_PROVIDER` |
 | `Tests/Fixtures/protocol-v1/` | JSON fixtures shared by gateway and Swift tests. Gateway ones are generated from the live mock (`npm run fixtures`). | drift-checked by gateway tests |
 | `Apple/Shared/` | Local Swift package `TamagoShared`: protocol models + sprite timing engine, tests in `Tests/`. | `UNIT_TESTED_ONLY` (host + watchOS simulator) |
 | `Apple/AppleTamago.xcodeproj` | Targets `TamagoWatch`, `TamagoComplication`, `TamagoPhone`, `TamagoTests` (D-101). | builds: `SIMULATOR_VERIFIED_ONLY` |
@@ -40,6 +41,9 @@ npm run fixtures                       # regenerate gateway-derived fixtures aft
 TAMAGO_ALLOW_NO_AUTH=1 npm start       # loopback-only dev server on :8787
 TAMAGO_HOST=0.0.0.0 npm start          # LAN: persistent token, prints a pairing code, publishes tamagoai.local
 ../scripts/smoke.sh                    # in another terminal
+npm run brain -- chat                  # talk to the Tamago brain in the terminal (no Watch)
+npm run brain -- inspect               # full decision trace of the last interaction
+TAMAGO_PROVIDER=brain npm start        # gateway backed by the brain (add OLLAMA_MODEL=… for a real model)
 
 # Apple (from the repo root, local Mac with Xcode 27 only)
 cd Apple/Shared && swift test --scratch-path ../../.build/spm          # host, fastest

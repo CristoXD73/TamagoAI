@@ -101,12 +101,20 @@ has something to show, say, and play.
 | `protocolVersion` | integer | `1` |
 | `requestId` | string \| null | Echo of the request. `null` **only** on errors raised before a UUID could be read (malformed JSON, auth failure). |
 | `status` | enum | `ok` \| `accepted` \| `error` |
-| `text` | string | Short display text (≤1000 chars; gateway truncates). Empty only for `accepted`. |
-| `speechText` | string | What TTS should say. Defaults to `text`. |
+| `text` | string | Short display text (≤1000 chars; gateway truncates). Empty only for `accepted` or a nonverbal reaction (§5.1). |
+| `speechText` | string | What TTS should say. Defaults to `text`. Empty = say nothing (§5.1). |
 | `characterState` | enum | See §6 |
 | `haptic` | enum | See §7 |
 | `followUpExpected` | boolean | `true` → Watch may go straight back to `listening` after speaking |
 | `error` | object | Present **iff** `status == "error"`: `{ code, message, retryable }` |
+
+### 5.1 Nonverbal reactions (clarification, 2026-09-27, D-117)
+
+An `ok` response **may** carry `text: ""` and `speechText: ""`. That means Tamago answers with no
+words, only `characterState` + `haptic` (e.g. "Thanks." → a pleased settle and a click). Clients MUST
+NOT speak an empty `speechText`. This is backward compatible: the existing Watch client already
+skips TTS for an empty `speechText` (`CharacterStateMachine.handle`) and doesn't display `text`.
+Fixture: `responses/ok-nonverbal.json`. The mock provider produces one for the input `nonverbal`.
 
 `status` meanings:
 

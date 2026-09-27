@@ -214,8 +214,12 @@ export function buildOkResponse(requestId, result) {
   if (result === null || typeof result !== 'object') {
     throw new ProtocolError('provider_error', 'Provider returned no result.', requestId);
   }
-  const text = typeof result.text === 'string' ? result.text.trim() : '';
-  if (text.length === 0) {
+  // Nonverbal reaction (PROTOCOL_V1 §5.1): no speech, no caption, only a
+  // reaction state + haptic. Existing Watch clients already handle this
+  // (an empty speechText skips TTS in CharacterStateMachine).
+  const nonverbal = result.nonverbal === true;
+  const text = nonverbal ? '' : typeof result.text === 'string' ? result.text.trim() : '';
+  if (!nonverbal && text.length === 0) {
     throw new ProtocolError('provider_error', 'Provider returned empty text.', requestId);
   }
   const characterState = result.characterState ?? 'idle';
@@ -230,8 +234,9 @@ export function buildOkResponse(requestId, result) {
   if (!HAPTICS.includes(haptic)) {
     throw new ProtocolError('provider_error', `Provider returned unknown haptic "${haptic}".`, requestId);
   }
-  const speechText =
-    typeof result.speechText === 'string' && result.speechText.trim().length > 0
+  const speechText = nonverbal
+    ? ''
+    : typeof result.speechText === 'string' && result.speechText.trim().length > 0
       ? result.speechText.trim()
       : text;
 

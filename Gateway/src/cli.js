@@ -25,6 +25,15 @@ if (config.host === '0.0.0.0' || config.host === '::') {
   });
 }
 
+if (config.provider.ready) {
+  try {
+    await config.provider.ready();
+  } catch (err) {
+    console.error(`tamagoai-gateway: brain failed to start: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 const pairing = config.pairingEnabled ? createPairingWindow() : null;
 const server = createGateway({ ...config, pairing, logger });
 

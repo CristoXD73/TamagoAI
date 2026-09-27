@@ -1263,3 +1263,21 @@ records the result in `docs/DEVICE_TEST_LOG.md`, including one run with the iPho
 Bluetooth off.
 **Do not redo:** Watch-side Bonjour/Network.framework discovery (blocked on hardware, TN3135); the
 pairing and transport architecture (extend it, don't replace it).
+
+---
+
+### 2026-09-27: Claude Code (cloud): Tamago Brain milestone 1 (Brain A–D)
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commit:** the commit adding `docs/BRAIN_ARCHITECTURE.md`
+**Task:** turn the Mac side from "system prompt + latest message → Ollama" into the Tamago Brain, keeping
+Protocol V1 externally, and make the first milestone demonstrable from the terminal.
+**Done:** orchestrator, structured TamagoIntent (silence first-class), personality-as-data, deterministic
+behavior policy, intent + model routing, budgeted context builder, speech composer, sessions, SQLite (FTS5)
+memory with a write gate, dedupe/supersede and forget, deterministic familiarity, `tamago brain` CLI
+(chat/inspect/memories/forget/status/reset), `TAMAGO_PROVIDER=brain`. Design: `docs/BRAIN_ARCHITECTURE.md`, D-117.
+**Tests:** `cd Gateway && npm test` → 101/101 (UNIT_TESTED_ONLY). Real gateway and CLI exercised in the cloud.
+**Unverified:** real Ollama (`UNVERIFIED_LOCAL_PROVIDER`), the owner's Mac, the physical Watch.
+**Next recommended task (ONE):** Brain F on the owner's Mac: pull 2–3 local models and run the plan in
+`BRAIN_ARCHITECTURE.md` §9, recording latency, JSON-validity and quality evidence; then choose fast/smart
+defaults. After that: Brain E (tool registry + policy + mock tools).
+**Do not redo:** the brain modules, memory gate, familiarity model, CLI, nonverbal V1 clarification.

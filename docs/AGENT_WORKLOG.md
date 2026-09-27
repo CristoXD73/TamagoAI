@@ -502,3 +502,55 @@ SE3 40mm", `49DEDF60-8D9E-4977-8630-F1984F2E00ED`) for clean test runs and left
 it for reuse.
 
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T02:06:34+0000: Claude Code (cloud) — Tamago Brain milestone 1 (Brain A–D)
+
+**Agent:** Claude Code (cloud session, no Xcode/Swift, no Ollama)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `146c480` (fast-forwarded from `a93d896` to origin before starting)
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- New: `Gateway/src/brain/**` (orchestrator, response-schema, context-builder, session, maintenance,
+  index, personality/{profile,behavior-policy}, routing/{intent-router,model-router},
+  memory/{extractor,gate,store,retrieve}, relationship/model, world/state, reasoners/{ollama,deterministic},
+  speech/composer, storage/database), `Gateway/bin/tamago.js`, `Gateway/test/brain.test.js`,
+  `Gateway/test/brain-gateway.test.js`, `docs/BRAIN_ARCHITECTURE.md`,
+  `Tests/Fixtures/protocol-v1/responses/ok-nonverbal.json`
+- Modified: `Gateway/src/protocol.js` (nonverbal ok envelope), `Gateway/src/providers/mock.js`
+  (`nonverbal` command), `Gateway/src/config.js` (`TAMAGO_PROVIDER=brain`), `Gateway/src/cli.js`
+  (await brain readiness), `Gateway/test/fixture-cases.js`, `Tests/Fixtures/protocol-v1/manifest.json`
+  (regenerated), `Gateway/package.json` (bin + `brain` script), `Gateway/.env.example`,
+  `Gateway/mock/README.md`, `.gitignore` (`*.sqlite*`), `docs/PROTOCOL_V1.md` (§5.1), `docs/DECISIONS.md`
+  (D-117), `docs/ACCEPTANCE_TESTS.md` (§K), `CLAUDE.md`, `docs/HANDOFF_LOG.md`, this file.
+
+**Work performed:** turned the Mac gateway's "prompt + latest message" into the Tamago Brain per the owner's
+architecture brief, keeping Protocol V1 as the external contract. Details: `docs/BRAIN_ARCHITECTURE.md`.
+
+**Tests/builds actually performed (by me, in the cloud, Node v22.22.2):**
+- `cd Gateway && npm test`: 101 tests, 101 pass (80 pre-existing + 1 new fixture case + 19 brain + 2
+  brain-gateway). No pre-existing test was modified except adding the nonverbal fixture case.
+- `npm run fixtures`: regenerated. The only new file is `ok-nonverbal.json`, and the manifest gained one entry.
+- CLI transcript across a real process restart (`printf … | node bin/tamago.js brain chat`, twice), plus
+  `inspect`, `memories` and `status`.
+- Real gateway process `TAMAGO_PROVIDER=brain TAMAGO_ALLOW_NO_AUTH=1 node src/cli.js`, driven by curl: V1
+  envelopes including the nonverbal one.
+
+**Things NOT verified:** any real LLM (the Ollama reasoner is tested against a stubbed fetch only:
+`UNVERIFIED_LOCAL_PROVIDER`); latency and quality on the owner's 16 GB Mac; the nonverbal envelope on the
+physical Watch (I checked by reading `CharacterStateMachine.handle` that an empty `speechText` skips TTS; I
+didn't run Swift); the Swift fixture tests against the new `ok-nonverbal.json` (not run: no toolchain; it
+decodes as a normal `TamagoResponse` with empty strings); Node 26 on the owner's Mac (built-in
+`node:sqlite`, expected to work).
+
+**Known issues:** English-only rule patterns; the deterministic reasoner is a labeled fallback, not
+intelligence; `node:sqlite` prints an ExperimentalWarning on Node 22 (the CLI suppresses it; the gateway log
+shows it once); tools (Brain E) aren't built, and Tamago says so.
+
+**Cross-agent impact:** the gateway default provider is still `mock`, so nothing changes unless
+`TAMAGO_PROVIDER=brain`. The Swift fixture suite gains one fixture (`ok-nonverbal.json`). `PROTOCOL_V1` §5.1
+documents empty `text`/`speechText` as a nonverbal reaction, which the current Watch client already handles.
+No Apple sources were touched.
+
+**Signed-by:** Claude Code (cloud)

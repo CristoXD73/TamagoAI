@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 *.p12
 *.mobileprovision
 *.cer

@@ -10,6 +10,7 @@ Send these as the `text` field of a `POST /v1/request`.
 | `state error` | `error`, code `provider_error` (HTTP 502) |
 | `state <anything else>` | `ok`, state `confused` |
 | `tool <name>` | `ok`, state `success`, simulated tool run (e.g. `tool jellyfin`) |
+| `nonverbal` | `ok`, empty `text`/`speechText`, state `happy`, haptic `click` (nonverbal reaction, PROTOCOL_V1 §5.1) |
 | `follow up` | `ok`, `followUpExpected: true` |
 | `slow <ms>` | waits `<ms>`, then `done`; exceeds the timeout to get `timeout` (HTTP 504) |
 | `unavailable` | `error`, code `provider_unavailable` (HTTP 503) |

@@ -28,6 +28,7 @@ export const RESPONSE_CASES = [
   { file: 'ok-success.json', httpStatus: 200, body: req(1, 'ping'), description: 'Plain success (ping -> pong).' },
   { file: 'ok-happy.json', httpStatus: 200, body: req(2, 'state happy'), description: 'Success that sets characterState happy.' },
   { file: 'ok-tool-success.json', httpStatus: 200, body: req(3, 'tool jellyfin'), description: 'Simulated local tool action succeeded.' },
+  { file: 'ok-nonverbal.json', httpStatus: 200, body: req(11, 'nonverbal'), description: 'Nonverbal reaction: empty text/speechText, reaction state + haptic only (§5.1).' },
   { file: 'ok-follow-up.json', httpStatus: 200, body: req(4, 'follow up'), description: 'Gateway expects a follow-up utterance.' },
   { file: 'error-timeout.json', httpStatus: 504, body: req(5, 'slow 60000'), description: 'Provider exceeded the gateway timeout.' },
   { file: 'error-invalid-request-malformed.json', httpStatus: 400, raw: RAW_REQUEST_FIXTURES['malformed.txt'], description: 'Body is not valid JSON; requestId unknown (null).' },
