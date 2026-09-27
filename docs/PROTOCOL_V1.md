@@ -282,3 +282,40 @@ x-tamago-protocol-version: 1       (optional; anything else → unsupported_prot
 - **Privacy:** the audio exists only in a private temp directory while it's transcribed, then is deleted; neither
   audio nor transcript is logged (the log line has request ID, byte count and timings only).
 - **Discovery:** `GET /v1/protocol` lists `inputTypes: ["text", "audio"]` when voice input is available.
+
+## 16. Speech audio output (added in D-121; backward compatible)
+
+Natural voice. The **Mac** synthesizes the reply's `speechText` with a local neural voice (sherpa-onnx +
+Kokoro-82M, `Gateway/tools/tts`, D-121) and the Watch fetches and plays it. The text reply **never waits** for
+audio. Synthesis starts in the background when the reply is ready, and the Watch fetches the audio afterwards.
+
+- **Response field (optional):** an `ok` response with non-empty `speechText` may carry
+  ```json
+  "speechAudio": { "path": "/v1/speech/<requestId>", "format": "audio/mp4", "voice": "af_heart" }
+  ```
+  It's present only when the gateway has a synthesizer configured (`TAMAGO_TTS`). It's never present on errors or
+  on nonverbal replies (§5.1). `voice` is informational. Clients that don't know the field ignore it, as §5 allows
+  unknown top-level fields. `/v1/audio` replies (§15) carry it the same way.
+- **Fetch:**
+  ```
+  GET /v1/speech/<requestId>
+  authorization: Bearer <token>
+  ```
+  - `200`: `content-type: audio/mp4` (AAC, mono, 24 kHz, ~32 kbps; a 2-sentence reply is ~20–60 KB),
+    `cache-control: no-store`. The audio is **served once** and then deleted.
+  - If synthesis is still running, the gateway holds the request for up to 2.5 s.
+  - `503 provider_unavailable`: not ready within that wait, or synthesis failed.
+  - `404 not_found`: unknown, already served, or expired (2 min, max 32 held).
+  - `400 invalid_request`: not a UUID.
+  - `401 auth_failed`.
+  - Error bodies are the normal §5 error envelope.
+- **Client rule (binding):** every non-200 result, a timeout (the Watch's budget is ~2.5 s), or a playback
+  failure means **speak `speechText` with the built-in voice exactly as before**. The creature must never stay in
+  `speaking` because audio was missing.
+- **Discovery:** `GET /v1/protocol` lists `outputTypes: ["text", "speech-audio"]` when a synthesizer is
+  configured, and `["text"]` otherwise.
+- **Privacy:** the reply text goes to the local helper in a private temp file (never a command line). The audio
+  lives in memory until it's fetched or expires. Neither text nor audio is logged: the log line has the request
+  ID, engine, voice, byte count and timings only. Nothing leaves the Mac. No cloud TTS, no API keys.
+- **Voices named after OpenAI voices are refused** (`af_alloy`, `af_nova`, `am_echo`, `am_onyx`, `bm_fable`), as is
+  any voice cloning. See `docs/VOICE_RESEARCH.md`.

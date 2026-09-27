@@ -42,3 +42,10 @@ Apple/Config/Local.xcconfig
 /docs/media/_work/
 /Assets/CharacterSource/_work/
 /Assets/CharacterProcessed/_work/
+
+# Natural voice (D-121): engines, models, samples and generated audio stay on /Volumes/Storage, never in git
+Gateway/tools/tts/.install/
+Gateway/tools/tts/models/
+Gateway/tools/tts/sherpa-onnx/
+*.onnx
+voices.bin

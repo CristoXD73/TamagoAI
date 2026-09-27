@@ -71,3 +71,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+---
+
+## Local voice engine (not included in this repository)
+
+The optional natural voice (D-121) uses **sherpa-onnx** (Apache-2.0), **Kokoro-82M** (Apache-2.0 weights) and
+**KittenTTS** (Apache-2.0). They're downloaded by `Gateway/tools/tts/setup.sh` onto the owner's Mac and are
+**not redistributed** here. Their model packages contain espeak-ng data (GPL-3.0), which our code doesn't link
+or ship. Details: `docs/UPSTREAM_REUSE.md` and `docs/VOICE_RESEARCH.md`. Anyone who later bundles these
+components must reproduce their licenses here.

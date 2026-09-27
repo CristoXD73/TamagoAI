@@ -10,6 +10,8 @@ import {
   REQUEST_FIXTURES,
   RAW_REQUEST_FIXTURES,
   RESPONSE_CASES,
+  SPEECH_CASES,
+  stubSynthesizer,
   CLIENT_FIXTURE_DESCRIPTIONS,
 } from './fixture-cases.js';
 
@@ -42,6 +44,20 @@ for (const c of RESPONSE_CASES) {
     const res = await post(gw.base, c.raw ?? c.body, { raw: c.raw !== undefined, token: c.noAuth ? null : undefined });
     assert.equal(res.status, c.httpStatus);
     assert.deepEqual(readJson('responses', c.file), res.body, `${c.file} drifted; run npm run fixtures`);
+  });
+}
+
+for (const c of SPEECH_CASES) {
+  test(`response fixture ${c.file} matches a gateway with a stub synthesizer`, async () => {
+    const speechGw = await startGateway({ timeoutMs: FIXTURE_TIMEOUT_MS, synthesizer: stubSynthesizer() });
+    try {
+      const res = await post(speechGw.base, c.body);
+      assert.equal(res.status, c.httpStatus);
+      assert.deepEqual(readJson('responses', c.file), res.body, `${c.file} drifted; run npm run fixtures`);
+      assert.ok(res.body.speechAudio, 'speechAudio present');
+    } finally {
+      await speechGw.close();
+    }
   });
 }
 

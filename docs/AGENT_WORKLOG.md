@@ -909,3 +909,33 @@ size, and how each runs on Apple Silicon without Python/npm; recommendation Koko
 public references and are re-checked by setup.sh at install time.
 **Cross-agent impact:** none.
 **Signed-by:** Claude Code (cloud)
+
+---
+
+### 2026-09-27T06:57:49+0000: Claude Code (cloud) — natural voice, part 2: gateway synthesis + GET /v1/speech
+
+**Agent:** Claude Code (cloud; no macOS, afconvert, Swift or model downloads)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `ebc30e2` · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- new: `Gateway/src/tts.js`, `Gateway/tools/tts/tamago-tts`, `Gateway/tools/tts/voices.tsv`, `Gateway/test/speech.test.js`,
+  fixture `responses/ok-speech-audio.json`
+- `Gateway/src/server.js`, `src/cli.js`, `src/protocol.js` (validator), `scripts/generate-fixtures.js`, `test/fixture-cases.js`,
+  `test/fixtures.test.js`, `protocol-info.json` + `manifest.json` (regenerated), `.env.example`, `.gitignore`
+- `docs/DECISIONS.md` (D-121), `docs/PROTOCOL_V1.md` (§16), `docs/CREATURE_SPEC.md` (§9.4 note), `docs/UPSTREAM_REUSE.md`,
+  `THIRD_PARTY_NOTICES.md`, this file
+
+**Work performed:**
+- Optional `speechAudio` on ok replies with speech. Background synthesis keyed by requestId (bounded to 32 entries, 2-min TTL,
+  served once). `GET /v1/speech/<id>` waits up to 2.5 s, else 503.
+- Text replies never wait for audio. No text or audio in logs.
+- The helper wraps sherpa-onnx (Kokoro/Kitten) or `say`, then `afconvert` to AAC. Text is passed via a 0600 temp file.
+- OpenAI-named voices are refused in both layers.
+
+**Tests/builds actually performed (by me):** `npm test`: 134 tests, 132 pass, 0 fail, 2 skipped (real Kokoro and the real transcriber, which
+need the Mac). The helper was tested with fake `sherpa-onnx-offline-tts`/`afconvert` binaries that record argv.
+**Things NOT verified:** the real sherpa-onnx CLI flags and speaker ids (from public docs, not run), afconvert conversion, latency and size
+budgets, any audio quality. All of this is UNVERIFIED until setup.sh runs on the owner's Mac.
+**Known issues:** none.
+**Cross-agent impact:** Protocol V1 is additive (new optional field + endpoint + `outputTypes` in /v1/protocol). The manifest now has 23 fixtures, so the
+Swift `ProtocolFixtureTests` count must move to 23 (done in part 3).
+**Signed-by:** Claude Code (cloud)

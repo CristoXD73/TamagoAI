@@ -918,3 +918,51 @@ off-LAN exposure).
 - **Evidence:** real transcription on the owner's Mac (`say` → "What's my dog's name?", 1.3–1.4 s); gateway tests
   113/113 including the real helper; simulator hold → upload (9.7 KB) → transcript → brain "Pixel" → speech
   started/finished (`SIMULATOR_VERIFIED_ONLY`). Real Watch microphone capture: UNVERIFIED.
+
+### D-121 Natural voice: the Mac synthesizes locally, the Watch fetches and plays (`GET /v1/speech/<id>`)
+
+- **Why:** the owner wants a natural, warm voice "like when ChatGPT talks to you". The Watch can't provide one:
+  watchOS offers no Enhanced/Premium voices, and an 82M-parameter neural model is too heavy for an SE 3. The
+  owner's Mac mini can run one comfortably and is already the brain.
+- **Decision:**
+  - The gateway optionally synthesizes each reply's `speechText` through a separate local helper,
+    `Gateway/tools/tts/tamago-tts` (sherpa-onnx `sherpa-onnx-offline-tts` then `afconvert` → AAC/MP4 mono 24 kHz).
+  - The helper runs as a child process with a timeout, like `tools/transcribe`. There are **zero npm
+    dependencies**.
+  - Responses gain an optional `speechAudio` field, and the Watch fetches `GET /v1/speech/<requestId>`
+    (PROTOCOL_V1 §16, additive, not V2).
+  - Synthesis starts when the reply is ready and never delays the text reply.
+- **Engine (docs/VOICE_RESEARCH.md):**
+  - **Primary:** Kokoro-82M v1.0 (Apache-2.0 weights) on sherpa-onnx (Apache-2.0). Candidate voices: `af_heart`
+    (default), `af_bella`, `bf_emma`, `am_michael`.
+  - **Lighter fallback:** KittenTTS nano (Apache-2.0).
+  - **Personal-use baseline:** macOS `say` with a Premium voice.
+  - The **owner picks the voice by ear** from generated samples. Nothing is chosen until then.
+- **Guardrails:**
+  - Local only: no cloud TTS, no API keys.
+  - No voice cloning. No imitation of any real person or of OpenAI's voices: the Kokoro voices named after
+    them are refused in both the gateway and the helper.
+  - Permissive licenses only; non-commercial options are marked not eligible.
+  - Models live under `$TAMAGO_TTS_MODEL_DIR` (owner: `/Volumes/Storage/AI/tts`, AGENTS.md §9) and are never
+    committed.
+- **Fallback (binding):** no synthesizer, a 404/503, the ~2.5 s fetch budget, or a playback failure all mean the
+  Watch speaks with AVSpeechSynthesizer exactly as before. The speech watchdog (D-106) covers both paths, so the
+  creature never sticks in `speaking`.
+- **How the audio reaches the player without touching `CharacterStateMachine`:**
+  1. Just before `apply(.response)`, `TamagoConnection` remembers the response's `speechAudio` keyed by
+     `requestId`.
+  2. When the machine then emits `.speak(text)`, `TamagoConnection` looks that entry up and tries the Mac audio
+     first.
+  3. The machine's states and effects are unchanged.
+- **Supersedes:** CREATURE_SPEC §9.4 "use on-device speech synthesis". Synthesis now happens on the owner's own
+  Mac, which is still local and private. Watch-side synthesis remains the fallback.
+- **Known caveats:**
+  - Kokoro's training data included some synthetic audio from closed commercial TTS models (per its model card).
+  - The sherpa-onnx runtime bundles espeak-ng (GPL-3.0) for phonemization. It's downloaded to the owner's Mac,
+    not linked into or redistributed by this repo (sherpa-onnx issue #3731 plans its removal).
+  - Both are recorded for the owner in VOICE_RESEARCH §4.
+- **Verification:**
+  - Gateway: `UNIT_TESTED_ONLY` (stub synthesizer, plus the helper with fake binaries).
+  - Real engine: UNVERIFIED (no downloads possible in the cloud sandbox).
+  - Watch Swift: UNVERIFIED (not compiled).
+  - Nothing is DEVICE_VERIFIED until the owner hears it on the Watch.

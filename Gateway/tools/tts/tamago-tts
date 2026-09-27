@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# tamago-tts: text → AAC (audio/mp4) for PROTOCOL_V1 §16 / D-121.
+#
+#   tamago-tts --engine kokoro|kitten|say --voice NAME [--speed 1.0] --text-file FILE --out FILE.m4a
+#   tamago-tts --engine kokoro|kitten|say --voice NAME --check      (are the engine and models in place?)
+#
+# Run by Gateway/src/tts.js. Text arrives in a file (never on the gateway's command line). Prints nothing on
+# success; errors go to stderr with exit 1. Uses only what setup.sh installed under $TAMAGO_TTS_MODEL_DIR and
+# macOS's built-in `afconvert` / `say`. Local only: no network, ever.
+#
+# VERIFICATION: UNVERIFIED. Written in the cloud without macOS or the sherpa-onnx binary. The sherpa-onnx flags
+# follow its documented Kokoro/KittenTTS usage; setup.sh --selftest exercises every engine on the owner's Mac.
+set -euo pipefail
+
+engine="" voice="" speed="1.0" text_file="" out="" check=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --engine) engine="$2"; shift 2 ;;
+    --voice) voice="$2"; shift 2 ;;
+    --speed) speed="$2"; shift 2 ;;
+    --text-file) text_file="$2"; shift 2 ;;
+    --out) out="$2"; shift 2 ;;
+    --check) check=1; shift ;;
+    *) echo "tamago-tts: unknown argument $1" >&2; exit 2 ;;
+  esac
+done
+
+die() { echo "tamago-tts: $*" >&2; exit 1; }
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+case "$voice" in af_alloy|af_nova|am_echo|am_onyx|bm_fable) die "voice $voice is excluded (named after an OpenAI voice)";; esac
+[[ "$speed" =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "bad --speed"
+
+command -v afconvert >/dev/null || die "afconvert not found (macOS only)"
+
+# Speaker id for a voice name (numeric ids pass through), from voices.tsv.
+speaker_id() {
+  if [[ "$voice" =~ ^[0-9]+$ ]]; then echo "$voice"; return; fi
+  local sid
+  sid="$(awk -F'\t' -v e="$1" -v v="$voice" '$1==e && $2==v {print $3; exit}' "$here/voices.tsv")"
+  [[ -n "$sid" ]] || die "unknown $1 voice '$voice' (see tools/tts/voices.tsv)"
+  echo "$sid"
+}
+
+sherpa_setup() {
+  : "${TAMAGO_TTS_MODEL_DIR:?set TAMAGO_TTS_MODEL_DIR (setup.sh prints it)}"
+  bin="$TAMAGO_TTS_MODEL_DIR/sherpa-onnx/bin/sherpa-onnx-offline-tts"
+  [[ -x "$bin" ]] || die "sherpa-onnx not installed at $bin (run tools/tts/setup.sh)"
+  export DYLD_LIBRARY_PATH="$TAMAGO_TTS_MODEL_DIR/sherpa-onnx/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+}
+
+length_scale() { awk -v s="$speed" 'BEGIN { printf "%.3f", 1 / s }'; }
+
+case "$engine" in
+  kokoro)
+    sherpa_setup
+    m="$TAMAGO_TTS_MODEL_DIR/models/kokoro-multi-lang-v1_0"
+    for f in model.onnx voices.bin tokens.txt espeak-ng-data; do [[ -e "$m/$f" ]] || die "missing $m/$f (run tools/tts/setup.sh)"; done
+    sid="$(speaker_id kokoro)"
+    args=(--kokoro-model="$m/model.onnx" --kokoro-voices="$m/voices.bin" --kokoro-tokens="$m/tokens.txt"
+          --kokoro-data-dir="$m/espeak-ng-data" --kokoro-length-scale="$(length_scale)" --sid="$sid")
+    [[ -d "$m/dict" ]] && args+=(--kokoro-dict-dir="$m/dict")
+    [[ -f "$m/lexicon-us-en.txt" ]] && args+=(--kokoro-lexicon="$m/lexicon-us-en.txt")
+    ;;
+  kitten)
+    sherpa_setup
+    m="$TAMAGO_TTS_MODEL_DIR/models/kitten-nano-en-v0_1-fp16"
+    for f in model.fp16.onnx voices.bin tokens.txt espeak-ng-data; do [[ -e "$m/$f" ]] || die "missing $m/$f (run tools/tts/setup.sh)"; done
+    sid="$(speaker_id kitten)"
+    args=(--kitten-model="$m/model.fp16.onnx" --kitten-voices="$m/voices.bin" --kitten-tokens="$m/tokens.txt"
+          --kitten-data-dir="$m/espeak-ng-data" --kitten-length-scale="$(length_scale)" --sid="$sid")
+    ;;
+  say)
+    command -v say >/dev/null || die "say not found (macOS only)"
+    if [[ -n "$voice" ]] && ! say -v '?' | grep -q -F -- "$voice"; then
+      die "macOS voice '$voice' isn't installed (System Settings → Accessibility → Spoken Content)"
+    fi
+    ;;
+  *) die "unknown --engine '$engine' (kokoro, kitten, say)" ;;
+esac
+
+[[ "$check" -eq 1 ]] && exit 0
+
+[[ -f "$text_file" ]] || die "--text-file missing"
+[[ -n "$out" ]] || die "--out missing"
+work="$(mktemp -d "${TMPDIR:-/tmp}/tamago-tts.XXXXXX")"
+trap 'rm -rf "$work"' EXIT
+
+if [[ "$engine" == "say" ]]; then
+  raw="$work/reply.aiff"
+  rate="$(awk -v s="$speed" 'BEGIN { printf "%d", 175 * s }')"
+  if [[ -n "$voice" ]]; then say -v "$voice" -r "$rate" -f "$text_file" -o "$raw"; else say -r "$rate" -f "$text_file" -o "$raw"; fi
+else
+  raw="$work/reply.wav"
+  text="$(cat "$text_file")"
+  # One quoted argv element, never parsed by a shell. Leading dashes are stripped so the text can't be
+  # mistaken for an option (e.g. a reply beginning "--output-filename=…").
+  text="${text#"${text%%[![:space:]-]*}"}"
+  [[ -n "$text" ]] || die "nothing to say"
+  "$bin" "${args[@]}" --output-filename="$raw" "$text" >/dev/null 2>"$work/err" || { cat "$work/err" >&2; die "synthesis failed"; }
+fi
+
+[[ -s "$raw" ]] || die "engine produced no audio"
+# AAC in an MP4 container, mono, 24 kHz, 32 kbps: ~4 KB per second of speech.
+afconvert "$raw" "$out" -f m4af -d aac@24000 -c 1 -b 32000 >/dev/null
+[[ -s "$out" ]] || die "afconvert produced no audio"

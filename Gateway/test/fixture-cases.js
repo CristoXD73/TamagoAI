@@ -39,6 +39,19 @@ export const RESPONSE_CASES = [
   { file: 'error-provider-unavailable.json', httpStatus: 503, body: req(10, 'unavailable'), description: 'Local AI engine not running.' },
 ];
 
+// Replayed against a gateway with a deterministic stub synthesizer (D-121, §16).
+export const SPEECH_CASES = [
+  { file: 'ok-speech-audio.json', httpStatus: 200, body: req(12, 'ping'), description: 'Success with optional speechAudio: fetch GET /v1/speech/<requestId> for Mac-synthesized audio (§16).' },
+];
+
+export const stubSynthesizer = () => ({
+  name: 'kokoro',
+  engine: 'kokoro',
+  voice: 'af_heart',
+  synthesize: async () => Buffer.from('stub-audio'),
+  check: async () => ({ ok: true }),
+});
+
 // Hand-written envelopes the Watch builds locally so the UI pipeline only ever
 // handles one response type. Validated structurally, not replayed.
 export const CLIENT_FIXTURE_DESCRIPTIONS = {

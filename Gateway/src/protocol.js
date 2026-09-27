@@ -306,6 +306,15 @@ export function validateResponse(obj) {
     expect(obj.error === undefined, 'error must be absent unless status is error');
     expect(obj.requestId !== null, 'requestId is required unless status is error');
   }
+  // Optional since D-121 (§16). Old clients ignore it.
+  if (obj.speechAudio !== undefined) {
+    const a = obj.speechAudio;
+    expect(obj.status === 'ok', 'speechAudio only on ok responses');
+    expect(a && typeof a === 'object' && typeof a.path === 'string' && a.path === `/v1/speech/${obj.requestId}`,
+      'speechAudio.path must be /v1/speech/<requestId>');
+    expect(a && a.format === 'audio/mp4', 'speechAudio.format must be audio/mp4');
+    expect(a && (a.voice === undefined || typeof a.voice === 'string'), 'speechAudio.voice must be a string');
+  }
   return problems;
 }
 

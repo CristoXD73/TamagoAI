@@ -9,6 +9,9 @@
   "inputTypes": [
     "text"
   ],
+  "outputTypes": [
+    "text"
+  ],
   "characterStates": [
     "sleeping",
     "idle",

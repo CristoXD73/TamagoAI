@@ -120,6 +120,13 @@
       "description": "GET /v1/protocol"
     },
     {
+      "path": "responses/ok-speech-audio.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "Success with optional speechAudio: fetch GET /v1/speech/<requestId> for Mac-synthesized audio (§16)."
+    },
+    {
       "path": "client/thinking-accepted.json",
       "kind": "response",
       "source": "client-synthesized",

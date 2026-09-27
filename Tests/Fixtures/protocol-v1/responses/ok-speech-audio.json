@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "requestId": "00000000-0000-4000-8000-000000000012",
+  "status": "ok",
+  "text": "pong",
+  "speechText": "pong",
+  "characterState": "idle",
+  "haptic": "click",
+  "followUpExpected": false,
+  "speechAudio": {
+    "path": "/v1/speech/00000000-0000-4000-8000-000000000012",
+    "format": "audio/mp4",
+    "voice": "af_heart"
+  }
+}

@@ -3,6 +3,7 @@ import { loadConfig } from './config.js';
 import { createGateway, GATEWAY_VERSION } from './server.js';
 import { createPairingWindow, PAIRING_DEFAULTS } from './pairing.js';
 import { createTranscriberFromEnv } from './transcriber.js';
+import { createSynthesizerFromEnv } from './tts.js';
 import { pickLanIPv4, startAdvertising, WELL_KNOWN_HOST } from './advertise.js';
 
 const logger = {
@@ -38,7 +39,27 @@ if (config.provider.ready) {
 const pairing = config.pairingEnabled ? createPairingWindow() : null;
 const transcriber = createTranscriberFromEnv(process.env);
 const keepAudioDir = process.env.TAMAGO_KEEP_AUDIO_DIR || null;   // diagnostics only
-const server = createGateway({ ...config, pairing, transcriber, keepAudioDir, logger });
+// PROTOCOL_V1 §16 / D-121: natural voice from the Mac. Checked once at startup;
+// if the helper or its models aren't in place, the Watch keeps its own voice.
+let synthesizer = null;
+let voiceOutput = 'unavailable (TAMAGO_TTS=off; see docs/DEVELOPMENT.md "Natural voice")';
+try {
+  synthesizer = createSynthesizerFromEnv(process.env);
+  if (synthesizer) {
+    const check = await synthesizer.check();
+    if (check.ok) voiceOutput = `${synthesizer.engine}/${synthesizer.voice || 'default'}`;
+    else {
+      voiceOutput = `unavailable (${check.reason})`;
+      synthesizer = null;
+    }
+  } else if (process.env.TAMAGO_TTS && process.env.TAMAGO_TTS !== 'off') {
+    voiceOutput = 'unavailable (speech helper not found: TAMAGO_TTS_COMMAND)';
+  }
+} catch (err) {
+  console.error(`tamagoai-gateway: ${err.message}`);
+  process.exit(1);
+}
+const server = createGateway({ ...config, pairing, transcriber, keepAudioDir, synthesizer, logger });
 
 let advertiser = null;
 let ipWatch = null;
@@ -52,6 +73,7 @@ server.listen(config.port, config.host, () => {
     port,
     provider: config.provider.name,
     voiceInput: transcriber ? transcriber.name : 'unavailable (npm run build:transcriber)',
+    voiceOutput,
     authRequired: config.authToken !== null,
     gatewayId: config.gatewayId,
   });
