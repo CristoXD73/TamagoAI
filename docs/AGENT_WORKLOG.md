@@ -586,3 +586,40 @@ decide (not deleted).
 **Cross-agent impact:** new binding rule for all agents (`AGENTS.md` §9). No code touched.
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T00:18:25-04:00: Claude Code — app icons; first physical iPhone install
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `2d744cd`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `Apple/iPhoneApp/Assets.xcassets/` and `Apple/WatchApp/Assets.xcassets/` (AppIcon, 1024×1024
+single-size), `Apple/Config/Tamago.xcconfig` (`ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`),
+`Assets/CharacterReference/octopus-v001/PROVENANCE.md` (owner's icon exception), this file.
+
+**Work performed:** the owner reported no app icon on the iPhone or the Watch; the project had no asset
+catalog at all. At the owner's direction, `ref_hero_q34.jpg` (the image the owner sent, byte-identical)
+became the icon, unchanged apart from scaling and centering on black. The Watch version is sized so the
+whole octopus fits inside the circular mask. Built the `TamagoPhone` scheme (with the embedded Watch app) for
+the owner's physical iPhone and installed it with `devicectl`.
+
+**Tests/builds actually performed (by me):**
+`xcodebuild build -scheme TamagoPhone -configuration Debug -destination 'platform=iOS,id=<owner iPhone>'
+-derivedDataPath ../.build/DerivedData-device -allowProvisioningUpdates` → BUILD SUCCEEDED, signed with
+automatic team profiles; both bundles contain `Assets.car` and `CFBundleIconName = AppIcon`;
+`xcrun devicectl device install app` → installed on the owner's iPhone (the first attempt over Wi-Fi failed
+with IXRemoteErrorDomain 6; the retry succeeded).
+
+**Things NOT verified:** that the icon appears on the iPhone home screen (the owner hasn't confirmed yet);
+the Watch app. Installing from the iPhone's Watch app spins, then nothing happens. Diagnosis: the Watch
+isn't visible to Xcode (`devicectl`, `xcdevice`), so it isn't in the team provisioning profile (the profile
+lists 2 devices, neither a Watch). The Watch binary was arm64-only (Debug `ONLY_ACTIVE_ARCH`).
+
+**Known issues:** the Watch install is blocked on getting the Watch into a profile (portal registration of
+its UDID) or on a TestFlight route; see HANDOFF.
+
+**Cross-agent impact:** the project gains asset catalogs in the synchronized folders (no `.pbxproj` edit)
+and one xcconfig line. Brain F is paused mid-run (the uncommitted `Gateway/scripts/brain-eval.js` isn't part
+of this commit).
+
+**Signed-by:** Claude Code

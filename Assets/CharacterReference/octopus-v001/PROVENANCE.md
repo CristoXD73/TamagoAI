@@ -14,3 +14,8 @@ These images are visual ground truth: do not redesign, humanize, or restyle the 
 - These are **references**, not runtime assets. Don't import them into the Watch asset catalog. Production
   frames follow `docs/CHARACTER_ASSET_PIPELINE.md` and the art gap report in `docs/ANIMATION_PROTOTYPE_PLAN.md` §5.
 - `tools/previz/` crops and warps these images **for preview only**.
+- **App icon exception (owner, 2026-09-27):** the owner supplied `ref_hero_q34.jpg` as the app icon. The
+  art is unchanged: it's only scaled and centered on a black 1024×1024 square
+  (`Apple/iPhoneApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png`, `Apple/WatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png`;
+  the Watch version is smaller so the whole octopus fits inside the circular mask). A final, purpose-drawn
+  icon can replace these later.
