@@ -128,6 +128,12 @@ same for Claude and Codex, survives Mac restarts and uses no credits while waiti
 
 The relay remembers "Claude unavailable until 3:00 PM" and doesn't send it new work before then.
 
+**Proactive trigger (R0 spike, docs/relay/R0_SPIKE.md):** both agents report their usage while they work.
+- Claude sends `rate_limit_event` (five-hour and weekly utilization, reset times).
+- Codex's session file has `rate_limits` (`used_percent`, `resets_at`).
+- The relay hands off **before** an agent runs dry, at ≥ 95 % or when an agent says it is limited. The failure
+  sorting above is the backstop.
+
 **Transfer is automatic (owner's decision 2).** Tamago tells you afterwards:
 "Claude ran out until 3 PM. Codex has the widget task now."
 
@@ -177,7 +183,7 @@ relay reads that agent's session file (Claude Code keeps them in `~/.claude/proj
 
 | # | Phase | Delivers | Done when |
 |---|---|---|---|
-| **R0** | Spike + decisions (1 session) | Claude and Codex run headless on a scratch repo, from the gateway: streaming output, session ids, resume, a real usage-limit message captured (or the documented one), timings. Check whether the installed **OpenClaw** already does part of this (reuse policy, `docs/UPSTREAM_REUSE.md`). | a short spike report with real outputs; section 9 answered |
+| **R0** ✅ | Spike + decisions (done 2026-09-27, `docs/relay/R0_SPIKE.md`) | Claude and Codex run headless on a scratch repo, from the gateway: streaming output, session ids, resume, a real usage-limit message captured (or the documented one), timings. Check whether the installed **OpenClaw** already does part of this (reuse policy, `docs/UPSTREAM_REUSE.md`). | a short spike report with real outputs; section 9 answered |
 | **R1** | Stronger local brain | 3 candidate models measured, winner chosen (D-entry); relay intents in the router with the 40-command test set | ≥ 38/40 commands routed right; median ≤ 3 s |
 | **R2** | Relay core | projects allowlist, tasks/runs in the brain database, Claude + Codex adapters, worktree per task, lock, limits; **Tasks** panel on the dashboard; driven from the dashboard box first | a real small task done end-to-end by each agent from a typed command |
 | **R3** | Questions | `ASK_OWNER` rule, question trimming, answer → resume; Protocol V1 §17 `GET /v1/inbox`; push notifications (APNs key + Watch entitlement); the Watch speaks waiting questions on open or from the notification | ask → push on the Watch → voice answer → agent continues |
