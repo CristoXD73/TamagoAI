@@ -1354,3 +1354,25 @@ the Swift compiles. `swift test` passes 147/147 and the TamagoWatch simulator bu
    synthesis ms, KB and engine RAM against the budgets.
 
 **Do not redo:** the engine research and licensing; the §16 contract; the fallback rules.
+
+---
+
+### 2026-09-27: Claude Code (cloud): iPhone widgets (D-122), review branch `claude/iphone-widgets`
+
+**Branch:** `claude/iphone-widgets`. Separate from `claude/great-volta-ogpuw8` on the owner's request, so another agent can
+review and merge it.
+**Done:**
+- `Apple/PhoneWidget/`: a WidgetKit extension source with the approved octopus in all six iPhone families (small, medium,
+  large, Lock Screen circular, rectangular, inline). A tap opens the app.
+- The sizes and rendering modes come from Apple's HIG (`docs/WIDGETS.md`). The art is a transparent cutout of the approved hero
+  image, never distorted.
+
+**Tests:** gateway `npm test` unchanged. Swift not compiled (cloud).
+**Unverified:** everything on the Apple side: compile, the look in each mode, the tap to open.
+**Next recommended task (ONE), agent on the Mac:**
+1. Review this branch and add the `TamagoPhoneWidget` target per `docs/WIDGETS.md` §4.
+2. Build `TamagoPhone`, and re-run the `TamagoWatch` tests and `swift test` to confirm nothing regressed.
+3. Check all six families in the simulator, including tinted/clear and the Lock Screen. Tap each one.
+4. Merge into `claude/great-volta-ogpuw8`.
+
+**Do not redo:** the size research, the cutout (use `tools/widget-art/make_cutout.py` if the art changes).

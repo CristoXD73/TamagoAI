@@ -1054,3 +1054,29 @@ lengths; simulator run against a loopback test gateway with TTS: transcribe 319 
 **Known issues:** synthesis competes with Ollama for CPU.
 **Cross-agent impact:** confirms the cloud agent's setup kit and gateway path work on the real Mac.
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T07:29:38+0000: Claude Code (cloud) — iPhone widgets (D-122), on review branch `claude/iphone-widgets`
+
+**Agent:** Claude Code (cloud; no Xcode or Swift toolchain)
+**Branch:** `claude/iphone-widgets` (off `claude/great-volta-ogpuw8` at `0429e59`, for another agent to review and merge) · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- new `Apple/PhoneWidget/` (2 Swift files, Info.plist, Assets.xcassets with CreatureCutout)
+- new `tools/widget-art/make_cutout.py`, `docs/WIDGETS.md`, `docs/widgets/layout-mock.png`
+- `docs/DECISIONS.md` (D-122), `Assets/CharacterReference/octopus-v001/PROVENANCE.md` (widget exception), `Apple/README.md`
+- `docs/HANDOFF_LOG.md`, this file
+
+**Work performed:**
+- Read Apple's HIG widget spec (the iOS dimensions table, families per device, rendering modes) and the WidgetKit docs.
+- Wrote a static widget for all 6 iPhone families. The art is aspect-fitted, never distorted, and a tap opens the app via `widgetURL`.
+- Made a transparent cutout of the approved hero art, because tinted/clear Home Screens paint opaque images white. The eyes are kept and three trapped
+  black pockets between the tentacles were removed.
+- The Xcode target is left to the Mac (CLAUDE.md: no project file edits in the cloud), with exact steps in docs/WIDGETS.md §4.
+
+**Tests/builds actually performed (by me):** checked the cutout visually on black, light and tinted backgrounds. Drew a Python layout mock at the HIG point sizes for the
+largest and smallest iPhones. `npm test` passes unchanged. No Swift compile.
+**Things NOT verified:** that it compiles, renders or opens the app. How tinted/clear/vibrant modes actually look.
+**Known issues:** the large widget upscales the 692 px art about 1.4× at @3x.
+**Cross-agent impact:** none until the target is added. TamagoPhone, the Watch app, the complication, the gateway and the protocol are untouched.
+**Signed-by:** Claude Code (cloud)
