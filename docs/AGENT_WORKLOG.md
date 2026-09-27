@@ -967,3 +967,24 @@ and the fallback timing on a device. All touched Swift files are marked UNVERIFI
 **Known issues:** none known.
 **Cross-agent impact:** the local agent must run `swift test` and the watchOS scheme before any TestFlight build.
 **Signed-by:** Claude Code (cloud)
+### 2026-09-27T03:00:50-04:00: Claude Code — Xcode Cloud without custom variables; version 0.1.1
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `8b942e2`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/ci_scripts/ci_post_clone.sh` (falls back to Xcode Cloud's `CI_BUNDLE_ID`/`CI_TEAM_ID`),
+`Apple/AppleTamago.xcodeproj/project.pbxproj` (`MARKETING_VERSION` 0.1.0 → 0.1.1, 8 lines, nothing else),
+`docs/DEVELOPMENT.md`, this file.
+**Work performed:** the owner chose to drive Xcode Cloud through the App Store Connect API. The API can't set
+workflow environment variables (Apple docs + a known App-Store-Connect-CLI issue), so the post-clone script
+now uses Xcode Cloud's built-in values instead. The owner's first Xcode Cloud run (a plain Build action on `main`
+@146c480) passed, which confirms the project builds there. Version 0.1.1 avoids build-number clashes with the
+local 0.1.0 uploads 2–6.
+**Tests/builds actually performed (by me):** post-clone script in four environments (built-ins → identical to the
+owner's `Local.xcconfig`; bundle only → no team line; workflow variables → identical; nothing → exit 1);
+Release `generic/platform=iOS` build → succeeded, `CFBundleShortVersionString` 0.1.1.
+**Things NOT verified:** an Xcode Cloud archive with this script (not run yet).
+**Known issues:** none.
+**Cross-agent impact:** the app version is now 0.1.1.
+**Signed-by:** Claude Code

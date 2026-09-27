@@ -171,15 +171,16 @@ workflow environment variables, so no bundle ID or team ID is ever committed.
    Cloud tab). Choose the **TamagoPhone** app (it carries the Watch app).
 2. When asked, **grant access to GitHub** for `CristoXD73/TamagoAI`.
 3. Edit the workflow:
-   - **Environment → Environment Variables:** `TAMAGO_BUNDLE_PREFIX` = the prefix in your `Local.xcconfig`,
-     `TAMAGO_TEAM_ID` = your team ID. Mark both **Secret**.
+   - **Environment variables: none needed.** The post-clone script uses Xcode Cloud's built-in `CI_BUNDLE_ID`
+     (the TamagoPhone bundle ID *is* the prefix) and `CI_TEAM_ID`. `TAMAGO_BUNDLE_PREFIX` / `TAMAGO_TEAM_ID`
+     workflow variables still override them if you ever set them.
    - **Start Conditions:** *Branch Changes* on `claude/great-volta-ogpuw8`, with **Files and Folders** limited to
      `Apple/` (docs and gateway pushes don't spend build hours). Keep **manual start** too.
    - **Actions:** *Archive*, platform iOS, scheme **TamagoPhone**, deployment preparation **TestFlight (Internal
      Testing Only)**. Optionally *Test*, scheme **TamagoWatch**, an Apple Watch SE 3 (40 mm) simulator.
    - **Post-Actions:** *TestFlight Internal Testing* → group **Owner**.
-4. **Build numbers:** TestFlight already has 0.1.0 builds 2–6. In App Store Connect → Xcode Cloud → Settings,
-   set the next build number to **7** or higher, or Xcode Cloud's build 1 will be rejected as a duplicate.
+4. **Build numbers:** local uploads used 0.1.0 builds 2–6; the version is now **0.1.1**, so Xcode Cloud's own
+   numbering (1, 2, …) is unique within it. Bump `MARKETING_VERSION` again before switching back to local uploads.
 5. Budget: the membership includes 25 compute hours a month; one archive of this project is a few minutes.
 
 Local archives (`xcodebuild archive … CURRENT_PROJECT_VERSION=<n>`, then `-exportArchive` with
