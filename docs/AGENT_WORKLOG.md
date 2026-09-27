@@ -893,3 +893,19 @@ settings to the owner's `Local.xcconfig`; without variables → exits 1 with a c
 **Known issues:** none.
 **Cross-agent impact:** new `Apple/ci_scripts/` (Xcode Cloud convention); no project file changes.
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T06:50:10+0000: Claude Code (cloud) — natural voice, part 1: research
+
+**Agent:** Claude Code (cloud; no macOS, Xcode, Swift or Ollama; Hugging Face and GitHub release downloads are blocked by the sandbox proxy)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `f4dc2dd` · **Ending commit SHA:** the commit containing this entry
+**Files changed:** `docs/VOICE_RESEARCH.md` (new), this file.
+**Work performed:** desk survey of local neural TTS (docs/handoff/VOICE_TASK.md step 1): licenses (code and weights), arena evidence,
+size, and how each runs on Apple Silicon without Python/npm; recommendation Kokoro-82M via sherpa-onnx, KittenTTS fallback,
+4 Kokoro voices + 1 Kitten voice as candidates; five OpenAI-named Kokoro voices excluded; espeak-ng GPL note.
+**Tests/builds actually performed:** none (documentation only). No engine was run: model downloads are blocked in this sandbox.
+**Things NOT verified:** every quality/speed claim is from the cited sources, not measured; sherpa-onnx asset names are from
+public references and are re-checked by setup.sh at install time.
+**Cross-agent impact:** none.
+**Signed-by:** Claude Code (cloud)
