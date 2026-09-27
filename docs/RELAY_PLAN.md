@@ -1,7 +1,8 @@
 # Relay plan: talk to Tamago, and it runs Claude, Codex or ChatGPT on your projects
 
-**Status:** PLAN (2026-09-27, Claude Code on the owner's Mac). Nothing here is built yet. The owner's
-decisions (section 9) come first, then phases R0–R6 in order. Every phase ends with tests and a worklog entry.
+**Status:** PLAN (2026-09-27, Claude Code on the owner's Mac). Nothing here is built yet. The owner answered
+section 9 on 2026-09-27; one point there still needs a yes. Phases R0–R6 run in order, and every phase ends
+with tests and a worklog entry.
 
 **Owner's goal (2026-09-27):**
 - Speak to the Watch; Tamago passes the work to Claude, ChatGPT or Codex and keeps projects moving.
@@ -104,11 +105,17 @@ it answers to). The agents get no secrets they weren't given for the task.
 same for Claude and Codex, survives Mac restarts and uses no credits while waiting.
 
 **Getting questions to the Watch:**
-- **R3:** the Watch checks `GET /v1/inbox` whenever Tamago opens. This is an additive Protocol V1 §17, like
-  §15/§16; it needs your OK.
-- **R5:** a complication badge.
-- **Later:** real push notifications. They need APNs set up in the developer account and an entitlement in the
-  app (decision 4).
+**R3 does both (owner approved, decisions 4–5):**
+- **Protocol V1 §17 `GET /v1/inbox`:** the Watch checks it whenever Tamago opens.
+- **Push notifications** with the question itself, so you don't have to open Tamago to know one is waiting:
+  - The Mac sends them straight to Apple's push service (HTTP/2 and a signed token, zero dependencies).
+  - Tapping one opens Tamago, which speaks the question.
+  - They need an **APNs key** (the owner creates it at developer.apple.com → Keys, same place as before; stored in
+    `/Volumes/Storage/AI/secrets/`).
+  - They need the **Push Notifications capability** on the Watch app: an entitlement plus a project change, which
+    the owner authorized with this decision.
+
+**R5** adds a complication badge.
 
 ## 6. Out of credits → the baton
 
@@ -121,10 +128,27 @@ same for Claude and Codex, survives Mac restarts and uses no credits while waiti
 
 The relay remembers "Claude unavailable until 3:00 PM" and doesn't send it new work before then.
 
-**Asking to transfer:** "Claude ran out until 3 PM. Hand TamaWatch widget to Codex?"
-- "Yes" transfers the task.
-- "Wait" parks it and resumes Claude at the reset time.
-- Automatic transfer is off by default (decision 2).
+**Transfer is automatic (owner's decision 2).** Tamago tells you afterwards:
+"Claude ran out until 3 PM. Codex has the widget task now."
+
+**The chain:**
+1. The agent you asked.
+2. The other coding agent (Claude ⇄ Codex).
+3. **Last: ChatGPT chat** (decision 1).
+   - It can't edit the project, so it gets the baton to think with: finish the plan, answer the open question,
+     write the next steps.
+   - Its answer is saved to the task and read to you in short.
+   - When a coding agent's credits come back, the task resumes there with ChatGPT's notes added to the baton.
+
+**Supervision: the relay keeps an eye on whoever holds the task.**
+- **What it watches for:**
+  - no new output or commit for 10 minutes;
+  - the same error 3 times;
+  - tests that were passing and now fail;
+  - edits outside the task's branch.
+- **What it does:** it pauses and tells you in one sentence, or hands on if the agent died.
+- **When an agent dies mid-run,** the relay first collects everything it can: its full output so far, the git
+  state, its last plan. Then it builds the baton, so nothing is lost at any step of the chain.
 
 **The baton** is a single Markdown file per handoff, built mostly **deterministically**, so it's exact and
 cheap. The **incoming agent**, the strongest model in the chain, does the reading and judging itself.
@@ -156,9 +180,9 @@ relay reads that agent's session file (Claude Code keeps them in `~/.claude/proj
 | **R0** | Spike + decisions (1 session) | Claude and Codex run headless on a scratch repo, from the gateway: streaming output, session ids, resume, a real usage-limit message captured (or the documented one), timings. Check whether the installed **OpenClaw** already does part of this (reuse policy, `docs/UPSTREAM_REUSE.md`). | a short spike report with real outputs; section 9 answered |
 | **R1** | Stronger local brain | 3 candidate models measured, winner chosen (D-entry); relay intents in the router with the 40-command test set | ≥ 38/40 commands routed right; median ≤ 3 s |
 | **R2** | Relay core | projects allowlist, tasks/runs in the brain database, Claude + Codex adapters, worktree per task, lock, limits; **Tasks** panel on the dashboard; driven from the dashboard box first | a real small task done end-to-end by each agent from a typed command |
-| **R3** | Questions | `ASK_OWNER` rule, question trimming, answer → resume; Protocol V1 §17 `GET /v1/inbox`; the Watch speaks waiting questions on open | ask → spoken on the Watch → voice answer → agent continues |
-| **R4** | Credits + baton | failure sorting, availability table, baton builder, transfer prompt, park-and-resume at reset | a forced "out of credits" (fake adapter) hands a half-done task to the other agent, which finishes it without redoing work |
-| **R5** | Watch polish | status on open, complication badge for waiting questions, haptics; push notifications if decision 4 says so | owner can run a task a whole day from the Watch |
+| **R3** | Questions | `ASK_OWNER` rule, question trimming, answer → resume; Protocol V1 §17 `GET /v1/inbox`; push notifications (APNs key + Watch entitlement); the Watch speaks waiting questions on open or from the notification | ask → push on the Watch → voice answer → agent continues |
+| **R4** | Credits, baton, chain | failure sorting, availability table, baton builder, automatic transfer down the chain (Claude ⇄ Codex → ChatGPT chat), supervision watchdog, resume when credits return | a forced "out of credits" (fake adapters) walks a half-done task down the whole chain with nothing lost, and it comes back to a coding agent afterwards |
+| **R5** | Watch polish | status on open, complication badge for waiting questions, haptics | owner can run a task a whole day from the Watch |
 | **R6** | Always on | launchd agents for the gateway and Ollama, started after `/Volumes/Storage` mounts | survives a restart with no terminal |
 
 Each phase:
@@ -180,13 +204,19 @@ Each phase:
   repo. Words spoken to Tamago follow the existing privacy rules.
 - **Budgets.** Per-task time and turn limits. The dashboard shows what each run used.
 
-## 9. Owner decisions needed before R0
+## 9. Owner decisions (answered 2026-09-27)
 
-1. **"ChatGPT classic".** There is no ChatGPT command-line tool.
-   - (a) *Recommended:* use Codex CLI in read-only "just answer" mode. Same ChatGPT account, no extra cost.
-   - (b) An OpenAI API key, billed per use separately from your subscription.
-2. **When an agent runs out of credits.** Ask every time (*recommended*) or transfer automatically.
-3. **Projects the relay may touch.** Start with TamaWatch only (*recommended*), or a list.
-4. **Push notifications for questions.** Later, after R3 works with "on open" (*recommended*), or now. Now means an APNs key and an
-   app entitlement change.
-5. **Protocol V1 §17 `GET /v1/inbox`.** Additive, the same kind as §15/§16; older Watch builds ignore it. Needs your OK.
+1. **ChatGPT: the owner wants Tamago to use the ChatGPT app "as if it was me", typing into it.** It's the last link
+   of the chain (§6). **Needs a yes before it's built:**
+   - OpenAI's terms of use forbid automated or programmatic extraction of output from ChatGPT, so driving the app
+     or website this way could get the account flagged or suspended.
+   - The allowed route with the same subscription is Codex CLI in read-only "just answer" mode (same account, same
+     models, no extra cost).
+   - The plan uses that route unless the owner accepts the risk for the app-typing route. That route would drive
+     the ChatGPT Mac app through macOS accessibility.
+2. **Out of credits: transfer automatically,** watch the next agent, and end the chain at ChatGPT chat with
+   everything collected (§6).
+3. **Projects:** the relay may change only folders on an allowlist. It starts with TamaWatch. Others are added
+   by name when the owner asks ("add my Jellyfin project").
+4. **Push notifications: now,** in R3.
+5. **Protocol V1 §17 `GET /v1/inbox`: approved** ("Inbox and push now").
