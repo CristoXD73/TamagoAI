@@ -1,3 +1,4 @@
+// VERIFICATION (speech-audio tests, D-121): UNVERIFIED (written in the cloud, not compiled).
 import Foundation
 import Testing
 @testable import TamagoShared
@@ -202,6 +203,7 @@ final class StubFetch: @unchecked Sendable {
     enum Outcome {
         case success(json: String, httpStatus: Int = 200)
         case failure(URLError)
+        case bytes(Data, httpStatus: Int = 200, contentType: String)
     }
 
     var next: Outcome
@@ -218,7 +220,76 @@ final class StubFetch: @unchecked Sendable {
                 return (Data(json.utf8), response)
             case let .failure(error):
                 throw error
+            case let .bytes(data, status, contentType):
+                let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+                                               headerFields: ["content-type": contentType])!
+                return (data, response)
             }
         }
+    }
+}
+
+// MARK: - Speech audio (PROTOCOL_V1 §16, D-121)
+
+@Suite("GatewayClient speech audio")
+struct GatewayClientSpeechAudioTests {
+    let baseURL = URL(string: "http://gateway.test:8787")!
+    let id = "00000000-0000-4000-8000-000000000012"
+
+    func makeClient(_ stub: StubFetch) -> GatewayClient {
+        GatewayClient(configuration: GatewayConfiguration(baseURL: baseURL, authToken: "test-token-0123456789"),
+                      fetch: stub.fetch)
+    }
+
+    @Test func fetchesAudioWithBearerAndBudget() async {
+        let stub = StubFetch(.bytes(Data("m4a".utf8), contentType: "audio/mp4"))
+        let data = await makeClient(stub).speechAudio(path: "/v1/speech/\(id)")
+        #expect(data == Data("m4a".utf8))
+        #expect(stub.captured?.url?.absoluteString == "http://gateway.test:8787/v1/speech/\(id)")
+        #expect(stub.captured?.httpMethod == "GET")
+        #expect(stub.captured?.value(forHTTPHeaderField: "authorization") == "Bearer test-token-0123456789")
+        #expect(stub.captured?.timeoutInterval == 2.5)
+    }
+
+    @Test func notReadyOrMissingMeansNil() async {
+        for status in [404, 503, 401] {
+            let stub = StubFetch(.success(json: #"{"status":"error"}"#, httpStatus: status))
+            #expect(await makeClient(stub).speechAudio(path: "/v1/speech/\(id)") == nil)
+        }
+    }
+
+    @Test func nonAudioOrEmptyBodyMeansNil() async {
+        let json = StubFetch(.bytes(Data("{}".utf8), contentType: "application/json"))
+        #expect(await makeClient(json).speechAudio(path: "/v1/speech/\(id)") == nil)
+        let empty = StubFetch(.bytes(Data(), contentType: "audio/mp4"))
+        #expect(await makeClient(empty).speechAudio(path: "/v1/speech/\(id)") == nil)
+    }
+
+    @Test func timeoutMeansNil() async {
+        let stub = StubFetch(.failure(URLError(.timedOut)))
+        #expect(await makeClient(stub).speechAudio(path: "/v1/speech/\(id)") == nil)
+    }
+
+    @Test func refusesPathsOfAnyOtherShapeWithoutFetching() async {
+        for path in ["/v1/request", "https://elsewhere.test/v1/speech/\(id)", "/v1/speech/../health", "/v1/speech/not-a-uuid", ""] {
+            let stub = StubFetch(.bytes(Data("m4a".utf8), contentType: "audio/mp4"))
+            #expect(await makeClient(stub).speechAudio(path: path) == nil, "\(path)")
+            #expect(stub.captured == nil, "\(path)")
+        }
+    }
+
+    @Test func responseDecodesOptionalSpeechAudio() throws {
+        let with = """
+        {"protocolVersion":1,"requestId":"\(id)","status":"ok","text":"pong","speechText":"pong",
+         "characterState":"idle","haptic":"click","followUpExpected":false,
+         "speechAudio":{"path":"/v1/speech/\(id)","format":"audio/mp4","voice":"af_heart"}}
+        """
+        let decoded = try JSONDecoder().decode(TamagoResponse.self, from: Data(with.utf8))
+        #expect(decoded.speechAudio == TamagoSpeechAudio(path: "/v1/speech/\(id)", format: "audio/mp4", voice: "af_heart"))
+        let without = """
+        {"protocolVersion":1,"requestId":"\(id)","status":"ok","text":"pong","speechText":"pong",
+         "characterState":"idle","haptic":"click","followUpExpected":false}
+        """
+        #expect(try JSONDecoder().decode(TamagoResponse.self, from: Data(without.utf8)).speechAudio == nil)
     }
 }

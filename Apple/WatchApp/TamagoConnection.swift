@@ -10,6 +10,9 @@
 // owns the Mac link: which gateway, with what credential, and whether it's
 // there. It never adds UI; everything here reaches the creature only through
 // the reducer's existing events (.routeLost/.routeRestored/.response).
+//
+// VERIFICATION (Mac voice playback, D-121): UNVERIFIED (written in the cloud,
+// not compiled). The rest of this file keeps its label above.
 
 import Foundation
 import Observation
@@ -52,6 +55,12 @@ final class TamagoConnection {
     @ObservationIgnored private weak var controller: CharacterInteractionController?
     @ObservationIgnored private var inFlightTask: Task<Void, Never>?
     @ObservationIgnored private var speechWatchdog: Task<Void, Never>?
+    /// D-121: the Mac-synthesized voice. SpeechOutput stays the fallback.
+    @ObservationIgnored private let replyAudio = AudioReplyPlayer()
+    /// `speechAudio` of the response about to be applied, keyed by request ID,
+    /// so `.speak` can find it without CharacterStateMachine knowing about it.
+    @ObservationIgnored private var pendingSpeechAudio: (requestId: String, audio: TamagoSpeechAudio)?
+    @ObservationIgnored private var speechFetch: Task<Void, Never>?
     /// Tamago's latest answer, shown under the creature while it speaks and a
     /// little after (D-119), then cleared.
     private(set) var caption: String?
@@ -100,12 +109,8 @@ final class TamagoConnection {
         }
         // See SpeechOutput's header: this fires even when speech is
         // disabled, so `.speaking` always has a way back out.
-        speech.onFinished = { [weak self] in
-            guard let self else { return }
-            self.speechWatchdog?.cancel()
-            guard let requestId = self.controller?.state.activeRequestID else { return }
-            self.controller?.apply(.speechFinished(requestId: requestId))
-        }
+        speech.onFinished = { [weak self] in self?.finishSpeaking() }
+        replyAudio.onFinished = { [weak self] in self?.finishSpeaking() }
         // No paired brain: the creature is offline, not broken (task §5).
         if !canTalk { controller.apply(.routeLost) }
     }
@@ -260,6 +265,12 @@ final class TamagoConnection {
                     let code = exchange.response.error?.code.rawValue ?? "ok"
                     Self.log.debug("request \(request.requestId, privacy: .public) answered in \(ms) ms: \(code, privacy: .public) (reached gateway: \(exchange.reachedGateway))")
                     self.lastTransportError = exchange.response.error.map { "\(exchange.reachedGateway ? "gateway" : "transport"): \($0.code.rawValue)" }
+                    // D-121: remembered before `apply`, which emits `.speak` synchronously.
+                    if let audio = exchange.response.speechAudio, let id = exchange.response.requestId {
+                        self.pendingSpeechAudio = (id.lowercased(), audio)
+                    } else {
+                        self.pendingSpeechAudio = nil
+                    }
                     // A stale answer is dropped by the reducer's requestId guard (D-103);
                     // cancelling this task is the first line, the guard is the real one.
                     self.controller?.apply(.response(exchange.response))
@@ -276,27 +287,70 @@ final class TamagoConnection {
 
             case let .speak(text):
                 showCaption(text)
-                speech.speak(text)
-                // D-106's watchdog: if the synthesizer's delegate never fires,
-                // don't leave `.speaking` stuck. A late/duplicate call is
-                // harmless — the reducer requires `.speaking` + a matching ID.
                 let requestId = controller?.state.activeRequestID
                 let estimatedSeconds = max(2.0, Double(text.count) / 15.0) + 3.0
-                speechWatchdog?.cancel()
-                speechWatchdog = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(estimatedSeconds))
-                    guard !Task.isCancelled, let self, let requestId else { return }
-                    self.controller?.apply(.speechFinished(requestId: requestId))
+                let audio = pendingSpeechAudio.flatMap { $0.requestId == requestId?.lowercased() ? $0.audio : nil }
+                pendingSpeechAudio = nil
+                speechFetch?.cancel()
+                if let audio, let requestId, speech.isEnabled {
+                    // D-121: try the Mac's voice within the fetch budget; any
+                    // failure falls back to the built-in voice below.
+                    armSpeechWatchdog(seconds: Self.speechFetchBudget + estimatedSeconds, requestId: requestId)
+                    speechFetch = Task { [weak self, client] in
+                        let data = await client.speechAudio(path: audio.path, timeout: Self.speechFetchBudget)
+                        guard let self, !Task.isCancelled,
+                              self.controller?.state.activeRequestID == requestId else { return }
+                        if let data, let duration = await self.replyAudio.play(data) {
+                            // Stopped or superseded while the session was activating.
+                            guard !Task.isCancelled, self.controller?.state.activeRequestID == requestId else {
+                                self.replyAudio.stop()
+                                return
+                            }
+                            self.armSpeechWatchdog(seconds: duration + 3.0, requestId: requestId)
+                        } else if !Task.isCancelled {
+                            Self.log.debug("speech audio unavailable; built-in voice")
+                            self.speech.speak(text)
+                        }
+                    }
+                } else {
+                    speech.speak(text)
+                    armSpeechWatchdog(seconds: estimatedSeconds, requestId: requestId)
                 }
 
             case .stopSpeech:
                 speechWatchdog?.cancel()
+                speechFetch?.cancel()
+                speechFetch = nil
+                replyAudio.stop()
                 speech.stop()
 
             case .updateComplicationSnapshot:
                 break
             }
         }
+    }
+
+    /// ~2.5 s: how long the Watch waits for the Mac's voice (PROTOCOL_V1 §16).
+    private static let speechFetchBudget: TimeInterval = 2.5
+
+    /// D-106's watchdog: if neither player reports back, don't leave
+    /// `.speaking` stuck. A late/duplicate call is harmless — the reducer
+    /// requires `.speaking` + a matching ID.
+    private func armSpeechWatchdog(seconds: TimeInterval, requestId: String?) {
+        speechWatchdog?.cancel()
+        speechWatchdog = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled, let self, let requestId else { return }
+            self.controller?.apply(.speechFinished(requestId: requestId))
+        }
+    }
+
+    /// Either voice finished (see SpeechOutput's header: this fires even when
+    /// speech is disabled, so `.speaking` always has a way back out).
+    private func finishSpeaking() {
+        speechWatchdog?.cancel()
+        guard let requestId = controller?.state.activeRequestID else { return }
+        controller?.apply(.speechFinished(requestId: requestId))
     }
 
     /// Runs after every `apply`: sound cues for the transition, and the two

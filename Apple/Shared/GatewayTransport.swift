@@ -4,6 +4,8 @@
 // live Node gateway from the SE 3 40 mm simulator (docs/HANDOFF_LOG.md). Not
 // DEVICE_VERIFIED.
 //
+// VERIFICATION (speechAudio(path:), D-121): UNVERIFIED (written in the cloud, not compiled).
+//
 // Executes CharacterStateMachine's `.sendRequest`/`.cancelRequest` effects
 // (D-103, D-115) and the pairing/reachability calls (D-116). Pure Foundation,
 // URLSession only — deliberately: Apple TN3135 classes Network.framework,
@@ -172,6 +174,29 @@ public actor GatewayClient {
             return GatewayExchange(response: synthesized(for: requestId, code: .gatewayUnavailable, message: "Gateway returned an unreadable response."), reachedGateway: false)
         }
         return GatewayExchange(response: response, reachedGateway: true)
+    }
+
+    /// GET `/v1/speech/<id>` (PROTOCOL_V1 §16): the Mac-synthesized voice for a
+    /// reply. Returns nil on anything but a 200 audio answer within `timeout`
+    /// (the ~2.5 s budget), so the caller falls back to the built-in voice.
+    /// Only paths of the documented shape are fetched: the gateway can't point
+    /// the Watch anywhere else.
+    public func speechAudio(path: String, timeout: TimeInterval = 2.5) async -> Data? {
+        let prefix = "/v1/speech/"
+        guard path.hasPrefix(prefix) else { return nil }
+        let id = String(path.dropFirst(prefix.count))
+        guard UUID(uuidString: id) != nil else { return nil }
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/speech").appendingPathComponent(id),
+                                    timeoutInterval: timeout)
+        urlRequest.httpMethod = "GET"
+        if let token = configuration.authToken {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        }
+        guard let (data, response) = try? await fetch(urlRequest),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              (http.value(forHTTPHeaderField: "content-type") ?? "").lowercased().hasPrefix("audio/"),
+              !data.isEmpty else { return nil }
+        return data
     }
 
     /// GET `/v1/health`, classified. Never used on the request path itself.

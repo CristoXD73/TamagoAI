@@ -939,3 +939,31 @@ budgets, any audio quality. All of this is UNVERIFIED until setup.sh runs on the
 **Cross-agent impact:** Protocol V1 is additive (new optional field + endpoint + `outputTypes` in /v1/protocol). The manifest now has 23 fixtures, so the
 Swift `ProtocolFixtureTests` count must move to 23 (done in part 3).
 **Signed-by:** Claude Code (cloud)
+
+---
+
+### 2026-09-27T07:00:21+0000: Claude Code (cloud) — natural voice, part 3: Watch fetches and plays the Mac voice
+
+**Agent:** Claude Code (cloud; **no Swift toolchain or Xcode**)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `7c5d441` · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- `Apple/Shared/TamagoProtocolV1.swift`: `TamagoSpeechAudio`, optional `TamagoResponse.speechAudio`, `TamagoProtocolInfo.outputTypes`
+- `Apple/Shared/GatewayTransport.swift`: `speechAudio(path:timeout:)`
+- new `Apple/WatchApp/AudioReplyPlayer.swift`
+- `Apple/WatchApp/TamagoConnection.swift`
+- tests: `GatewayClientTests.swift` (StubFetch `.bytes` + 6 tests), `ProtocolFixtureTests.swift` (23 fixtures, ok-speech-audio)
+- this file
+
+**Work performed:**
+- The response's `speechAudio` is remembered by requestId just before `apply(.response)`. `.speak` fetches `/v1/speech/<id>` (2.5 s budget,
+  documented path shape only) and plays it with AVAudioPlayer (session `.playback`/`.voicePrompt`, activated and deactivated off-main).
+- Anything else falls back to AVSpeechSynthesizer as before. The watchdog covers the fetch plus the real clip duration, and `.stopSpeech` stops both
+  players and the fetch.
+- `CharacterStateMachine` is untouched. No project file edits (synchronized folder).
+
+**Tests/builds actually performed (by me):** none for Swift. It can't be compiled here. Gateway `npm test` is still 132 pass / 0 fail / 2 skipped.
+**Things NOT verified:** that any of this compiles (Swift 6 strict concurrency especially), AVAudioPlayer AAC playback on watchOS, audibility,
+and the fallback timing on a device. All touched Swift files are marked UNVERIFIED.
+**Known issues:** none known.
+**Cross-agent impact:** the local agent must run `swift test` and the watchOS scheme before any TestFlight build.
+**Signed-by:** Claude Code (cloud)
