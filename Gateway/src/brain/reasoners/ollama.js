@@ -5,6 +5,7 @@
 
 import { ProviderError } from '../../providers/provider.js';
 import { INTENT_JSON_SCHEMA, validateIntent } from '../response-schema.js';
+import { renderDetailPrompt } from '../personality/profile.js';
 
 const HEALTH_TTL_MS = 30_000;
 const WARM_EVERY_MS = 60_000;
@@ -26,15 +27,15 @@ export function createOllamaReasoner({
   let health = { at: 0, ok: true };
   let lastWarm = -Infinity;
 
-  async function call(model, messages, temperature, signal) {
+  async function call(model, messages, temperature, signal, { format = INTENT_JSON_SCHEMA, numPredict } = {}) {
     let res;
     try {
       res = await fetchImpl(chatUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model, messages, stream: false, format: INTENT_JSON_SCHEMA, keep_alive: KEEP_ALIVE, think: THINK,
-          options: { temperature, ...CHAT_OPTIONS },
+          model, messages, stream: false, ...(format ? { format } : {}), keep_alive: KEEP_ALIVE, think: THINK,
+          options: { temperature, ...CHAT_OPTIONS, ...(numPredict ? { num_predict: numPredict } : {}) },
         }),
         signal,
       });
@@ -112,6 +113,24 @@ export function createOllamaReasoner({
           { role: 'user', content: `Invalid reply: ${errors.join('; ')}. Reply again with JSON only, matching the schema.` });
       }
       throw new ProviderError('provider_error', `Model output failed validation twice (${model}).`);
+    },
+
+    /**
+     * D-127: the full answer for the owner's phone, after the spoken gist. Plain text, no schema, the smart
+     * model. Runs in the background (the gateway never holds a reply for it), so it may take a while.
+     */
+    async detail({ question, gist, context }, { signal } = {}) {
+      const prompt = [
+        context ? `CONTEXT (what you know):\n${context}\n` : '',
+        `QUESTION: ${question}`,
+        `YOU ALREADY SAID ALOUD: ${gist}`,
+        'Now write the full answer.',
+      ].filter(Boolean).join('\n');
+      const content = await call(smartModel, [{ role: 'system', content: renderDetailPrompt() }, { role: 'user', content: prompt }],
+        0.5, signal, { format: null, numPredict: 400 });
+      const text = String(content).trim();
+      if (!text) throw new ProviderError('provider_error', `Empty long answer (${smartModel}).`);
+      return text;
     },
   };
 }

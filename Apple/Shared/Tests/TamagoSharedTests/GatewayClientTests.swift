@@ -293,3 +293,82 @@ struct GatewayClientSpeechAudioTests {
         #expect(try JSONDecoder().decode(TamagoResponse.self, from: Data(without.utf8)).speechAudio == nil)
     }
 }
+
+// MARK: - Conversation (PROTOCOL_V1 §18, D-127)
+// VERIFICATION: UNVERIFIED (written in the cloud, not compiled).
+
+@Suite("GatewayClient conversation")
+struct GatewayClientConversationTests {
+    let baseURL = URL(string: "http://gateway.test:8787")!
+
+    func makeClient(_ stub: StubFetch) -> GatewayClient {
+        GatewayClient(configuration: GatewayConfiguration(baseURL: baseURL, authToken: "test-token-0123456789"),
+                      fetch: stub.fetch)
+    }
+
+    static let page = """
+    {"protocolVersion":1,"latest":7,"turns":[
+     {"seq":3,"rev":7,"requestId":"00000000-0000-4000-8000-000000000001","at":"2026-09-27T14:02:03.456Z",
+      "from":"watch","you":"How do I make sourdough?","tamago":"Here is the whole thing:\\n\\n1. Feed it.",
+      "said":"Sourdough needs a starter. That one's long. Check your phone, or should I say it all?",
+      "long":{"status":"ready"}},
+     {"seq":6,"rev":6,"requestId":"00000000-0000-4000-8000-000000000002","at":"2026-09-27T14:02:30.000Z",
+      "from":"watch","you":"Say it all.","tamago":"","said":"Here is the whole thing: Feed it.","note":"read_aloud","about":3},
+     {"seq":7,"rev":7,"requestId":"00000000-0000-4000-8000-000000000003","at":"2026-09-27T14:03:00.000Z",
+      "from":"phone","you":"ping","tamago":"","said":"","error":"provider_unavailable"}
+    ]}
+    """
+
+    @Test func decodesAPageWithBearerAndAfter() async throws {
+        let stub = StubFetch(.success(json: Self.page))
+        let page = try #require(await makeClient(stub).conversation(after: 2))
+        #expect(stub.captured?.url?.absoluteString == "http://gateway.test:8787/v1/conversation?after=2")
+        #expect(stub.captured?.httpMethod == "GET")
+        #expect(stub.captured?.value(forHTTPHeaderField: "authorization") == "Bearer test-token-0123456789")
+        #expect(page.latest == 7)
+        #expect(page.turns.map(\.seq) == [3, 6, 7])
+        let long = page.turns[0]
+        #expect(long.from == "watch")
+        #expect(long.long == TamagoLongAnswer(status: "ready"))
+        #expect(long.tamago.hasPrefix("Here is the whole thing:"))
+        #expect(long.date != nil)
+        #expect(page.turns[1].note == "read_aloud")
+        #expect(page.turns[1].about == 3)
+        #expect(page.turns[2].error == "provider_unavailable")
+    }
+
+    @Test func negativeAfterIsSentAsZero() async {
+        let stub = StubFetch(.success(json: #"{"protocolVersion":1,"latest":0,"turns":[]}"#))
+        _ = await makeClient(stub).conversation(after: -5)
+        #expect(stub.captured?.url?.query == "after=0")
+    }
+
+    @Test func anythingButAPageIsNil() async {
+        for status in [401, 404, 500] {
+            let stub = StubFetch(.success(json: #"{"status":"error"}"#, httpStatus: status))
+            #expect(await makeClient(stub).conversation() == nil)
+        }
+        #expect(await makeClient(StubFetch(.success(json: "{ nope"))).conversation() == nil)
+        #expect(await makeClient(StubFetch(.failure(URLError(.cannotConnectToHost)))).conversation() == nil)
+    }
+
+    @Test func clearIsADeleteThatNeeds200() async {
+        let ok = StubFetch(.success(json: #"{"protocolVersion":1,"latest":7,"turns":[],"cleared":true}"#))
+        #expect(await makeClient(ok).clearConversation())
+        #expect(ok.captured?.httpMethod == "DELETE")
+        #expect(ok.captured?.url?.path == "/v1/conversation")
+        let denied = StubFetch(.success(json: #"{"status":"error"}"#, httpStatus: 401))
+        #expect(await makeClient(denied).clearConversation() == false)
+    }
+
+    @Test func responseDecodesOptionalLongAnswer() throws {
+        let json = """
+        {"protocolVersion":1,"requestId":"00000000-0000-4000-8000-000000000001","status":"ok",
+         "text":"Sourdough needs a starter.","speechText":"Sourdough needs a starter. That one's long.",
+         "characterState":"idle","haptic":"click","followUpExpected":true,"longAnswer":{"status":"pending","seq":3}}
+        """
+        let r = try JSONDecoder().decode(TamagoResponse.self, from: Data(json.utf8))
+        #expect(r.longAnswer == TamagoLongAnswer(status: "pending", seq: 3))
+        #expect(r.followUpExpected)
+    }
+}

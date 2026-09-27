@@ -17,6 +17,8 @@ const HAPTIC_FOR_STATE = {
  *   tool <name>          -> simulated successful tool run
  *   nonverbal            -> no speech/caption: reaction state + haptic only
  *   follow up            -> followUpExpected = true
+ *   long                 -> a one-line gist with needsDetail; detail() returns a fixed full answer (D-127)
+ *   long fail            -> the same gist, but detail() fails
  *   slow <ms>            -> waits <ms> (abortable), then "done" — for timeouts
  *   unavailable          -> provider_unavailable error
  *   throw                -> raw exception (tests the generic provider_error path)
@@ -67,6 +69,15 @@ export function createMockProvider() {
         return { nonverbal: true, characterState: 'happy', haptic: 'click' };
       }
 
+      if (lower === 'long' || lower === 'long fail') {
+        return {
+          text: 'Sourdough needs a starter, flour, water and salt, and about a day.',
+          characterState: 'idle',
+          haptic: 'click',
+          needsDetail: true,
+        };
+      }
+
       if (lower === 'follow up') {
         return {
           text: 'Which one do you mean?',
@@ -92,8 +103,27 @@ export function createMockProvider() {
 
       return { text: `You said: ${input}`, characterState: 'idle', haptic: 'none' };
     },
+
+    /** The full answer behind a `needsDetail` reply (D-127). Deterministic. */
+    async detail(request, { signal } = {}) {
+      if (signal?.aborted) throw new ProviderError('timeout', 'aborted');
+      if (request.text.trim().toLowerCase() === 'long fail') {
+        throw new ProviderError('provider_error', 'Mock long answer was asked to fail.');
+      }
+      return MOCK_DETAIL;
+    },
   };
 }
+
+export const MOCK_DETAIL = [
+  'Here is the whole thing:',
+  '',
+  '1. Feed your starter the night before.',
+  '2. Mix 500 g flour, 350 g water and 100 g starter. Rest 1 hour.',
+  '3. Add 10 g salt, then stretch and fold every 30 minutes for 2 hours.',
+  '4. Let it rise until puffy, shape it, and chill it overnight.',
+  '5. Bake at 250 °C in a covered pot for 20 minutes, then 20 more uncovered.',
+].join('\n');
 
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);

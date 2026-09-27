@@ -472,7 +472,7 @@ test('context builder stays within budget and system prompt is compact', () => {
     relationship: { stage: 'familiar', daysKnown: 6, lastSeenAgoSec: 30 }, world: { timeOfDay: 'evening', localTime: '20:00', energy: 0.5 },
   });
   assert.ok(ctx.prompt.length <= CONTEXT_BUDGET_CHARS + 700);
-  assert.ok(renderSystemPrompt().length < 1200);
+  assert.ok(renderSystemPrompt().length < 1300);   // 1200 until D-127 added the needsDetail line
 });
 
 test('D-118 defaults: ollama without a named model uses llama3.2:3b; nothing set stays deterministic', async () => {

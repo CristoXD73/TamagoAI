@@ -36,7 +36,7 @@ client already handled.
 |---|---|
 | `orchestrator.js` | Owns the lifecycle. Commits atomically (turns, memories, relationship, trace). **An aborted or timed-out interaction commits nothing.** |
 | `response-schema.js` | **TamagoIntent**: `speech` (or `null` = silence), private `thought`, `emotion`, `energy`, `attention`, `sound`, `haptic`, `behavior`, `followUpExpected`, `memoryCandidates`, `tool`. It's a JSON schema for the model, validation (unknown enums are errors), and the mapping to V1. `sound`, `behavior`, `attention` and `thought` stay on the Mac (in the trace) until a protocol revision needs them. |
-| `personality/profile.js` | The personality **as data** (temperament, communication, behavior flags). The model sees a compact prompt *generated* from it (< 1200 chars). |
+| `personality/profile.js` | The personality **as data** (temperament, communication, behavior flags). The model sees a compact prompt *generated* from it (< 1300 chars; 1200 until D-127). |
 | `personality/behavior-policy.js` | Deterministic replies that never need a model: gratitude and affirmation are nonverbal; greetings are watchful when "new" and brief once acquainted. |
 | `routing/intent-router.js` | Deterministic classification: gratitude, affirmation, greeting, forget, tool_request, recall, question, statement. It also detects complexity, "don't remember" requests and pronouns, and extracts keywords. |
 | `routing/model-router.js` | `rule` (no model) · `fast` · `smart` (complex *why/how* questions). |

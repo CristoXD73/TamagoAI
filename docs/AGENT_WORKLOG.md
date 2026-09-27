@@ -1275,3 +1275,45 @@ model is planned (D-118).
 - The settings page shows the system clock; that's fine for settings.
 **Cross-agent impact:** the Watch TabView now has Settings at tag 1 and Debug at tag 2.
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T14:09:47+0000: Claude Code (cloud) — iPhone chat + long answers from the Watch (D-127), local branch `claude/phone-chat`, NOT pushed
+
+**Agent:** Claude Code (cloud; no Xcode, Swift toolchain, Ollama or devices)
+**Branch:** `claude/phone-chat` (local only, off `claude/great-volta-ogpuw8` at `34880c1`). **The owner said "just dont push anything".**
+**Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- Gateway, new: `src/conversation.js`, `src/handoff.js`, `test/conversation.test.js`, `test/long-answer-brain.test.js`
+- Gateway, changed: `src/server.js`, `src/cli.js`, `src/providers/mock.js`, and the brain (`response-schema.js`, `personality/profile.js`,
+  `reasoners/ollama.js`, `orchestrator.js`, `index.js`); `test/brain.test.js` (prompt guard < 1300); `protocol-info.json` fixture (`features`)
+- Apple: `Shared/TamagoProtocolV1.swift`, `Shared/GatewayTransport.swift`, `Shared/Tests/.../GatewayClientTests.swift`;
+  `iPhoneApp/` (new ChatModel, ChatView, ChatTheme, PairingScreen, PairingStore, TamagoAvatar asset; TamagoPhoneApp rewritten);
+  `Config/Tamago.xcconfig` + new `Config/TamagoPhone-Info.plist`
+- Docs: `PROTOCOL_V1.md` (§5 `longAnswer`, §17 reserved, §18), `DECISIONS.md` (D-127), `DEVELOPMENT.md`, `BRAIN_ARCHITECTURE.md`, `Apple/README.md`,
+  `PROVENANCE.md`, `docs/phone-chat/mock.html` + `mock.png`, `HANDOFF_LOG.md`, this file
+
+**Work performed:**
+- Long answers: the brain flags `needsDetail`. The Watch hears the gist + "That one's long. Check your phone, or should I say it all?", and the full
+  answer is written in the background into an in-memory conversation.
+- "Say it all" / "phone" are handled by the gateway without a model call.
+- The phone pairs with the Mac, reads `GET /v1/conversation`, and types as `client.device = "phone"`, in a dark, Muse-inspired chat UI.
+- No Watch code changed.
+
+**Tests/builds actually performed (by me):**
+- `npm test`: 162 tests, 160 pass, 0 fail, 2 skipped (real TTS and transcriber).
+- A live no-auth dev server: `long` → gist + offer → conversation filled → "say it all" returned the full answer.
+- The HTML design mock was rendered in headless Chromium.
+- No Swift compile.
+
+**Things NOT verified:**
+- All Swift compiles or runs, and the phone ATS/local-network plist route through the xcconfig.
+- Gemma's real `needsDetail` judgement and detail time/quality.
+- The offer's audio timing on the Watch.
+
+**Known issues:**
+- A read-aloud over 300 chars uses the Watch's own voice (no Mac audio).
+- A background long answer holds Ollama for the next question.
+
+**Cross-agent impact:** Protocol V1 is additive only. The fixture manifest count is unchanged (23). Swift `TamagoResponse` and `TamagoProtocolInfo` gain optional fields.
+**Signed-by:** Claude Code (cloud)

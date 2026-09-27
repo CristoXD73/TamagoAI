@@ -33,3 +33,5 @@ These images are visual ground truth: do not redesign, humanize, or restyle the 
   - **What ships:** `Apple/WatchApp/IdleLoop.mp4` (300×400) and `Apple/iPhoneApp/IdleLoop.mp4` (600×800), both
     H.264 on black with no audio, plus the first frame `Apple/WatchApp/idle-000.jpg`.
   - **Known limit:** faint alpha noise in some sucker gaps, inherited from the generated cutout (PROTOTYPE.md).
+- **iPhone chat avatar (owner, 2026-09-27, D-127):** the owner asked for a chat on the phone. Its avatar,
+  `Apple/iPhoneApp/Assets.xcassets/TamagoAvatar.imageset/TamagoAvatar.png`, is the same widget cutout (D-122), shown still.

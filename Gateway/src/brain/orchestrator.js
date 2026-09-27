@@ -36,6 +36,9 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
   const db = await openBrainDb(dbPath);
   const fallback = createDeterministicReasoner();
 
+  // D-127: the context each recent model turn used, so its long answer (detail()) knows the same things.
+  const recentContexts = new Map();
+
   async function handle(input, { signal, requestId = randomUUID(), client } = {}) {
     const started = now();
     const text = String(input).trim();
@@ -98,6 +101,8 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     } else {
       const context = buildContext({ text, cls, route, memories, turns: factRecall ? [] : turns, relationship, world, profile });
       step('context', { ...context.stats, prompt: redacted ? context.prompt.replace(/OWNER SAYS: [\s\S]*$/, `OWNER SAYS: ${redacted}`) : context.prompt });
+      recentContexts.set(requestId, context.prompt.replace(/\n\nOWNER SAYS:[\s\S]*$/, ''));
+      while (recentContexts.size > 8) recentContexts.delete(recentContexts.keys().next().value);
       let active = reasoner.available === false ? fallback : reasoner;
       try {
         const r = await active.reason({ context, route, text, cls, memories, focusKeywords }, { signal });
@@ -214,8 +219,16 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     }
   }
 
+  /** D-127: the full answer behind a `needsDetail` reply, written by the reasoner (never spoken as-is). */
+  async function detail(request, { gist, signal } = {}) {
+    const context = recentContexts.get(request.requestId);
+    recentContexts.delete(request.requestId);
+    return reasoner.detail({ question: request.text, gist, context }, { signal });
+  }
+
   return {
     handle,
+    detail,
     /** AIProvider adapter so the existing gateway server needs no changes. */
     asProvider() {
       return {
@@ -224,6 +237,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
           const { v1 } = await handle(request.text, { signal, requestId: request.requestId, client: request.client });
           return v1;
         },
+        ...(typeof reasoner.detail === 'function' ? { detail } : {}),
       };
     },
     lastTrace() {

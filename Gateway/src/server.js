@@ -19,7 +19,12 @@ import {
 } from './protocol.js';
 import { ProviderError } from './providers/provider.js';
 import { cleanTranscript } from './transcriber.js';
-import { prepareSpeechText } from './tts.js';
+import { prepareSpeechText, MAX_SPEECH_CHARS } from './tts.js';
+import { createConversation } from './conversation.js';
+import {
+  OFFER, PHONE_OK, PHONE_SOON, STILL_WRITING, DETAIL_FAILED, HANDOFF_LIMITS,
+  classifyFollowUp, detailToSpeech, cleanDetail,
+} from './handoff.js';
 
 export const GATEWAY_VERSION = '0.1.0';
 
@@ -52,11 +57,14 @@ const silentLogger = { info() {}, warn() {}, error() {} };
  * @param {Function|null} [opts.monitor] OWNER'S LIVE VIEW ONLY (TAMAGO_MONITOR=1, monitor.js): gets each
  *   hop of a conversation, including what was heard and said, to print on the owner's own terminal.
  *   Never persisted and never mixed into `logger`, which stays metadata-only. Off by default.
+ * @param {object|null} [opts.conversation] what the owner's iPhone shows (conversation.js, PROTOCOL_V1 §18):
+ *   every exchange including full long answers, memory only. Default: a fresh one; null disables §18 and
+ *   long answers (D-127).
  */
 export function createGateway({
   provider, authToken, timeoutMs = 20000, logger = silentLogger, now = Date.now,
   gatewayId = null, gatewayName = 'TamagoAI', pairing = null, transcriber = null, keepAudioDir = null,
-  synthesizer = null, speechWaitMs = SPEECH_WAIT_MS, monitor = null,
+  synthesizer = null, speechWaitMs = SPEECH_WAIT_MS, monitor = null, conversation: conversationOpt,
 }) {
   if (!provider || typeof provider.generate !== 'function') {
     throw new Error('createGateway requires a provider with generate().');
@@ -71,6 +79,11 @@ export function createGateway({
   const recent = new Map();
   // requestId -> { at, state: 'pending'|'ready'|'failed', promise, audio?, controller }
   const speech = new Map();
+  const conversation = conversationOpt === undefined ? createConversation({ now }) : conversationOpt;
+  // D-127: the Watch's most recent long answer, so "say it all" knows what "it" is.
+  // { at, seq, requestId, state: 'pending'|'ready'|'failed', detail?, settled: Promise }
+  let pendingLong = null;
+  const longAnswers = conversation !== null && typeof provider.detail === 'function';
 
   // A broken monitor must never break a conversation.
   const show = (event) => {
@@ -130,6 +143,7 @@ export function createGateway({
         authRequired: expectedTokenHash !== null,
         inputTypes: transcriber ? ['text', 'audio'] : ['text'],
         outputTypes: synthesizer ? ['text', 'speech-audio'] : ['text'],
+        features: [...(conversation ? ['conversation'] : []), ...(longAnswers ? ['long-answers'] : [])],
         characterStates: CHARACTER_STATES,
         reactionStates: REACTION_STATES,
         haptics: HAPTICS,
@@ -147,6 +161,11 @@ export function createGateway({
     if (url.pathname === '/v1/audio') {
       if (req.method !== 'POST') return sendError(res, null, 'method_not_allowed');
       return handleAudio(req, res);
+    }
+
+    if (url.pathname === '/v1/conversation') {
+      if (req.method !== 'GET' && req.method !== 'DELETE') return sendError(res, null, 'method_not_allowed');
+      return handleConversation(req, res, url);
     }
 
     if (url.pathname.startsWith('/v1/speech/')) {
@@ -201,7 +220,7 @@ export function createGateway({
     const duplicate = entry !== undefined;
     show({ kind: 'text_in', requestId: request.requestId, text: request.text, from: peer(req), duplicate });
     if (!entry) {
-      entry = { at: now(), promise: runProvider(request).then(attachSpeech) };
+      entry = { at: now(), promise: answer(request).then(attachSpeech) };
       recent.set(request.requestId, entry);
     }
     const { httpStatus, body } = await entry.promise;
@@ -319,7 +338,7 @@ export function createGateway({
       if (err instanceof ProtocolError) return { ...errorOutcome(requestId, err.code, err.message), transcribeMs };
       throw err;
     }
-    const outcome = await runProvider(request);
+    const outcome = await answer(request);
     return { ...outcome, body: { ...outcome.body, transcript: request.text }, transcribeMs };
   }
 
@@ -329,8 +348,10 @@ export function createGateway({
   function attachSpeech(outcome) {
     const body = outcome.body;
     if (!synthesizer || outcome.httpStatus !== 200 || body.status !== 'ok' || !body.speechText || !body.requestId) return outcome;
-    const text = prepareSpeechText(body.speechText);
-    if (!text) return outcome;
+    const text = prepareSpeechText(body.speechText, Infinity);
+    // Longer than one synthesis (e.g. "say it all", D-127): the Watch reads it with its own voice rather
+    // than play Mac audio that stops halfway.
+    if (!text || text.length > MAX_SPEECH_CHARS) return outcome;
     startSynthesis(body.requestId, text);
     const speechAudio = { path: `/v1/speech/${body.requestId}`, format: 'audio/mp4', voice: synthesizer.voice || synthesizer.engine };
     return { ...outcome, body: { ...body, speechAudio } };
@@ -453,7 +474,7 @@ export function createGateway({
       if (outcome === 'timeout') {
         return errorOutcome(request.requestId, 'timeout', `No answer within ${timeoutMs} ms.`);
       }
-      return { httpStatus: 200, body: buildOkResponse(request.requestId, outcome.result) };
+      return { httpStatus: 200, body: buildOkResponse(request.requestId, outcome.result), result: outcome.result };
     } catch (err) {
       if (controller.signal.aborted) {
         return errorOutcome(request.requestId, 'timeout', `No answer within ${timeoutMs} ms.`);
@@ -466,6 +487,114 @@ export function createGateway({
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  // Every text or voice question goes through here (the dedupe map calls it once per requestId).
+  async function answer(request) {
+    const from = request.client?.device === 'phone' ? 'phone' : 'watch';
+    if (from === 'watch' && pendingLong) {
+      const live = now() - pendingLong.at < HANDOFF_LIMITS.followUpMs;
+      const kind = live ? classifyFollowUp(request.text) : null;
+      if (kind) return followUp(request, kind);
+      pendingLong = null;   // a new question: the offer is over
+    }
+    const { result, ...outcome } = await runProvider(request);
+    const body = outcome.body;
+    if (outcome.httpStatus !== 200 || body.status !== 'ok') {
+      conversation?.add({ requestId: request.requestId, from, heard: request.text, reply: '', said: '', error: body.error?.code });
+      return outcome;
+    }
+    if (longAnswers && result?.needsDetail === true && body.text) {
+      return startLongAnswer(request, from, body);
+    }
+    conversation?.add({ requestId: request.requestId, from, heard: request.text, reply: body.text, said: body.speechText });
+    return outcome;
+  }
+
+  // D-127: the reply so far is the gist. The Watch hears it plus the offer; the full answer is written in
+  // the background (never holding the reply back) and lands in the conversation for the phone.
+  function startLongAnswer(request, from, body) {
+    const gist = body.speechText || body.text;
+    const reply = from === 'watch'
+      ? { ...body, speechText: `${gist} ${OFFER}`, followUpExpected: true }
+      : body;
+    const seq = conversation.add({ requestId: request.requestId, from, heard: request.text, reply: body.text,
+      said: from === 'watch' ? reply.speechText : '', long: { status: 'pending' } });
+    const long = { at: now(), seq, requestId: request.requestId, state: 'pending' };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new ProviderError('timeout', 'Long answer timed out.')), HANDOFF_LIMITS.detailTimeoutMs);
+    const t0 = now();
+    long.settled = Promise.resolve()
+      .then(() => provider.detail(request, { gist, signal: controller.signal }))
+      .then((raw) => {
+        const detail = cleanDetail(raw);
+        if (!detail) throw new ProviderError('provider_error', 'Empty long answer.');
+        Object.assign(long, { state: 'ready', detail });
+        conversation.update(seq, { tamago: detail, long: { status: 'ready' } });
+        logger.info({ event: 'long_answer', requestId: request.requestId, status: 'ready', chars: detail.length, ms: now() - t0 });
+      })
+      .catch((err) => {
+        long.state = 'failed';
+        conversation.update(seq, { long: { status: 'failed' } });
+        logger.warn({ event: 'long_answer', requestId: request.requestId, status: 'failed', code: err?.code, ms: now() - t0 });
+      })
+      .finally(() => clearTimeout(timer));
+    if (from === 'watch') pendingLong = long;
+    return { httpStatus: 200, body: { ...reply, longAnswer: { status: 'pending', seq } } };
+  }
+
+  // The owner answered the offer. Answered here, without the model: it's a yes/no about the last answer.
+  async function followUp(request, kind) {
+    const long = pendingLong;
+    pendingLong = null;
+    let text;
+    let speechText;
+    let note;
+    if (kind === 'phone') {
+      text = long.state === 'ready' ? PHONE_OK : long.state === 'failed' ? DETAIL_FAILED : PHONE_SOON;
+      note = 'phone';
+    } else {
+      if (long.state === 'pending') {
+        let timer;
+        await Promise.race([long.settled, new Promise((r) => { timer = setTimeout(r, Math.max(0, timeoutMs - 1500)); })]);
+        clearTimeout(timer);
+      }
+      if (long.state === 'ready') {
+        text = long.detail;
+        speechText = detailToSpeech(long.detail);
+        note = 'read_aloud';
+      } else {
+        text = long.state === 'failed' ? DETAIL_FAILED : STILL_WRITING;
+        note = 'phone';
+      }
+    }
+    const body = buildOkResponse(request.requestId, { text, speechText, characterState: 'idle', haptic: 'click' });
+    conversation.add({ requestId: request.requestId, from: 'watch', heard: request.text, reply: note === 'read_aloud' ? '' : text,
+      said: body.speechText, note, about: long.seq });
+    logger.info({ event: 'long_answer_follow_up', requestId: request.requestId, kind, state: long.state });
+    return { httpStatus: 200, body };
+  }
+
+  // PROTOCOL_V1 §18: the owner's iPhone reads the conversation (and clears it). Never logs its contents.
+  async function handleConversation(req, res, url) {
+    req.resume();
+    if (!isAuthorized(req.headers.authorization)) {
+      logger.warn({ event: 'conversation', status: 'error', code: 'auth_failed' });
+      return sendError(res, null, 'auth_failed', 'Missing or invalid bearer token.');
+    }
+    if (!conversation) return sendError(res, null, 'not_found', 'This gateway keeps no conversation.');
+    if (req.method === 'DELETE') {
+      const latest = conversation.clear();
+      pendingLong = null;
+      logger.info({ event: 'conversation_cleared' });
+      return send(res, 200, { protocolVersion: PROTOCOL_VERSION, turns: [], latest, cleared: true });
+    }
+    const raw = url.searchParams.get('after') ?? '0';
+    const after = /^\d{1,12}$/.test(raw) ? Number(raw) : NaN;
+    if (!Number.isSafeInteger(after)) return sendError(res, null, 'invalid_request', '`after` must be a non-negative integer.');
+    const page = conversation.page(after);
+    logger.info({ event: 'conversation', turns: page.turns.length });
+    return send(res, 200, { protocolVersion: PROTOCOL_VERSION, ...page });
   }
 
   function errorOutcome(requestId, code, message) {

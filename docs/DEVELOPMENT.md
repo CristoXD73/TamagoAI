@@ -242,3 +242,28 @@ TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=af_heart TAMAGO_TTS_SPEED=1.0 npm start   # t
   the next step is a persistent engine process, not a different voice.
 - Logs show `speech_synth` with the request ID, engine, voice, bytes and milliseconds. They never include text or
   audio.
+
+## The iPhone chat (D-127, PROTOCOL_V1 §18)
+
+The phone is where Tamago's words land. Long answers the Watch offered ("check your phone") and everything said to
+Tamago appear there, and you can type too. The brain stays on the Mac and the Watch stays the creature.
+**Status: UNVERIFIED** (Swift written in the cloud, not compiled). Design mock: [`phone-chat/mock.png`](phone-chat/mock.png).
+
+- **Pair the phone:**
+  1. Restart the gateway (`scripts/tamago-up.sh`). Each start opens one single-use pairing window.
+  2. Open the Tamago app on the iPhone.
+  3. Type the Mac's address (empty = `tamagoai.local`, or its IP) and the 6-digit code from the terminal or dashboard.
+  4. iOS asks for Local Network access once: allow it.
+- **Try long answers without a model:** the mock provider answers `long` with a gist + offer and writes a fixed
+  recipe as the full answer; `long fail` makes the full answer fail.
+  ```sh
+  TAMAGO_ALLOW_NO_AUTH=1 npm start
+  # another terminal:
+  curl -s localhost:8787/v1/request -d '{"protocolVersion":1,"requestId":"00000000-0000-4000-8000-000000000001","inputType":"text","text":"long"}'
+  curl -s 'localhost:8787/v1/conversation?after=0'
+  ```
+- **With the brain:** the model sets `needsDetail` for answers that need more than two sentences; the full answer is
+  a second, plain-text Ollama call in the background. Watch for its time and quality on the Mac (unmeasured).
+- **Privacy:** the conversation lives in the gateway's memory only (200 turns / 24 h, cleared on restart), behind
+  the token, and is never logged. `TAMAGO_CONVERSATION=off` keeps none (the phone then shows nothing, and long
+  answers are off).
