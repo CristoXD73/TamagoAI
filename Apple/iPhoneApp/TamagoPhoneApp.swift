@@ -1,18 +1,32 @@
 import SwiftUI
 import TamagoShared
 
-/// Phase 3 placeholder. Gateway configuration, Keychain token and the
-/// WatchConnectivity relay come in Phase 10 (docs/DECISIONS.md D-108, D-109).
+/// The iPhone side is a doorway, not a second Tamago: the creature lives on the
+/// Watch and thinks on the Mac (D-108 keeps the relay for later). The approved
+/// art (unchanged) on black, and one line on how to meet it.
 @main
 struct TamagoPhoneApp: App {
     var body: some Scene {
         WindowGroup {
-            VStack(spacing: 8) {
-                Text("Apple Tamago")
-                    .font(.title2)
-                Text("Companion · protocol v\(TamagoProtocol.version)")
-                    .foregroundStyle(.secondary)
+            ZStack {
+                Color.black.ignoresSafeArea()
+                VStack(spacing: 20) {
+                    Image("Octopus")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 360)
+                        .accessibilityLabel("Tamago, a small white octopus")
+                    Text("TamagoAI")
+                        .font(.title.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text("Tamago lives on your Apple Watch.\nOpen it there and hold it to talk.")
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .padding(24)
             }
+            .preferredColorScheme(.dark)
         }
     }
 }

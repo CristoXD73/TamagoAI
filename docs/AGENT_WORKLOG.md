@@ -1079,3 +1079,24 @@ to automated long-press); on the owner's Watch.
 Xcode and its build service.
 **Cross-agent impact:** complication target now has an asset catalog; app-icon setting is per target.
 **Signed-by:** Claude Code
+
+### 2026-09-27T05:43:05-04:00: Claude Code — iPhone app screen; iPhone widget staged (project-file edit blocked)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `ab233c5`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/iPhoneApp/TamagoPhoneApp.swift` (octopus on black + "Tamago lives on your Apple Watch…",
+replacing "Apple Tamago · Companion · protocol v1"), new `Apple/iPhoneApp/Assets.xcassets/Octopus.imageset`
+(approved art, unchanged), this file.
+**Work performed:** the owner found no Tamago option when adding an iPhone widget: there is no iOS widget target
+(only the Watch complication). Adding one needs a new target in `AppleTamago.xcodeproj`; my scripted
+project-file edit was **blocked by the permission classifier** ("shared resource"); nothing in the project file
+changed. Staged the complete widget (Home Screen small/medium + Lock Screen circular/rectangular/inline, approved
+art) outside the repo in `.build/staging/TamagoPhoneWidget/` pending the owner's decision.
+**Tests/builds actually performed (by me):** TamagoPhone simulator build → succeeded; screenshot in the iPhone 18
+Pro simulator shows the new screen.
+**Things NOT verified:** the widget (no target yet).
+**Known issues:** the iPhone launch screen is still white (needs an Info.plist / project setting).
+**Cross-agent impact:** none; the project file is untouched.
+**Signed-by:** Claude Code
