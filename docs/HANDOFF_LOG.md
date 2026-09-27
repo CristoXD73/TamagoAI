@@ -1281,3 +1281,21 @@ memory with a write gate, dedupe/supersede and forget, deterministic familiarity
 `BRAIN_ARCHITECTURE.md` §9, recording latency, JSON-validity and quality evidence; then choose fast/smart
 defaults. After that: Brain E (tool registry + policy + mock tools).
 **Do not redo:** the brain modules, memory gate, familiarity model, CLI, nonverbal V1 clarification.
+
+---
+
+### 2026-09-27: Claude Code (local, owner's Mac): Brain F done; iPhone install; TestFlight in progress
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commits:** `2d744cd` (Storage rule), `5073a2f` + `9c9e24b` (icons,
+TestFlight readiness), `c9c8add` (Brain F, D-118), `3a7f2d8` (Swift fixture tests).
+**Done:** Ollama 0.34.4 installed (loopback only, models on `/Volumes/Storage/AI/ollama/models`); Brain F with
+`llama3.2:3b` (owner's choice): 9 defects found and fixed, including a privacy defect (docs/BRAIN_EVAL.md,
+D-118); Swift fixture suite fixed for `ok-nonverbal.json`; app icons; iPhone Debug build installed on the
+owner's iPhone. The Watch can't get a Xcode build (Xcode can't see it, so it isn't in the profile), so the
+route is TestFlight; the owner renewed the developer membership on 2026-09-27.
+**Tests:** gateway `npm test` 108/108; Swift 138/138 host + watchOS 27 simulator; three real-model eval runs.
+**Unverified:** anything on the physical Watch; other models; the legacy Ollama provider.
+**Next recommended task (ONE):** TestFlight: create the App Store Connect record for
+`com.cristoxd73.tamawatch.c73x926`, upload `.build/Archives/Tamago-0.1.0-2.xcarchive`, add the owner's Gmail
+Apple ID as an internal tester, install on the iPhone/Watch, pair, hold to talk; record in `docs/DEVICE_TEST_LOG.md`.
+**Do not redo:** the Brain F fixes; the icon set; Watch-side Bonjour (TN3135).
