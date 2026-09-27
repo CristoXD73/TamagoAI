@@ -875,3 +875,21 @@ and weights, zero npm deps, additive protocol, never delay the text reply, Stora
 **Known issues:** none.
 **Cross-agent impact:** assigns the voice work to the cloud agent; the local agent verifies on the Mac/Watch after.
 **Signed-by:** Claude Code
+
+### 2026-09-27T02:44:36-04:00: Claude Code — Xcode Cloud repo side (ci_post_clone) + setup guide
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `f4dc2dd`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `Apple/ci_scripts/ci_post_clone.sh`, `docs/DEVELOPMENT.md` (Xcode Cloud section), this file.
+**Work performed:** checked the owner's membership perks in the browser (active to 2027-09-27; Xcode Cloud,
+WeatherKit, code-level support available). Xcode Cloud's first workflow must be created in the Xcode app, so
+prepared the repo side: a post-clone script that writes the git-ignored `Local.xcconfig` from secret workflow
+variables, plus step-by-step workflow settings (Apple/-only trigger, archive → TestFlight "Owner", next build ≥ 7).
+**Tests/builds actually performed (by me):** dry-ran the script into a temp dir with the real values → identical
+settings to the owner's `Local.xcconfig`; without variables → exits 1 with a clear message.
+**Things NOT verified:** an actual Xcode Cloud build (needs the owner's one-time Xcode setup).
+**Known issues:** none.
+**Cross-agent impact:** new `Apple/ci_scripts/` (Xcode Cloud convention); no project file changes.
+**Signed-by:** Claude Code

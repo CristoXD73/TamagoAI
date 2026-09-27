@@ -160,3 +160,27 @@ recorded in [DEVICE_TEST_LOG.md](DEVICE_TEST_LOG.md). Compilation alone establis
 neither. Use all five labels precisely as defined in [AGENTS.md](../AGENTS.md).
 Append exact commands, outcomes, untested scope and one bounded next task to the
 handoff log after meaningful work. Never infer physical behavior from a GIF.
+
+## Xcode Cloud: every Apple change reaches TestFlight by itself
+
+Set up once by the owner in Xcode (Apple only allows creating the first workflow there). The repo side is
+ready: `Apple/ci_scripts/ci_post_clone.sh` writes the git-ignored `Apple/Config/Local.xcconfig` from two
+workflow environment variables, so no bundle ID or team ID is ever committed.
+
+1. Open `Apple/AppleTamago.xcodeproj` in Xcode → **Integrate → Create Workflow…** (or the Report navigator's
+   Cloud tab). Choose the **TamagoPhone** app (it carries the Watch app).
+2. When asked, **grant access to GitHub** for `CristoXD73/TamagoAI`.
+3. Edit the workflow:
+   - **Environment → Environment Variables:** `TAMAGO_BUNDLE_PREFIX` = the prefix in your `Local.xcconfig`,
+     `TAMAGO_TEAM_ID` = your team ID. Mark both **Secret**.
+   - **Start Conditions:** *Branch Changes* on `claude/great-volta-ogpuw8`, with **Files and Folders** limited to
+     `Apple/` (docs and gateway pushes don't spend build hours). Keep **manual start** too.
+   - **Actions:** *Archive*, platform iOS, scheme **TamagoPhone**, deployment preparation **TestFlight (Internal
+     Testing Only)**. Optionally *Test*, scheme **TamagoWatch**, an Apple Watch SE 3 (40 mm) simulator.
+   - **Post-Actions:** *TestFlight Internal Testing* → group **Owner**.
+4. **Build numbers:** TestFlight already has 0.1.0 builds 2–6. In App Store Connect → Xcode Cloud → Settings,
+   set the next build number to **7** or higher, or Xcode Cloud's build 1 will be rejected as a duplicate.
+5. Budget: the membership includes 25 compute hours a month; one archive of this project is a few minutes.
+
+Local archives (`xcodebuild archive … CURRENT_PROJECT_VERSION=<n>`, then `-exportArchive` with
+`destination=upload`) keep working alongside it.
