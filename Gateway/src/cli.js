@@ -37,7 +37,8 @@ if (config.provider.ready) {
 
 const pairing = config.pairingEnabled ? createPairingWindow() : null;
 const transcriber = createTranscriberFromEnv(process.env);
-const server = createGateway({ ...config, pairing, transcriber, logger });
+const keepAudioDir = process.env.TAMAGO_KEEP_AUDIO_DIR || null;   // diagnostics only
+const server = createGateway({ ...config, pairing, transcriber, keepAudioDir, logger });
 
 let advertiser = null;
 let ipWatch = null;

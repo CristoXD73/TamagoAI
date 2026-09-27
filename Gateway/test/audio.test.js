@@ -9,7 +9,8 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startGateway, TOKEN, ID } from './helpers.js';
-import { createTranscriber, DEFAULT_TRANSCRIBER_PATH } from '../src/transcriber.js';
+import { createTranscriber, cleanTranscript, DEFAULT_TRANSCRIBER_PATH } from '../src/transcriber.js';
+import { createMockProvider } from '../src/providers/mock.js';
 
 const AUDIO = Buffer.from('fake m4a bytes');
 
@@ -64,13 +65,12 @@ test('audio: transcript becomes an ordinary request; transcript returned; temp f
   }
 });
 
-test('audio: silence gets a puzzled nonverbal reaction, not an error', async () => {
+test('audio: nothing heard gets a spoken "I didn\'t catch that.", not silence or an error', async () => {
   const gw = await startGateway({ transcriber: stubTranscriber('').transcriber });
   try {
     const r = await postAudio(gw.base);
     assert.equal(r.status, 200);
-    assert.equal(r.body.text, '');
-    assert.equal(r.body.speechText, '');
+    assert.equal(r.body.speechText, "I didn't catch that.");
     assert.equal(r.body.characterState, 'confused');
     assert.equal(r.body.transcript, '');
   } finally {
@@ -127,5 +127,32 @@ test('audio: the real Apple SpeechAnalyzer helper transcribes a spoken phrase', 
     assert.match(text.toLowerCase(), /dog'?s name/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('audio: punctuation runs from trailing silence are cleaned before the brain sees them', async () => {
+  // Real transcripts from the owner's Watch, 2026-09-27.
+  assert.equal(cleanTranscript("What's my dog?,,',',,,"), "What's my dog?");
+  assert.equal(cleanTranscript('Can you tell me 10, fun, facts?,,,,,'), 'Can you tell me 10, fun, facts?');
+  assert.equal(cleanTranscript("What's your name?"), "What's your name?");
+  assert.equal(cleanTranscript(',,, '), '');
+  const gw = await startGateway({ transcriber: stubTranscriber("ping,,',',,,").transcriber });
+  try {
+    assert.equal((await postAudio(gw.base)).body.transcript, 'ping');
+  } finally {
+    await gw.close();
+  }
+});
+
+test('health: the Watch checking in warms the provider (never blocking the answer)', async () => {
+  let warms = 0;
+  const provider = { ...createMockProvider(), warm: async () => { warms += 1; return true; } };
+  const gw = await startGateway({ provider });
+  try {
+    const r = await fetch(`${gw.base}/v1/health`);
+    assert.equal(r.status, 200);
+    assert.equal(warms, 1);
+  } finally {
+    await gw.close();
   }
 });

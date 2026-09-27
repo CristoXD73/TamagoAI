@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { timingSafeEqual, createHash } from 'node:crypto';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -18,6 +18,7 @@ import {
   buildErrorResponse,
 } from './protocol.js';
 import { ProviderError } from './providers/provider.js';
+import { cleanTranscript } from './transcriber.js';
 
 export const GATEWAY_VERSION = '0.1.0';
 
@@ -39,10 +40,12 @@ const silentLogger = { info() {}, warn() {}, error() {} };
  * @param {string} [opts.gatewayName]    human-readable name shown at pairing
  * @param {object|null} [opts.pairing]   a pairing window (pairing.js); null disables POST /v1/pair
  * @param {object|null} [opts.transcriber] speech-to-text (transcriber.js); null disables POST /v1/audio
+ * @param {string|null} [opts.keepAudioDir] DIAGNOSTICS ONLY (TAMAGO_KEEP_AUDIO_DIR): keep a copy of each
+ *   recording + its transcript there. Off by default; the owner's voice is otherwise never stored.
  */
 export function createGateway({
   provider, authToken, timeoutMs = 20000, logger = silentLogger, now = Date.now,
-  gatewayId = null, gatewayName = 'TamagoAI', pairing = null, transcriber = null,
+  gatewayId = null, gatewayName = 'TamagoAI', pairing = null, transcriber = null, keepAudioDir = null,
 }) {
   if (!provider || typeof provider.generate !== 'function') {
     throw new Error('createGateway requires a provider with generate().');
@@ -73,6 +76,10 @@ export function createGateway({
 
     if (url.pathname === '/v1/health') {
       if (req.method !== 'GET') return sendError(res, null, 'method_not_allowed');
+      // The Watch probes health when Tamago comes to the front: a good moment to
+      // load the local model so the first question doesn't pay for it. The
+      // provider rate-limits this; it never blocks the answer.
+      provider.warm?.().catch(() => {});
       return send(res, 200, {
         status: 'ok',
         protocolVersion: PROTOCOL_VERSION,
@@ -242,7 +249,13 @@ export function createGateway({
     let transcript;
     try {
       await writeFile(file, audio, { mode: 0o600 });
-      transcript = await transcriber.transcribe(file);
+      transcript = cleanTranscript(await transcriber.transcribe(file));
+      if (keepAudioDir) {
+        await mkdir(keepAudioDir, { recursive: true, mode: 0o700 });
+        await copyFile(file, join(keepAudioDir, `${requestId}.${ext}`));
+        await writeFile(join(keepAudioDir, `${requestId}.txt`), `${transcript}\n`, { mode: 0o600 });
+        logger.warn({ event: 'audio_kept', requestId, dir: keepAudioDir });
+      }
     } catch (err) {
       logger.warn({ event: 'transcribe_failed', requestId, message: err?.message?.slice(0, 200) });
       return { ...errorOutcome(requestId, 'provider_error', "Couldn't make out the audio."), transcribeMs: now() - t0 };
@@ -251,10 +264,11 @@ export function createGateway({
     }
     const transcribeMs = now() - t0;
     if (!transcript) {
-      // Heard nothing usable: a puzzled reaction, not an error screen.
+      // Heard nothing usable. Say so: a silent shrug looked like "no reply" on
+      // the owner's Watch (first hold-to-talk run, 2026-09-27).
       return {
         httpStatus: 200, transcribeMs,
-        body: { ...buildOkResponse(requestId, { nonverbal: true, characterState: 'confused', haptic: 'notification' }), transcript: '' },
+        body: { ...buildOkResponse(requestId, { text: "I didn't catch that.", characterState: 'confused', haptic: 'notification' }), transcript: '' },
       };
     }
     let request;

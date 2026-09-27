@@ -7,6 +7,11 @@ import { ProviderError } from '../../providers/provider.js';
 import { INTENT_JSON_SCHEMA, validateIntent } from '../response-schema.js';
 
 const HEALTH_TTL_MS = 30_000;
+const WARM_EVERY_MS = 60_000;
+// Evidence (owner's Mac): a cold llama3.2:3b load cost ~1.5–4.6 s on the first
+// question after idle. Keep it loaded longer, and warm it when the Watch checks in.
+const KEEP_ALIVE = '60m';
+const CHAT_OPTIONS = { num_ctx: 4096 };   // warm-ups must match, or Ollama reloads the model
 
 export function createOllamaReasoner({
   baseUrl = 'http://127.0.0.1:11434', fastModel, smartModel, fetchImpl = fetch, now = Date.now,
@@ -16,6 +21,7 @@ export function createOllamaReasoner({
   const chatUrl = new URL('/api/chat', baseUrl).toString();
   const tagsUrl = new URL('/api/tags', baseUrl).toString();
   let health = { at: 0, ok: true };
+  let lastWarm = -Infinity;
 
   async function call(model, messages, temperature, signal) {
     let res;
@@ -24,8 +30,8 @@ export function createOllamaReasoner({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model, messages, stream: false, format: INTENT_JSON_SCHEMA, keep_alive: '15m',
-          options: { temperature, num_ctx: 4096 },
+          model, messages, stream: false, format: INTENT_JSON_SCHEMA, keep_alive: KEEP_ALIVE,
+          options: { temperature, ...CHAT_OPTIONS },
         }),
         signal,
       });
@@ -51,6 +57,23 @@ export function createOllamaReasoner({
       return health.ok;
     },
     models: { fast: fastModel, smart: smartModel },
+
+    /** Loads the fast model (same options as real calls) at most once a minute. */
+    async warm() {
+      if (now() - lastWarm < WARM_EVERY_MS) return false;
+      lastWarm = now();
+      try {
+        const r = await fetchImpl(chatUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ model: fastModel, messages: [{ role: 'user', content: 'hi' }], stream: false,
+            keep_alive: KEEP_ALIVE, options: { ...CHAT_OPTIONS, num_predict: 1 } }),
+        });
+        return r.ok;
+      } catch {
+        return false;
+      }
+    },
 
     async checkHealth({ signal } = {}) {
       if (now() - health.at < HEALTH_TTL_MS) return health.ok;

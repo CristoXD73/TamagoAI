@@ -826,3 +826,34 @@ the model after 15 min idle (cold start ~1.5 s).
 the talk gesture is now hold-and-release. Protocol V1 extended additively (§15).
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T02:32:52-04:00: Claude Code — hold-to-talk verified on the owner's Watch; Mac-side fixes from the real logs
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `0d4e3fc`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Gateway/src/server.js` (spoken "I didn't catch that.", transcript cleanup, warm on health,
+opt-in `keepAudioDir` diagnostics), `Gateway/src/transcriber.js` (`cleanTranscript`), `Gateway/src/cli.js`
+(`TAMAGO_KEEP_AUDIO_DIR`), `Gateway/src/brain/reasoners/ollama.js` (`warm()`, keep-alive 60 min, shared
+options), `Gateway/src/brain/index.js` (provider `warm`), `Gateway/src/brain/personality/profile.js` (no bare
+"No"), `Gateway/test/audio.test.js` (+2), `Gateway/test/brain.test.js` (+1), `Gateway/scripts/brain-eval.js`
+(+1 utterance), `docs/DEVICE_TEST_LOG.md`, this file.
+
+**Work performed:** the owner's first hold-to-talk try returned an empty transcript (silent shrug = "no reply").
+With diagnostics opt-in, three further tries all worked (see DEVICE_TEST_LOG); fixed what the logs showed:
+silent failure, punctuation junk, cold/reloaded model, a bare "No". Recordings measured then deleted; the
+gateway now runs without keeping audio.
+
+**Tests/builds actually performed (by me):** `npm test` → 116/116; real-model eval run 4 (26 turns, 11/11 valid
+JSON first try, median 1.4 s, no regressions; fun facts now answered); real gateway restarted; a health probe
+loaded llama3.2:3b with a 60-min expiry (`/api/ps`).
+
+**Things NOT verified:** why the very first recording transcribed empty (it wasn't kept); the fixes on the Watch
+(no new build needed, all Mac-side).
+
+**Known issues:** SpeechTranscriber sometimes drops a word ("What's my dog?" for "What's my dog's name?").
+
+**Cross-agent impact:** none beyond the gateway.
+
+**Signed-by:** Claude Code

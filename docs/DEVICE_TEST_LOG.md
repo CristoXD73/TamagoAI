@@ -62,3 +62,18 @@ Next: build 3 shows the exact failure reason and allows typing the Mac's address
 
 `DEVICE_VERIFIED` (owner-observed + gateway evidence): physical Watch → Mac → Watch round trip over HTTP by IP.
 Not verified: `tamagoai.local` from the Watch (fails), speech, dictation.
+
+## 2026-09-27 02:17–02:30 EDT — build 6, hold-to-talk on the owner's SE 3
+
+| Try | Audio | Transcript (Mac, on-device) | Answer | Total |
+|---|---|---|---|---|
+| 1 (first after allowing the mic) | 26.8 KB | *(empty)* → silent "confused" shrug; owner saw nothing | — | 0.56 s |
+| 2 | 40.5 KB, 5.4 s | `What's my dog?,,',',,,` | "Pixel, your dog." | 6.1 s (model reload) |
+| 3 | 31.8 KB, 2.2 s | `What's your name?` | "My name is Tamago" | 2.1 s |
+| 4 | 41.3 KB, 5.2 s | `Can you tell me 10, fun, facts?,,,,,` | "No" | 2.4 s |
+
+`DEVICE_VERIFIED` (owner received replies; gateway + brain evidence): Watch microphone capture, upload, on-device
+Mac transcription, spoken/captioned reply. Recordings were kept only for this diagnosis (`TAMAGO_KEEP_AUDIO_DIR`),
+measured (audible, peak RMS ≈ 2000/32768), then deleted.
+Fixed on the Mac right after: empty transcript now says "I didn't catch that."; punctuation runs from trailing
+silence are stripped; the model is kept warm (60 min, and warmed when the Watch checks in); no bare "No" answers.

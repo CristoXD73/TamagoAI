@@ -510,6 +510,23 @@ test('ollama reasoner: model down → honest offline fallback, not an invented a
   }
 });
 
+test('ollama reasoner: warm() loads the fast model with the real call options, at most once a minute', async () => {
+  const { fetchImpl, calls } = ollamaStub([{ speech: null, emotion: 'content', haptic: 'none', behavior: 'none', followUpExpected: false }]);
+  let t = 0;
+  const reasoner = createOllamaReasoner({ fastModel: 'small', smartModel: 'big', fetchImpl, now: () => t });
+  assert.equal(await reasoner.warm(), true);
+  assert.equal(await reasoner.warm(), false, 'rate-limited');
+  t += 61_000;
+  assert.equal(await reasoner.warm(), true);
+  const warmCalls = calls.filter((c) => c.url.endsWith('/api/chat'));
+  assert.equal(warmCalls.length, 2);
+  assert.equal(warmCalls[0].body.model, 'small');
+  assert.equal(warmCalls[0].body.options.num_ctx, 4096, 'same context size as real calls, or Ollama reloads');
+  assert.equal(warmCalls[0].body.options.num_predict, 1);
+  assert.equal(warmCalls[0].body.keep_alive, '60m');
+  assert.match(renderSystemPrompt(), /Never answer a request with just "No"/);
+});
+
 test('ollama reasoner: invalid twice → structured provider_error (never raw model text to the Watch)', async () => {
   const { fetchImpl } = ollamaStub(['{"speech": 5}', 'still bad']);
   const db = tmpDb();

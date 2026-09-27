@@ -42,5 +42,6 @@ export function createBrainProvider(options) {
       return brain.asProvider().generate(request, opts);
     },
     close: () => brainP.then((b) => b.close()),
+    warm: () => options.reasoner.warm?.() ?? Promise.resolve(false),
   };
 }

@@ -48,6 +48,7 @@ export const SCRIPT = [
   'Restart Jellyfin.',
   "What's the weather like?",
   'Tell me something weird.',
+  'Can you tell me 10 fun facts?',
   'Ok.',
   'What do you know about me?',
 ];
