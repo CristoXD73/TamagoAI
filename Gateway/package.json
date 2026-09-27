@@ -2,7 +2,7 @@
   "name": "apple-tamago-gateway",
   "version": "0.1.0",
   "private": true,
-  "description": "Apple Tamago Mac gateway: protocol v1 HTTP server with a deterministic mock provider.",
+  "description": "TamagoAI Mac gateway: protocol v1 HTTP server, deterministic mock provider, and the Tamago brain.",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {
@@ -12,6 +12,12 @@
     "start": "node src/cli.js",
     "dev": "TAMAGO_ALLOW_NO_AUTH=1 node src/cli.js",
     "test": "node --test",
-    "fixtures": "node scripts/generate-fixtures.js"
+    "fixtures": "node scripts/generate-fixtures.js",
+    "brain": "node bin/tamago.js brain",
+    "voice-samples": "node scripts/voice-samples.js",
+    "build:transcriber": "mkdir -p tools/transcribe/.build && swiftc -O tools/transcribe/transcribe.swift -o tools/transcribe/.build/transcribe"
+  },
+  "bin": {
+    "tamago": "bin/tamago.js"
   }
 }

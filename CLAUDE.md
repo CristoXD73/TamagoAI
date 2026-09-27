@@ -3,6 +3,12 @@
 **Read `AGENTS.md` first. Its rules are binding for Claude too.** This file only
 adds Claude-specific notes.
 
+> [!IMPORTANT]
+> **On the owner's Mac, use the external `/Volumes/Storage` disk, never the
+> internal one**, for builds, AI models, databases, caches and temp files
+> (`AGENTS.md` §9). If it isn't mounted, stop and ask. Sign and time every
+> worklog entry (`AGENTS.md` §8).
+
 ## Orientation (read in order)
 
 1. `AGENTS.md`: rules, prohibitions, verification labels
@@ -20,6 +26,7 @@ adds Claude-specific notes.
 | Path | What | Verified how |
 |---|---|---|
 | `Gateway/` | Node ≥22 Mac gateway, zero dependencies. `npm test`, `npm start`. | `UNIT_TESTED_ONLY` (CI + cloud) |
+| `Gateway/src/brain/` | **Tamago Brain** (orchestrator, memory, familiarity, routing; `TAMAGO_PROVIDER=brain`). Design: `docs/BRAIN_ARCHITECTURE.md`. | `UNIT_TESTED_ONLY`; Ollama reasoner verified with `llama3.2:3b` on the owner's Mac (`docs/BRAIN_EVAL.md`) |
 | `Tests/Fixtures/protocol-v1/` | JSON fixtures shared by gateway and Swift tests. Gateway ones are generated from the live mock (`npm run fixtures`). | drift-checked by gateway tests |
 | `Apple/Shared/` | Local Swift package `TamagoShared`: protocol models + sprite timing engine, tests in `Tests/`. | `UNIT_TESTED_ONLY` (host + watchOS simulator) |
 | `Apple/AppleTamago.xcodeproj` | Targets `TamagoWatch`, `TamagoComplication`, `TamagoPhone`, `TamagoTests` (D-101). | builds: `SIMULATOR_VERIFIED_ONLY` |
@@ -40,6 +47,9 @@ npm run fixtures                       # regenerate gateway-derived fixtures aft
 TAMAGO_ALLOW_NO_AUTH=1 npm start       # loopback-only dev server on :8787
 TAMAGO_HOST=0.0.0.0 npm start          # LAN: persistent token, prints a pairing code, publishes tamagoai.local
 ../scripts/smoke.sh                    # in another terminal
+npm run brain -- chat                  # talk to the Tamago brain in the terminal (no Watch)
+npm run brain -- inspect               # full decision trace of the last interaction
+TAMAGO_PROVIDER=brain npm start        # gateway backed by the brain (add OLLAMA_MODEL=… for a real model)
 
 # Apple (from the repo root, local Mac with Xcode 27 only)
 cd Apple/Shared && swift test --scratch-path ../../.build/spm          # host, fastest
@@ -53,6 +63,8 @@ cd Apple && xcodebuild test -project AppleTamago.xcodeproj -scheme TamagoWatch \
 - Cloud sessions have **no Xcode or Swift toolchain**. Don't claim Swift compiles.
 - Don't edit `Apple/AppleTamago.xcodeproj` in the cloud. Adding Swift files to the
   synchronized folders needs no project edit.
-- Keep `-derivedDataPath` under the repo's `.build/` (external volume).
+- Keep `-derivedDataPath` under the repo's `.build/` (external volume). Ollama
+  models, brain databases and eval runs also go on `/Volumes/Storage`
+  (`AGENTS.md` §9 has the paths and env vars).
 - Premium Xcode time is scarce. Spend it on Apple-platform problems, not boilerplate.
 - Before finishing, update `docs/HANDOFF_LOG.md`.

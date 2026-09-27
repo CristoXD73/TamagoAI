@@ -1,9 +1,8 @@
+// Static approved artwork; see docs/WIDGETS.md for rendering and verification.
+
 import SwiftUI
 import WidgetKit
-import TamagoShared
 
-/// Phase 3 placeholder: a static face that opens the app. The mood snapshot
-/// shared through an App Group comes in Phase 6 (docs/DECISIONS.md D-105).
 @main
 struct TamagoComplication: Widget {
     static let kind = "TamagoCompanion"
@@ -11,11 +10,11 @@ struct TamagoComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: Provider()) { _ in
             ComplicationView()
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(for: .widget) { Color.black }
                 .widgetURL(URL(string: "tamago://open"))
         }
         .configurationDisplayName("Tamago")
-        .description("Your companion at a glance.")
+        .description("Your octopus, one tap away. Hold it to talk.")
         .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryRectangular, .accessoryInline])
     }
 }
@@ -25,18 +24,26 @@ struct Entry: TimelineEntry {
 }
 
 struct Provider: TimelineProvider {
-    func placeholder(in context: Context) -> Entry {
-        Entry(date: .now)
-    }
+    func placeholder(in context: Context) -> Entry { Entry(date: .now) }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
         completion(Entry(date: .now))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
-        // One entry, no scheduled refresh: the app reloads the timeline when
-        // the mood changes (D-105).
+        // Static art: one entry, never refreshed on a schedule (battery, AGENTS.md §5).
         completion(Timeline(entries: [Entry(date: .now)], policy: .never))
+    }
+}
+
+/// Transparent approved cutout. Keep grayscale detail in watch-face accented mode.
+private struct Octopus: View {
+    var body: some View {
+        Image("Octopus")
+            .resizable()
+            .widgetAccentedRenderingMode(.desaturated)   // an Image modifier: before scaledToFit
+            .scaledToFit()
+            .accessibilityLabel("Tamago")
     }
 }
 
@@ -45,17 +52,37 @@ private struct ComplicationView: View {
 
     var body: some View {
         switch family {
-        case .accessoryInline:
-            Text("Tamago")
+        case .accessoryCircular:
+            // An opaque foreground background is tinted white on accented faces.
+            // Keep the background only in containerBackground, where WidgetKit owns it.
+            Octopus().padding(3)
+        case .accessoryCorner:
+            Octopus()
+                .widgetLabel("Tamago")
         case .accessoryRectangular:
-            VStack(alignment: .leading) {
-                Text("Tamago").font(.headline)
-                Text(TamagoCharacterState.idle.rawValue)
+            HStack(spacing: 6) {
+                Octopus()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Tamago")
+                        .font(.headline)
+                        .widgetAccentable()
+                    Text("Hold to talk")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
             }
+        case .accessoryInline:
+            Label("Tamago", image: "Octopus")
         default:
-            Image(systemName: "face.smiling")
-                .font(.title2)
-                .widgetAccentable()
+            Octopus()
         }
     }
 }
+
+#Preview("Circular", as: .accessoryCircular) { TamagoComplication() } timeline: { Entry(date: .now) }
+#Preview("Corner", as: .accessoryCorner) { TamagoComplication() } timeline: { Entry(date: .now) }
+#Preview("Rectangular", as: .accessoryRectangular) { TamagoComplication() } timeline: { Entry(date: .now) }
+#Preview("Inline", as: .accessoryInline) { TamagoComplication() } timeline: { Entry(date: .now) }

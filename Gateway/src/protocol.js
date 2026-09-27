@@ -112,6 +112,7 @@ export const ERROR_CODES = Object.keys(ERRORS);
 
 export const LIMITS = {
   maxBodyBytes: 16 * 1024,
+  maxAudioBytes: 1024 * 1024,   // POST /v1/audio (§15): ~30 s of 16 kHz mono AAC is well under this
   maxInputTextChars: 2000,
   maxResponseTextChars: 1000,
 };
@@ -214,8 +215,12 @@ export function buildOkResponse(requestId, result) {
   if (result === null || typeof result !== 'object') {
     throw new ProtocolError('provider_error', 'Provider returned no result.', requestId);
   }
-  const text = typeof result.text === 'string' ? result.text.trim() : '';
-  if (text.length === 0) {
+  // Nonverbal reaction (PROTOCOL_V1 §5.1): no speech, no caption, only a
+  // reaction state + haptic. Existing Watch clients already handle this
+  // (an empty speechText skips TTS in CharacterStateMachine).
+  const nonverbal = result.nonverbal === true;
+  const text = nonverbal ? '' : typeof result.text === 'string' ? result.text.trim() : '';
+  if (!nonverbal && text.length === 0) {
     throw new ProtocolError('provider_error', 'Provider returned empty text.', requestId);
   }
   const characterState = result.characterState ?? 'idle';
@@ -230,8 +235,9 @@ export function buildOkResponse(requestId, result) {
   if (!HAPTICS.includes(haptic)) {
     throw new ProtocolError('provider_error', `Provider returned unknown haptic "${haptic}".`, requestId);
   }
-  const speechText =
-    typeof result.speechText === 'string' && result.speechText.trim().length > 0
+  const speechText = nonverbal
+    ? ''
+    : typeof result.speechText === 'string' && result.speechText.trim().length > 0
       ? result.speechText.trim()
       : text;
 
@@ -299,6 +305,15 @@ export function validateResponse(obj) {
   } else {
     expect(obj.error === undefined, 'error must be absent unless status is error');
     expect(obj.requestId !== null, 'requestId is required unless status is error');
+  }
+  // Optional since D-121 (§16). Old clients ignore it.
+  if (obj.speechAudio !== undefined) {
+    const a = obj.speechAudio;
+    expect(obj.status === 'ok', 'speechAudio only on ok responses');
+    expect(a && typeof a === 'object' && typeof a.path === 'string' && a.path === `/v1/speech/${obj.requestId}`,
+      'speechAudio.path must be /v1/speech/<requestId>');
+    expect(a && a.format === 'audio/mp4', 'speechAudio.format must be audio/mp4');
+    expect(a && (a.voice === undefined || typeof a.voice === 'string'), 'speechAudio.voice must be a string');
   }
   return problems;
 }

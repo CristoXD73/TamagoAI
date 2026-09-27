@@ -8,6 +8,7 @@ Structure decided in `docs/DECISIONS.md` **D-101** (Phase 3, Xcode 27.0).
 | `Shared/` | Local Swift package **`TamagoShared`** (pure Foundation, Swift 6). Sources stay at `Shared/*.swift`; tests in `Shared/Tests/TamagoSharedTests/`. | `UNIT_TESTED_ONLY` |
 | `WatchApp/` | `TamagoWatch` target (watchOS 27.0). Placeholder screen only. `Info.plist` holds `NSAllowsLocalNetworking` (D-107). | launch: `SIMULATOR_VERIFIED_ONLY` |
 | `Complication/` | `TamagoComplication` WidgetKit extension, embedded in the Watch app. Static placeholder. | build only |
+| `PhoneWidget/` | iPhone WidgetKit extension sources (D-122): the octopus in all 6 iPhone families; a tap opens the app. **Not yet a target**: set it up on the Mac with `docs/WIDGETS.md` §4. | UNVERIFIED |
 | `iPhoneApp/` | `TamagoPhone` target (iOS 27.0), embeds the Watch app. Placeholder screen only. | build only |
 | `Config/Tamago.xcconfig` | Placeholder bundle prefix `com.example.appletamago`, empty team. Put real values in git-ignored `Config/Local.xcconfig`. | n/a |
 

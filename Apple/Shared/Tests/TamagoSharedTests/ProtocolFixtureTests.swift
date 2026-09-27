@@ -1,3 +1,4 @@
+// VERIFICATION (ok-speech-audio additions, D-121): UNVERIFIED (written in the cloud, not compiled).
 import Foundation
 import Testing
 @testable import TamagoShared
@@ -13,7 +14,7 @@ struct ProtocolFixtureTests {
     @Test func manifestIsComplete() throws {
         let manifest = try FixtureLoader.manifest()
         #expect(manifest.protocolVersion == TamagoProtocol.version)
-        #expect(manifest.fixtures.count == 21)
+        #expect(manifest.fixtures.count == 23)
         #expect(Set(manifest.fixtures.map(\.kind)) == ["request", "response", "protocolInfo"])
 
         for entry in manifest.fixtures {
@@ -107,8 +108,12 @@ struct ProtocolFixtureTests {
             #expect(!response.text.isEmpty)
         }
 
-        // Text is empty only for `accepted`.
-        #expect(response.text.isEmpty == (response.status == .accepted))
+        // Text is empty only for `accepted`, and for a nonverbal `ok` reply, which
+        // leaves both text and speechText empty (PROTOCOL_V1 §5.1).
+        if response.status == .accepted { #expect(response.text.isEmpty) }
+        if response.text.isEmpty {
+            #expect(response.status == .accepted || (response.status == .ok && response.speechText.isEmpty))
+        }
 
         // requestId is null only for errors raised before a UUID was read.
         if response.requestId == nil {
@@ -138,6 +143,8 @@ struct ProtocolFixtureTests {
         "responses/ok-happy.json": (.ok, .happy, .success, nil, false),
         "responses/ok-tool-success.json": (.ok, .success, .success, nil, false),
         "responses/ok-follow-up.json": (.ok, .confused, .notification, nil, true),
+        "responses/ok-nonverbal.json": (.ok, .happy, .click, nil, false),
+        "responses/ok-speech-audio.json": (.ok, .idle, .click, nil, false),
         "responses/error-timeout.json": (.error, .confused, .failure, .timeout, false),
         "responses/error-invalid-request-malformed.json": (.error, .confused, .failure, .invalidRequest, false),
         "responses/error-invalid-request-schema.json": (.error, .confused, .failure, .invalidRequest, false),
@@ -184,6 +191,18 @@ struct ProtocolFixtureTests {
             let response = try JSONDecoder().decode(TamagoResponse.self, from: FixtureLoader.data(path))
             #expect(response.error?.retryable == flag, "\(path)")
         }
+    }
+
+    @Test func speechAudioFixtureCarriesFetchPath() throws {
+        let response = try JSONDecoder().decode(
+            TamagoResponse.self, from: FixtureLoader.data("responses/ok-speech-audio.json"))
+        let audio = try #require(response.speechAudio)
+        #expect(audio.path == "/v1/speech/\(response.requestId ?? "")")
+        #expect(audio.format == "audio/mp4")
+        #expect(audio.voice == "af_heart")
+        // Every other fixture predates §16 and has none.
+        let plain = try JSONDecoder().decode(TamagoResponse.self, from: FixtureLoader.data("responses/ok-success.json"))
+        #expect(plain.speechAudio == nil)
     }
 
     @Test func toolSuccessSpeechDiffersFromText() throws {

@@ -15,6 +15,7 @@ const HAPTIC_FOR_STATE = {
  *   ping                 -> "pong"
  *   state <reaction>     -> characterState = <reaction>; "state error" fails
  *   tool <name>          -> simulated successful tool run
+ *   nonverbal            -> no speech/caption: reaction state + haptic only
  *   follow up            -> followUpExpected = true
  *   slow <ms>            -> waits <ms> (abortable), then "done" — for timeouts
  *   unavailable          -> provider_unavailable error
@@ -60,6 +61,10 @@ export function createMockProvider() {
           characterState: 'success',
           haptic: 'success',
         };
+      }
+
+      if (lower === 'nonverbal') {
+        return { nonverbal: true, characterState: 'happy', haptic: 'click' };
       }
 
       if (lower === 'follow up') {

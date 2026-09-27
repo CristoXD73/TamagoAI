@@ -693,6 +693,9 @@ art is the underside pose, profile mantle, den, small props, overlays, and compl
 
 ### 9.4 The voice (TTS)
 
+> **Superseded in part by D-121:** synthesis now runs on the owner's own Mac (still local; Kokoro via
+> sherpa-onnx, `PROTOCOL_V1` §16) and the Watch plays the audio. The Watch's own voice is the fallback.
+
 - The owner decided the Watch speaks answers. Use on-device speech synthesis with a consistent voice.
   A slightly slower rate (0.9×) and a slightly raised pitch (1.05–1.15×) can make it feel "from the water"
   without being cartoonish. The final choice is made by ear on the device.

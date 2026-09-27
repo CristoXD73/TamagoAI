@@ -9,6 +9,9 @@
   "inputTypes": [
     "text"
   ],
+  "outputTypes": [
+    "text"
+  ],
   "characterStates": [
     "sleeping",
     "idle",
@@ -54,6 +57,7 @@
   ],
   "limits": {
     "maxBodyBytes": 16384,
+    "maxAudioBytes": 1048576,
     "maxInputTextChars": 2000,
     "maxResponseTextChars": 1000
   }

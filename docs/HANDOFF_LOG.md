@@ -1263,3 +1263,134 @@ records the result in `docs/DEVICE_TEST_LOG.md`, including one run with the iPho
 Bluetooth off.
 **Do not redo:** Watch-side Bonjour/Network.framework discovery (blocked on hardware, TN3135); the
 pairing and transport architecture (extend it, don't replace it).
+
+---
+
+### 2026-09-27: Claude Code (cloud): Tamago Brain milestone 1 (Brain A–D)
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commit:** the commit adding `docs/BRAIN_ARCHITECTURE.md`
+**Task:** turn the Mac side from "system prompt + latest message → Ollama" into the Tamago Brain, keeping
+Protocol V1 externally, and make the first milestone demonstrable from the terminal.
+**Done:** orchestrator, structured TamagoIntent (silence first-class), personality-as-data, deterministic
+behavior policy, intent + model routing, budgeted context builder, speech composer, sessions, SQLite (FTS5)
+memory with a write gate, dedupe/supersede and forget, deterministic familiarity, `tamago brain` CLI
+(chat/inspect/memories/forget/status/reset), `TAMAGO_PROVIDER=brain`. Design: `docs/BRAIN_ARCHITECTURE.md`, D-117.
+**Tests:** `cd Gateway && npm test` → 101/101 (UNIT_TESTED_ONLY). Real gateway and CLI exercised in the cloud.
+**Unverified:** real Ollama (`UNVERIFIED_LOCAL_PROVIDER`), the owner's Mac, the physical Watch.
+**Next recommended task (ONE):** Brain F on the owner's Mac: pull 2–3 local models and run the plan in
+`BRAIN_ARCHITECTURE.md` §9, recording latency, JSON-validity and quality evidence; then choose fast/smart
+defaults. After that: Brain E (tool registry + policy + mock tools).
+**Do not redo:** the brain modules, memory gate, familiarity model, CLI, nonverbal V1 clarification.
+
+---
+
+### 2026-09-27: Claude Code (local, owner's Mac): Brain F done; iPhone install; TestFlight in progress
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commits:** `2d744cd` (Storage rule), `5073a2f` + `9c9e24b` (icons,
+TestFlight readiness), `c9c8add` (Brain F, D-118), `3a7f2d8` (Swift fixture tests).
+**Done:** Ollama 0.34.4 installed (loopback only, models on `/Volumes/Storage/AI/ollama/models`); Brain F with
+`llama3.2:3b` (owner's choice): 9 defects found and fixed, including a privacy defect (docs/BRAIN_EVAL.md,
+D-118); Swift fixture suite fixed for `ok-nonverbal.json`; app icons; iPhone Debug build installed on the
+owner's iPhone. The Watch can't get a Xcode build (Xcode can't see it, so it isn't in the profile), so the
+route is TestFlight; the owner renewed the developer membership on 2026-09-27.
+**Tests:** gateway `npm test` 108/108; Swift 138/138 host + watchOS 27 simulator; three real-model eval runs.
+**Unverified:** anything on the physical Watch; other models; the legacy Ollama provider.
+**Next recommended task (ONE):** TestFlight: create the App Store Connect record for
+`com.cristoxd73.tamawatch.c73x926`, upload `.build/Archives/Tamago-0.1.0-2.xcarchive`, add the owner's Gmail
+Apple ID as an internal tester, install on the iPhone/Watch, pair, hold to talk; record in `docs/DEVICE_TEST_LOG.md`.
+**Do not redo:** the Brain F fixes; the icon set; Watch-side Bonjour (TN3135).
+
+---
+
+### 2026-09-27 02:10 EDT: Claude Code (local): first real-Watch loop, voice + caption, hold-to-talk (TestFlight builds 3–6)
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commits:** `3ff17b4` (pair by address), `07100ce` (D-119 voice + caption +
+floating art), `8f79761` (D-120 hold-to-talk).
+**Done:** first physical round trip Watch → Mac → Watch (owner's SE 3, paired by typed IP; `tamagoai.local` doesn't
+resolve from the Watch). Answers spoken + captioned; creature = approved art, gently floating (owner-approved).
+Hold-to-talk: Watch records, Mac transcribes on-device (Apple SpeechAnalyzer helper), brain answers.
+**Tests:** gateway 113/113 (incl. real transcription), Swift 140/140 host; simulator hold-to-talk with a recorded
+file; TestFlight builds 2–5 Complete, 6 processing.
+**Running on the owner's Mac:** LAN gateway (brain + llama3.2:3b, voice input on), state in
+`/Volumes/Storage/AI/TamagoAI`; Ollama on loopback with models on Storage.
+**Unverified:** Watch microphone capture and permission prompt; audibility of speech on the Watch speaker; the
+hold gesture's feel on hardware; why `.local` fails on the Watch.
+**Owner to-do:** install build 6 from TestFlight; hold the octopus, allow the microphone once, hold again and
+speak, release; report whether you hear the answer. Reserve 192.168.0.74 for the Mac in the router (DHCP reservation).
+**Next recommended task (ONE):** verify build 6 on the Watch with the owner and record it in DEVICE_TEST_LOG.md.
+**Do not redo:** the transcriber helper, `/v1/audio`, voice + caption decision (D-119/D-120).
+
+---
+
+### 2026-09-27: Claude Code (cloud): natural local voice: Mac synthesizes, Watch plays (D-121)
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commits:**
+- `ebc30e2`: research
+- `7c5d441`: gateway `speechAudio` + `GET /v1/speech`, V1 §16, D-121
+- `90b8c9e`: Watch Swift
+- the commit with this entry: setup kit + listening page
+
+**Done:**
+- `docs/VOICE_RESEARCH.md`: Kokoro-82M via sherpa-onnx is primary, KittenTTS the fallback, macOS `say` the baseline. All Apache-2.0 except `say`.
+  Non-commercial options are marked not eligible. OpenAI-named voices are excluded.
+- Gateway (zero deps): background synthesis through `tools/tts/tamago-tts`; audio fetched once, bounded, never logged. Text never waits.
+- Watch: fetch within 2.5 s, else the built-in voice.
+- `tools/tts/setup.sh` and `npm run voice-samples` (listening page).
+
+**Tests:** gateway `npm test` 132 pass / 0 fail / 2 skipped. Speech tests use a stub synthesizer and the real helper script with fake binaries.
+**Verified by the local agent, not me (worklog 2026-09-27T03:02):** after one fix (`2dd5d58`: `AVFileType` → its string value),
+the Swift compiles. `swift test` passes 147/147 and the TamagoWatch simulator build succeeds.
+**Unverified:**
+- Mac voice playback on the Watch (never run)
+- setup.sh downloads, sherpa-onnx flags, Kokoro speaker ids, afconvert output, every timing, size and RAM number
+- how it sounds
+
+**Next recommended task (ONE), local agent on the owner's Mac:**
+1. `cd Gateway && tools/tts/setup.sh`, then `TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts npm run voice-samples`. Fix any asset-name, flag or
+   speaker-id mismatch the self-test or the page shows.
+2. The owner listens to `/Volumes/Storage/AI/tts/samples/index.html` and picks a voice and speed by ear.
+3. Restart the LAN gateway with `TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=<pick> TAMAGO_TTS_SPEED=<pick>`.
+4. Ship a TestFlight build. The owner holds to talk and says whether they hear the new voice. Record it in `docs/DEVICE_TEST_LOG.md`, with measured
+   synthesis ms, KB and engine RAM against the budgets.
+
+**Do not redo:** the engine research and licensing; the §16 contract; the fallback rules.
+
+---
+
+### 2026-09-27: Claude Code (cloud): iPhone widgets (D-122), review branch `claude/iphone-widgets`
+
+**Branch:** `claude/iphone-widgets`. Separate from `claude/great-volta-ogpuw8` on the owner's request, so another agent can
+review and merge it.
+**Done:**
+- `Apple/PhoneWidget/`: a WidgetKit extension source with the approved octopus in all six iPhone families (small, medium,
+  large, Lock Screen circular, rectangular, inline). A tap opens the app.
+- The sizes and rendering modes come from Apple's HIG (`docs/WIDGETS.md`). The art is a transparent cutout of the approved hero
+  image, never distorted.
+
+**Tests:** gateway `npm test` unchanged. Swift not compiled (cloud).
+**Unverified:** everything on the Apple side: compile, the look in each mode, the tap to open.
+**Next recommended task (ONE), agent on the Mac:**
+1. Review this branch and add the `TamagoPhoneWidget` target per `docs/WIDGETS.md` §4.
+2. Build `TamagoPhone`, and re-run the `TamagoWatch` tests and `swift test` to confirm nothing regressed.
+3. Check all six families in the simulator, including tinted/clear and the Lock Screen. Tap each one.
+4. Merge into `claude/great-volta-ogpuw8`.
+
+**Do not redo:** the size research, the cutout (use `tools/widget-art/make_cutout.py` if the art changes).
+
+---
+
+### 2026-09-27T07:14:24-04:00: Codex: release 0.1.2 widget corrections
+Branch: `codex/widget-rendering-fix`.
+Commits: integration of d741044 and cbea65d plus this fix (SHA pending commit).
+Files: Xcode project, Watch cutout/complication, iPhone widget layouts/configuration, widget documentation and logs.
+Upstream source reused: none; existing approved art copied without pixel changes.
+Tests: exact commands and results in matching AGENT_WORKLOG entry. Swift 147 pass; gateway 132 pass/2 skipped;
+iOS simulator build and unsigned Release archive succeeded; both extensions and asset catalogs embedded.
+Physical evidence: owner's white complication/tap-to-open report in DEVICE_TEST_LOG (prior release).
+Verification: UNIT_TESTED_ONLY for automated tests; UNVERIFIED for new widget UI on hardware.
+Known risks: no actual all-family rendered visual check because native UI automation timed out; larger art can soften
+when scaled beyond the existing 692-pixel source. Cloud signing/distribution is still pending at this checkpoint.
+Next recommended task (ONE): install 0.1.2 from TestFlight and record the seven iPhone families and four Watch families
+across default/tinted/clear and reduced luminance in DEVICE_TEST_LOG.
+Do not redo: transparent cutout generation, native widget target integration, latest-branch merge, voice engine setup.
+Signed-by: Codex

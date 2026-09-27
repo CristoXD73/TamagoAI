@@ -28,6 +28,7 @@ export const RESPONSE_CASES = [
   { file: 'ok-success.json', httpStatus: 200, body: req(1, 'ping'), description: 'Plain success (ping -> pong).' },
   { file: 'ok-happy.json', httpStatus: 200, body: req(2, 'state happy'), description: 'Success that sets characterState happy.' },
   { file: 'ok-tool-success.json', httpStatus: 200, body: req(3, 'tool jellyfin'), description: 'Simulated local tool action succeeded.' },
+  { file: 'ok-nonverbal.json', httpStatus: 200, body: req(11, 'nonverbal'), description: 'Nonverbal reaction: empty text/speechText, reaction state + haptic only (§5.1).' },
   { file: 'ok-follow-up.json', httpStatus: 200, body: req(4, 'follow up'), description: 'Gateway expects a follow-up utterance.' },
   { file: 'error-timeout.json', httpStatus: 504, body: req(5, 'slow 60000'), description: 'Provider exceeded the gateway timeout.' },
   { file: 'error-invalid-request-malformed.json', httpStatus: 400, raw: RAW_REQUEST_FIXTURES['malformed.txt'], description: 'Body is not valid JSON; requestId unknown (null).' },
@@ -37,6 +38,19 @@ export const RESPONSE_CASES = [
   { file: 'error-provider.json', httpStatus: 502, body: req(9, 'state error'), description: 'Provider failed (mock "state error").' },
   { file: 'error-provider-unavailable.json', httpStatus: 503, body: req(10, 'unavailable'), description: 'Local AI engine not running.' },
 ];
+
+// Replayed against a gateway with a deterministic stub synthesizer (D-121, §16).
+export const SPEECH_CASES = [
+  { file: 'ok-speech-audio.json', httpStatus: 200, body: req(12, 'ping'), description: 'Success with optional speechAudio: fetch GET /v1/speech/<requestId> for Mac-synthesized audio (§16).' },
+];
+
+export const stubSynthesizer = () => ({
+  name: 'kokoro',
+  engine: 'kokoro',
+  voice: 'af_heart',
+  synthesize: async () => Buffer.from('stub-audio'),
+  check: async () => ({ ok: true }),
+});
 
 // Hand-written envelopes the Watch builds locally so the UI pipeline only ever
 // handles one response type. Validated structurally, not replayed.

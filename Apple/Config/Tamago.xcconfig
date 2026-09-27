@@ -13,4 +13,15 @@ TAMAGO_BUNDLE_PREFIX = com.example.appletamago
 DEVELOPMENT_TEAM =
 CODE_SIGN_STYLE = Automatic
 
+// App icons: Apple/WatchApp and Apple/iPhoneApp each carry Assets.xcassets/AppIcon
+// (owner-approved reference art on black, see Assets/CharacterReference/octopus-v001/PROVENANCE.md).
+// Only the two apps have an icon; the complication's catalog holds its art only.
+TAMAGO_APPICON_TamagoWatch = AppIcon
+TAMAGO_APPICON_TamagoPhone = AppIcon
+ASSETCATALOG_COMPILER_APPICON_NAME = $(TAMAGO_APPICON_$(TARGET_NAME))
+
+// TestFlight/App Store export compliance: the apps use no encryption beyond the
+// OS's own (plain HTTP on the LAN, Keychain), so uploads don't stop to ask.
+INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO
+
 #include? "Local.xcconfig"

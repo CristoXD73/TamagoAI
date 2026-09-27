@@ -50,6 +50,13 @@
       "description": "Simulated local tool action succeeded."
     },
     {
+      "path": "responses/ok-nonverbal.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "Nonverbal reaction: empty text/speechText, reaction state + haptic only (§5.1)."
+    },
+    {
       "path": "responses/ok-follow-up.json",
       "kind": "response",
       "source": "gateway",
@@ -111,6 +118,13 @@
       "source": "gateway",
       "httpStatus": 200,
       "description": "GET /v1/protocol"
+    },
+    {
+      "path": "responses/ok-speech-audio.json",
+      "kind": "response",
+      "source": "gateway",
+      "httpStatus": 200,
+      "description": "Success with optional speechAudio: fetch GET /v1/speech/<requestId> for Mac-synthesized audio (§16)."
     },
     {
       "path": "client/thinking-accepted.json",

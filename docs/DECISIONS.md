@@ -833,3 +833,167 @@ off-LAN exposure).
   Wi-Fi *and* while proxied through the iPhone (turn iPhone Wi-Fi and Bluetooth
   off in Settings, per TN3135), real dictation, audible speech and sounds with
   silent mode on and off, haptics, and energy.
+
+### D-117 Tamago Brain: the LLM is one component inside Tamago, behind Protocol V1
+
+- **Decision (owner direction, 2026-09-27):** the Mac becomes the Tamago Brain (`Gateway/src/brain/`,
+  `TAMAGO_PROVIDER=brain`). An Interaction Orchestrator owns each interaction: deterministic classification
+  and routing (`rule` / `fast` / `smart`), a personality **profile as data**, a structured **TamagoIntent**
+  (silence allowed), a speech composer, sessions, SQLite memory behind a **write gate**, and a deterministic,
+  never-decreasing familiarity model. Design and status: `docs/BRAIN_ARCHITECTURE.md`.
+- **Protocol:** V1 stays the external contract. One backward-compatible clarification: nonverbal replies
+  (`text` and `speechText` empty, §5.1), which `CharacterStateMachine` already handled. No V2 until the Watch
+  needs a new semantic.
+- **Storage:** built-in `node:sqlite` with FTS5, keeping zero npm dependencies (D-002). Needs Node ≥ 22.13 for
+  the brain only; the mock and legacy Ollama providers still run on older Node.
+- **Alternatives rejected:** a bigger system prompt (behavior drifts with the model); a vector DB up front
+  (unneeded at this scale); letting the model write memory directly (privacy, junk); background LLM loops (battery, cost).
+- **Verification:** `UNIT_TESTED_ONLY` (101 gateway tests, including the brain against a deterministic reasoner
+  and a stubbed Ollama). The real Ollama reasoner stays `UNVERIFIED_LOCAL_PROVIDER` until Brain F runs on the owner's Mac.
+- **Not built:** tools (Brain E), LLM consolidation, embeddings.
+
+
+### D-118 Brain F: `llama3.2:3b` as the interim default; owner facts come from memory, never a model's guess
+
+- **Decision (owner direction + evidence, 2026-09-27):** with `TAMAGO_REASONER=ollama` and no model named,
+  the brain uses **`llama3.2:3b` for both fast and smart** (`DEFAULT_MODELS` in `Gateway/src/brain/index.js`).
+  The owner chose it "just for testing"; a stronger model will replace it. Nothing set at all still means the
+  deterministic reasoner.
+- **Evidence:** `docs/BRAIN_EVAL.md`: 34 real model turns on the owner's Mac (M6, 16 GB, Ollama 0.34.4), all
+  valid JSON on the first try (the repair path never ran), ~1 s warm, 1.5 s cold load, 2.3 GB resident.
+- **What the evidence changed in the design (bounded fixes, not a rewrite):**
+  - Simple "what/where/who is my…" questions are answered **from memory only**: no matching memory → "I don't
+    know that yet." by rule; a match → the model sees the memories without older conversation lines. A 3B model
+    otherwise guessed ("Blue") or copied a stale answer ("Teal" after the owner changed it).
+  - **Live information** (weather, news, "is it running?") is a deterministic `live_info` kind → "I can't check
+    that yet." until tools exist (Brain E). The model invented "Rain" and "No".
+  - **Secret-looking and off-the-record text is never persisted verbatim**: conversation turns and traces store a
+    placeholder, and a secret never reaches a model. Before, the gate refused the *memory* but the turn log kept
+    the words for 7 days and fed them to later prompts.
+  - **Forget** also blanks the matching conversation turns.
+- **Alternatives rejected:** a bigger prompt alone (the 3B model ignored "never invent owner facts"); pulling
+  7–8B models now (owner's call; the eval script makes the comparison a one-command job later).
+- **Verification:** real-model behavior verified with `llama3.2:3b` only; logic `UNIT_TESTED_ONLY` (108 gateway
+  tests). The legacy `TAMAGO_PROVIDER=ollama` provider is still `UNVERIFIED_LOCAL_PROVIDER`.
+
+### D-119 First physical-Watch run: answers are spoken and captioned; the approved art floats; pair by address
+
+- **Evidence (owner's SE 3, TestFlight build 2–3, 2026-09-27):** the Watch→Mac→Watch loop worked (the brain
+  answered "Got it." and "Pixel" correctly), but the owner saw and heard nothing: speech was off by default and
+  the creature screen shows no text. Pairing by `tamagoai.local` never reached the Mac (Bluetooth on or off),
+  while pairing by the typed address `192.168.0.74` succeeded. The system input sheet showed a keyboard, not
+  dictation, on the owner's Watch.
+- **Decision (owner asked Claude to decide voice vs text):** replies are **spoken** (`SpeechOutput.isEnabled =
+  true`, `.playback`/`.voicePrompt` audio session activated off the main thread) **and shown as a small caption**
+  under the creature while speaking (plain text, no bubble), so an answer is never lost when the Watch is muted.
+- **Decision (owner direction):** the on-screen creature is the approved hero art (`ref_hero_q34.jpg`,
+  unchanged) on black with a barely-there float (±2.5 pt, ~4.8 s), paused in Always-On, off-page and with Reduce
+  Motion. Recorded as APPROVED in the Visual Approval Gate register (#11). The procedural `CharacterView` (D-114)
+  stays in the repo, off screen.
+- **Pairing:** the pairing sheet accepts a typed Mac address (kept with the pairing) and shows the actual failure
+  reason. `tamagoai.local` stays the default; why it fails on the Watch is still open (TN3135-class behavior).
+- **Voice input:** WatchKit's `.plain` input sheet on watchOS 27 opens with a microphone button, not straight into
+  dictation (seen in the simulator, where it also preheats on-device recognition). The owner must tap the mic;
+  if it's missing, dictation is off in the Watch's settings. A true hold-to-talk (record on the Watch, transcribe
+  on the Mac) needs an audio upload in the protocol and the owner's agreement; not built.
+- **Verification:** `SIMULATOR_VERIFIED_ONLY` for caption + speech start/finish (Tamago's own `speech` log lines);
+  audibility on the Watch speaker UNVERIFIED.
+
+### D-120 Hold-to-talk: the Watch records, the Mac transcribes on-device (`POST /v1/audio`)
+
+- **Why:** on the owner's SE 3 the system input sheet opened with a keyboard; the owner: "it tells me to type
+  and it's not really possible on the watch", and asked for the mic to be tested. On watchOS 27 the `.plain`
+  sheet opens with mic/handwriting buttons rather than straight into dictation (seen in the simulator).
+- **Decision:** hold the creature ≥ 0.45 s → record (16 kHz mono AAC via `AVAudioRecorder`, `.start` haptic),
+  release → `POST /v1/audio` (PROTOCOL_V1 §15, additive, not V2). The Mac transcribes with Apple
+  **SpeechAnalyzer/SpeechTranscriber** (on-device, en_CA model already installed, no permission prompt) through a
+  small compiled helper `Gateway/tools/transcribe` (`npm run build:transcriber`), then the transcript is an
+  ordinary request. The system input sheet stays as the fallback when the microphone is unavailable or denied.
+- **Reverses an earlier owner instruction, knowingly:** the D-116 pass said "Do not build a fake custom
+  microphone system just to avoid Apple's UI". This isn't a fake pipeline (real recording, real on-device
+  transcription), and the owner's hardware experience of Apple's UI changed the premise. **Owner may veto**;
+  removing it means reverting `VoiceRecorder` + `beginHold` and the `/v1/audio` route.
+- **Zero-dependency gateway (D-002):** unchanged for npm. The helper is a Swift source compiled locally with the
+  Xcode toolchain; without it the endpoint answers `provider_unavailable` and nothing else changes.
+- **Evidence:** real transcription on the owner's Mac (`say` → "What's my dog's name?", 1.3–1.4 s); gateway tests
+  113/113 including the real helper; simulator hold → upload (9.7 KB) → transcript → brain "Pixel" → speech
+  started/finished (`SIMULATOR_VERIFIED_ONLY`). Real Watch microphone capture: UNVERIFIED.
+
+### D-121 Natural voice: the Mac synthesizes locally, the Watch fetches and plays (`GET /v1/speech/<id>`)
+
+- **Why:** the owner wants a natural, warm voice "like when ChatGPT talks to you". The Watch can't provide one:
+  watchOS offers no Enhanced/Premium voices, and an 82M-parameter neural model is too heavy for an SE 3. The
+  owner's Mac mini can run one comfortably and is already the brain.
+- **Decision:**
+  - The gateway optionally synthesizes each reply's `speechText` through a separate local helper,
+    `Gateway/tools/tts/tamago-tts` (sherpa-onnx `sherpa-onnx-offline-tts` then `afconvert` → AAC/MP4 mono 24 kHz).
+  - The helper runs as a child process with a timeout, like `tools/transcribe`. There are **zero npm
+    dependencies**.
+  - Responses gain an optional `speechAudio` field, and the Watch fetches `GET /v1/speech/<requestId>`
+    (PROTOCOL_V1 §16, additive, not V2).
+  - Synthesis starts when the reply is ready and never delays the text reply.
+- **Engine (docs/VOICE_RESEARCH.md):**
+  - **Primary:** Kokoro-82M v1.0 (Apache-2.0 weights) on sherpa-onnx (Apache-2.0). Candidate voices: `af_heart`
+    (default), `af_bella`, `bf_emma`, `am_michael`.
+  - **Lighter fallback:** KittenTTS nano (Apache-2.0).
+  - **Personal-use baseline:** macOS `say` with a Premium voice.
+  - The **owner picks the voice by ear** from generated samples. Nothing is chosen until then.
+- **Guardrails:**
+  - Local only: no cloud TTS, no API keys.
+  - No voice cloning. No imitation of any real person or of OpenAI's voices: the Kokoro voices named after
+    them are refused in both the gateway and the helper.
+  - Permissive licenses only; non-commercial options are marked not eligible.
+  - Models live under `$TAMAGO_TTS_MODEL_DIR` (owner: `/Volumes/Storage/AI/tts`, AGENTS.md §9) and are never
+    committed.
+- **Fallback (binding):** no synthesizer, a 404/503, the ~2.5 s fetch budget, or a playback failure all mean the
+  Watch speaks with AVSpeechSynthesizer exactly as before. The speech watchdog (D-106) covers both paths, so the
+  creature never sticks in `speaking`.
+- **How the audio reaches the player without touching `CharacterStateMachine`:**
+  1. Just before `apply(.response)`, `TamagoConnection` remembers the response's `speechAudio` keyed by
+     `requestId`.
+  2. When the machine then emits `.speak(text)`, `TamagoConnection` looks that entry up and tries the Mac audio
+     first.
+  3. The machine's states and effects are unchanged.
+- **Supersedes:** CREATURE_SPEC §9.4 "use on-device speech synthesis". Synthesis now happens on the owner's own
+  Mac, which is still local and private. Watch-side synthesis remains the fallback.
+- **Known caveats:**
+  - Kokoro's training data included some synthetic audio from closed commercial TTS models (per its model card).
+  - The sherpa-onnx runtime bundles espeak-ng (GPL-3.0) for phonemization. It's downloaded to the owner's Mac,
+    not linked into or redistributed by this repo (sherpa-onnx issue #3731 plans its removal).
+  - Both are recorded for the owner in VOICE_RESEARCH §4.
+- **Verification:**
+  - Gateway: `UNIT_TESTED_ONLY` (stub synthesizer, plus the helper with fake binaries).
+  - Real engine: UNVERIFIED (no downloads possible in the cloud sandbox).
+  - Watch Swift: UNVERIFIED (not compiled).
+  - Nothing is DEVICE_VERIFIED until the owner hears it on the Watch.
+
+**D-121 addendum (owner, 2026-09-27): the voice is Kokoro `af_heart` at 0.9×.** Chosen by ear from the
+listening page (8 voices × 2 speeds). Measured on the owner's Mac after setup (sherpa-onnx 1.13.8, checksums in
+`/Volumes/Storage/AI/tts/checksums.sha256`): the helper now runs sherpa-onnx with 4 threads (it defaulted to 1),
+cutting a sentence from ~2.1 s to ~1.0 s (0.65 s for "Pixel.", 1.4 s for 86 characters), inside the Watch's 2.5 s
+wait. Simulator end to end: hold → transcript 0.32 s → reply 1.4 s → Mac voice synthesized 1.15 s and played
+("reply audio finished ok"). Gateway start line:
+`TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=af_heart TAMAGO_TTS_SPEED=0.9 TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts`.
+Heard on the Watch: UNVERIFIED until the owner listens.
+
+### D-122 iPhone widgets: the octopus in every iPhone widget family, tap opens the app
+
+- **Why:** the owner wants Tamago on the iPhone Home and Lock Screens: "encapsulate our octopus friend in there
+  and when you click it it bring you to the app". Other uses come later; for now the widgets just need to exist.
+- **Decision:**
+  - A new iOS WidgetKit extension, `TamagoPhoneWidget`, with sources in `Apple/PhoneWidget/`, embedded in
+    `TamagoPhone`.
+  - One static widget, `TamagoCreature`, in all six iPhone families: small, medium, large, accessory circular,
+    accessory rectangular, accessory inline. Extra large is iPad-only and accessory corner is Watch-only.
+  - One timeline entry and no refreshes. `widgetURL` is `tamago://widget/creature`, and a tap opens the app.
+- **Art:** the owner-approved `ref_hero_q34.jpg`, static and unchanged, with only its black background made
+  transparent (`CreatureCutout.png`, `tools/widget-art/make_cutout.py`).
+  - The cutout is needed because tinted/clear Home Screens paint opaque images solid white.
+  - It's always aspect-fitted, never stretched or cropped. Margins follow the HIG (16 pt text, 11 pt art).
+  - Sizes, rendering modes and sources are in `docs/WIDGETS.md`.
+  - No motion, so the Visual Approval Gate's prototype step doesn't apply. The art use is recorded as an
+    owner-directed runtime exception in `PROVENANCE.md`.
+- **Not done here:** the Xcode target itself. `project.pbxproj` isn't edited in the cloud (CLAUDE.md). The Mac
+  agent follows `docs/WIDGETS.md` §4. No App Group, mood or controls yet.
+- **Verification:** UNVERIFIED (not compiled, not rendered). The layout math is checked only by a Python mock
+  at HIG point sizes (`docs/widgets/layout-mock.png`).

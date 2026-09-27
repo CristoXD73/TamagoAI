@@ -160,3 +160,60 @@ recorded in [DEVICE_TEST_LOG.md](DEVICE_TEST_LOG.md). Compilation alone establis
 neither. Use all five labels precisely as defined in [AGENTS.md](../AGENTS.md).
 Append exact commands, outcomes, untested scope and one bounded next task to the
 handoff log after meaningful work. Never infer physical behavior from a GIF.
+
+## Xcode Cloud: every Apple change reaches TestFlight by itself
+
+Set up once by the owner in Xcode (Apple only allows creating the first workflow there). The repo side is
+ready: `Apple/ci_scripts/ci_post_clone.sh` writes the git-ignored `Apple/Config/Local.xcconfig` from two
+workflow environment variables, so no bundle ID or team ID is ever committed.
+
+1. Open `Apple/AppleTamago.xcodeproj` in Xcode → **Integrate → Create Workflow…** (or the Report navigator's
+   Cloud tab). Choose the **TamagoPhone** app (it carries the Watch app).
+2. When asked, **grant access to GitHub** for `CristoXD73/TamagoAI`.
+3. Edit the workflow:
+   - **Environment variables: none needed.** The post-clone script uses Xcode Cloud's built-in `CI_BUNDLE_ID`
+     (the TamagoPhone bundle ID *is* the prefix) and `CI_TEAM_ID`. `TAMAGO_BUNDLE_PREFIX` / `TAMAGO_TEAM_ID`
+     workflow variables still override them if you ever set them.
+   - **Start Conditions:** *Branch Changes* on `claude/great-volta-ogpuw8`, with **Files and Folders** limited to
+     `Apple/` (docs and gateway pushes don't spend build hours). Keep **manual start** too.
+   - **Actions:** *Archive*, platform iOS, scheme **TamagoPhone**, deployment preparation **TestFlight (Internal
+     Testing Only)**. Optionally *Test*, scheme **TamagoWatch**, an Apple Watch SE 3 (40 mm) simulator.
+   - **Post-Actions:** *TestFlight Internal Testing* → group **Owner**.
+4. **Build numbers:** local uploads used 0.1.0 builds 2–6; the version is now **0.1.1**, so Xcode Cloud's own
+   numbering (1, 2, …) is unique within it. Bump `MARKETING_VERSION` again before switching back to local uploads.
+5. Budget: the membership includes 25 compute hours a month; one archive of this project is a few minutes.
+
+Local archives (`xcodebuild archive … CURRENT_PROJECT_VERSION=<n>`, then `-exportArchive` with
+`destination=upload`) keep working alongside it.
+
+## Natural voice: the Mac speaks for Tamago (D-121, PROTOCOL_V1 §16)
+
+The gateway can synthesize each reply with a local neural voice (Kokoro-82M via sherpa-onnx; KittenTTS as the
+lighter fallback). The Watch fetches and plays it, and falls back to its own voice on any problem. It's local
+only: no cloud, no keys, no cloning. Research and licenses: [`VOICE_RESEARCH.md`](VOICE_RESEARCH.md).
+**Status: UNVERIFIED** until it's run on the Mac and heard on the Watch.
+
+```sh
+cd Gateway
+tools/tts/setup.sh                      # asks before each download; installs to /Volumes/Storage/AI/tts (≈ 450 MB est.)
+tools/tts/setup.sh --kitten             # also the lighter fallback engine
+tools/tts/setup.sh --selftest           # check the install, time one clip
+
+export TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts
+npm run voice-samples                   # 6 lines × every installed voice × 2 speeds, with times and sizes
+open /Volumes/Storage/AI/tts/samples/index.html   # listen, press "Choose this one", tell your agent the line
+
+TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=af_heart TAMAGO_TTS_SPEED=1.0 npm start   # the gateway prints "voice output: …"
+```
+
+- `TAMAGO_TTS=off` (default) turns it off, and replies carry no `speechAudio`. `say` uses an Apple voice
+  instead (personal-use baseline).
+- Budgets to check with the samples:
+  - ≤ ~1 s synthesis for a short reply
+  - ≤ ~60 KB per reply
+  - ≤ 1 GB engine RAM
+  - the Watch waits at most 2.5 s for the audio
+- Each reply is one helper process, so the time includes loading the model. If that alone blows the 1 s budget,
+  the next step is a persistent engine process, not a different voice.
+- Logs show `speech_synth` with the request ID, engine, voice, bytes and milliseconds. They never include text or
+  audio.

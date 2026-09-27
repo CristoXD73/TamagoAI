@@ -160,7 +160,7 @@ struct DebugStateControlsView: View {
                     case let .paired(grant): "Paired with \(grant.gatewayName)"
                     case .wrongCode: "Wrong code"
                     case .closed: "Pairing closed"
-                    case .unreachable: "Mac not reachable"
+                    case let .unreachable(reason): reason
                     }
                 }
             }

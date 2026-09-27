@@ -125,6 +125,20 @@ code was copied. No assets from either project were copied.
 
 ---
 
+## Local voice engine (D-121): downloaded on the owner's Mac, not redistributed
+
+No source, binaries or weights from these projects are in this repository. `Gateway/tools/tts/setup.sh`
+downloads them (after printing URL, size and license, and asking) to `$TAMAGO_TTS_MODEL_DIR`
+(owner: `/Volumes/Storage/AI/tts`). `Gateway/tools/tts/tamago-tts` only *invokes* the prebuilt CLI as a child
+process. Full comparison: `docs/VOICE_RESEARCH.md`.
+
+| Component | Repository | License | Role | How used |
+|---|---|---|---|---|
+| sherpa-onnx (`sherpa-onnx-offline-tts`, prebuilt macOS universal2) | https://github.com/k2-fsa/sherpa-onnx | Apache-2.0 | Runtime | Invoked as a CLI by the helper |
+| Kokoro-82M v1.0 (`kokoro-multi-lang-v1_0`) | https://huggingface.co/hexgrad/Kokoro-82M | Apache-2.0 (weights) | Primary voice model | Loaded by sherpa-onnx; voices named after OpenAI voices refused |
+| KittenTTS nano (`kitten-nano-en-v0_1-fp16`) | https://github.com/KittenML/KittenTTS | Apache-2.0 | Lighter fallback model | Loaded by sherpa-onnx |
+| espeak-ng data (bundled inside the model packages) | https://github.com/espeak-ng/espeak-ng | GPL-3.0 | Phonemizer used by the sherpa-onnx runtime | Not linked into or shipped by our code; only on the owner's Mac. Revisit if Tamago is ever distributed with the engine |
+
 ## Attribution records
 
 ```text

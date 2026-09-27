@@ -6,6 +6,8 @@
 // 27 simulator). Originally written in the cloud without a Swift
 // toolchain.
 //
+// VERIFICATION (speechAudio, D-121): UNVERIFIED (written in the cloud, not compiled).
+//
 // Mirrors docs/PROTOCOL_V1.md and Gateway/src/protocol.js. Enum raw values
 // must match those files exactly. Pure Foundation, no UI or transport code.
 
@@ -136,6 +138,22 @@ public struct TamagoErrorInfo: Codable, Sendable, Equatable {
     }
 }
 
+/// PROTOCOL_V1 §16 (D-121): where to fetch the Mac-synthesized voice for a reply.
+public struct TamagoSpeechAudio: Codable, Sendable, Equatable {
+    /// Always `/v1/speech/<requestId>`, relative to the gateway's base URL.
+    public var path: String
+    /// `audio/mp4` (AAC, mono, 24 kHz).
+    public var format: String
+    /// Informational (e.g. `af_heart`).
+    public var voice: String?
+
+    public init(path: String, format: String = "audio/mp4", voice: String? = nil) {
+        self.path = path
+        self.format = format
+        self.voice = voice
+    }
+}
+
 public struct TamagoResponse: Codable, Sendable, Equatable {
     public var protocolVersion: Int
     /// Null only for errors raised before the gateway could read a request ID
@@ -148,6 +166,8 @@ public struct TamagoResponse: Codable, Sendable, Equatable {
     public var haptic: TamagoHaptic
     public var followUpExpected: Bool
     public var error: TamagoErrorInfo?
+    /// Optional (§16): absent on old gateways, errors and nonverbal replies.
+    public var speechAudio: TamagoSpeechAudio?
 
     /// Every response the gateway sends is decoded, not constructed (Codable
     /// synthesizes `init(from:)` for that; unaffected by this initializer).
@@ -160,7 +180,8 @@ public struct TamagoResponse: Codable, Sendable, Equatable {
     public init(
         requestId: String?, status: TamagoResponseStatus, text: String, speechText: String,
         characterState: TamagoCharacterState, haptic: TamagoHaptic,
-        followUpExpected: Bool = false, error: TamagoErrorInfo? = nil
+        followUpExpected: Bool = false, error: TamagoErrorInfo? = nil,
+        speechAudio: TamagoSpeechAudio? = nil
     ) {
         self.protocolVersion = TamagoProtocol.version
         self.requestId = requestId
@@ -171,6 +192,7 @@ public struct TamagoResponse: Codable, Sendable, Equatable {
         self.haptic = haptic
         self.followUpExpected = followUpExpected
         self.error = error
+        self.speechAudio = speechAudio
     }
 
     /// Stale-response guard: true only if this response belongs to `request`.
@@ -192,6 +214,8 @@ public struct TamagoProtocolInfo: Codable, Sendable {
     public var provider: String?
     /// PROTOCOL_V1 §14; absent on an unpaired, loopback-only dev gateway.
     public var gatewayId: String?
+    /// PROTOCOL_V1 §16; `["text", "speech-audio"]` when the Mac has a voice. Older gateways omit it.
+    public var outputTypes: [String]?
 
     public var supportsThisClient: Bool {
         supportedProtocolVersions.contains(TamagoProtocol.version)

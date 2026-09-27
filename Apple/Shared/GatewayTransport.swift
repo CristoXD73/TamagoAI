@@ -4,6 +4,8 @@
 // live Node gateway from the SE 3 40 mm simulator (docs/HANDOFF_LOG.md). Not
 // DEVICE_VERIFIED.
 //
+// VERIFICATION (speechAudio(path:), D-121): UNVERIFIED (written in the cloud, not compiled).
+//
 // Executes CharacterStateMachine's `.sendRequest`/`.cancelRequest` effects
 // (D-103, D-115) and the pairing/reachability calls (D-116). Pure Foundation,
 // URLSession only — deliberately: Apple TN3135 classes Network.framework,
@@ -35,6 +37,23 @@ public struct GatewayConfiguration: Sendable, Equatable {
     public var expectedGatewayId: String?
 
     /// D-107: gateway timeout 20 s + 5 s.
+    /// A Mac address typed on the Watch, for networks where `tamagoai.local`
+    /// can't be resolved from the Watch. Accepts `192.168.0.74`,
+    /// `192.168.0.74:9000` or a full `http://…` URL; the port defaults to 8787.
+    public static func manualBaseURL(from input: String) -> URL? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
+        guard var parts = URLComponents(string: trimmed.contains("://") ? trimmed : "http://\(trimmed)"),
+              let scheme = parts.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              let host = parts.host, !host.isEmpty else { return nil }
+        parts.scheme = scheme
+        parts.port = parts.port ?? 8787
+        parts.path = ""
+        parts.query = nil
+        parts.fragment = nil
+        return parts.url
+    }
+
     public init(baseURL: URL, authToken: String? = nil, requestTimeout: TimeInterval = 25, expectedGatewayId: String? = nil) {
         self.baseURL = baseURL
         self.authToken = authToken
@@ -61,7 +80,9 @@ public enum PairingOutcome: Equatable, Sendable {
     /// No pairing window open: expired, already used, too many wrong codes,
     /// or the gateway doesn't pair (loopback dev mode).
     case closed
-    case unreachable
+    /// With a short, human-readable reason ("Name not found: tamagoai.local"),
+    /// so a failure on a real Watch says *which* step failed.
+    case unreachable(String)
 }
 
 /// A request's response plus whether it actually came from the gateway —
@@ -115,27 +136,67 @@ public actor GatewayClient {
                                     timeoutInterval: configuration.requestTimeout)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
+        guard let body = try? encoder.encode(request) else {
+            return GatewayExchange(response: synthesized(for: request.requestId, code: .gatewayUnavailable, message: "Could not encode request."), reachedGateway: false)
+        }
+        urlRequest.httpBody = body
+        return await perform(urlRequest, requestId: request.requestId)
+    }
+
+    /// POST `/v1/audio` (PROTOCOL_V1 §15): hold-to-talk. The Mac transcribes
+    /// the recording on-device and answers exactly like `/v1/request`.
+    public func exchangeAudio(_ audio: Data, contentType: String = "audio/mp4", requestId: String) async -> GatewayExchange {
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/audio"),
+                                    timeoutInterval: configuration.requestTimeout)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue(contentType, forHTTPHeaderField: "content-type")
+        urlRequest.setValue(requestId, forHTTPHeaderField: "x-tamago-request-id")
+        urlRequest.setValue(String(TamagoProtocol.version), forHTTPHeaderField: "x-tamago-protocol-version")
+        urlRequest.httpBody = audio
+        return await perform(urlRequest, requestId: requestId)
+    }
+
+    private func perform(_ request: URLRequest, requestId: String) async -> GatewayExchange {
+        var urlRequest = request
         if let token = configuration.authToken {
             urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
         }
-        guard let body = try? encoder.encode(request) else {
-            return GatewayExchange(response: synthesized(for: request, code: .gatewayUnavailable, message: "Could not encode request."), reachedGateway: false)
-        }
-        urlRequest.httpBody = body
-
         let data: Data
         do {
             data = try await fetch(urlRequest).0
         } catch let error as URLError where error.code == .timedOut {
-            return GatewayExchange(response: synthesized(for: request, code: .timeout, message: "No answer within \(Int(configuration.requestTimeout))s."), reachedGateway: false)
+            return GatewayExchange(response: synthesized(for: requestId, code: .timeout, message: "No answer within \(Int(configuration.requestTimeout))s."), reachedGateway: false)
         } catch {
-            return GatewayExchange(response: synthesized(for: request, code: .gatewayUnavailable, message: "Gateway is not reachable."), reachedGateway: false)
+            return GatewayExchange(response: synthesized(for: requestId, code: .gatewayUnavailable, message: "Gateway is not reachable."), reachedGateway: false)
         }
         guard let response = try? decoder.decode(TamagoResponse.self, from: data) else {
             // Something answered, but not in protocol v1 — treat as unusable.
-            return GatewayExchange(response: synthesized(for: request, code: .gatewayUnavailable, message: "Gateway returned an unreadable response."), reachedGateway: false)
+            return GatewayExchange(response: synthesized(for: requestId, code: .gatewayUnavailable, message: "Gateway returned an unreadable response."), reachedGateway: false)
         }
         return GatewayExchange(response: response, reachedGateway: true)
+    }
+
+    /// GET `/v1/speech/<id>` (PROTOCOL_V1 §16): the Mac-synthesized voice for a
+    /// reply. Returns nil on anything but a 200 audio answer within `timeout`
+    /// (the ~2.5 s budget), so the caller falls back to the built-in voice.
+    /// Only paths of the documented shape are fetched: the gateway can't point
+    /// the Watch anywhere else.
+    public func speechAudio(path: String, timeout: TimeInterval = 2.5) async -> Data? {
+        let prefix = "/v1/speech/"
+        guard path.hasPrefix(prefix) else { return nil }
+        let id = String(path.dropFirst(prefix.count))
+        guard UUID(uuidString: id) != nil else { return nil }
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/speech").appendingPathComponent(id),
+                                    timeoutInterval: timeout)
+        urlRequest.httpMethod = "GET"
+        if let token = configuration.authToken {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        }
+        guard let (data, response) = try? await fetch(urlRequest),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              (http.value(forHTTPHeaderField: "content-type") ?? "").lowercased().hasPrefix("audio/"),
+              !data.isEmpty else { return nil }
+        return data
     }
 
     /// GET `/v1/health`, classified. Never used on the request path itself.
@@ -176,15 +237,36 @@ public actor GatewayClient {
             data = result.0
             response = result.1
         } catch {
-            return .unreachable
+            return .unreachable(Self.describe(error, host: configuration.baseURL.host))
         }
-        switch (response as? HTTPURLResponse)?.statusCode {
+        let status = (response as? HTTPURLResponse)?.statusCode
+        switch status {
         case 200:
-            guard let grant = try? decoder.decode(TamagoPairingGrant.self, from: data) else { return .unreachable }
+            guard let grant = try? decoder.decode(TamagoPairingGrant.self, from: data) else {
+                return .unreachable("Unreadable answer from \(configuration.baseURL.host ?? "the Mac")")
+            }
             return .paired(grant)
         case 401: return .wrongCode
         case 404, 410: return .closed
-        default: return .unreachable
+        default: return .unreachable("Unexpected answer (HTTP \(status.map(String.init) ?? "none"))")
+        }
+    }
+
+    /// Short reason for a transport failure, naming the host that was tried.
+    public static func describe(_ error: Error, host: String?) -> String {
+        let target = host ?? "the Mac"
+        guard let urlError = error as? URLError else {
+            let ns = error as NSError
+            return "Network error \(ns.domain) \(ns.code)"
+        }
+        switch urlError.code {
+        case .cannotFindHost, .dnsLookupFailed: return "Name not found: \(target)"
+        case .cannotConnectToHost: return "Connection refused by \(target)"
+        case .timedOut: return "No answer from \(target)"
+        case .notConnectedToInternet: return "The Watch has no network connection"
+        case .networkConnectionLost: return "Connection to \(target) dropped"
+        case .appTransportSecurityRequiresSecureConnection: return "Blocked by App Transport Security"
+        default: return "Network error \(urlError.code.rawValue) reaching \(target)"
         }
     }
 
@@ -199,9 +281,9 @@ public actor GatewayClient {
         var gatewayId: String?
     }
 
-    private func synthesized(for request: TamagoRequest, code: TamagoErrorCode, message: String) -> TamagoResponse {
+    private func synthesized(for requestId: String, code: TamagoErrorCode, message: String) -> TamagoResponse {
         TamagoResponse(
-            requestId: request.requestId, status: .error, text: "", speechText: "",
+            requestId: requestId, status: .error, text: "", speechText: "",
             characterState: .idle, haptic: .none, followUpExpected: false,
             error: TamagoErrorInfo(code: code, message: message, retryable: true)
         )

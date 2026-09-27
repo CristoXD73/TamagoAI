@@ -1,0 +1,13 @@
+# engine	voice	speaker_id	label	notes
+# Stock voices only (no cloning). Kokoro speaker ids follow the speaker order of sherpa-onnx's
+# kokoro-multi-lang-v1_0 package (hexgrad VOICES.md order). UNVERIFIED from the cloud: setup.sh --selftest
+# and the listening page label every clip, so check by ear that each voice sounds like its label.
+# OpenAI-named Kokoro voices (af_alloy, af_nova, am_echo, am_onyx, bm_fable) are deliberately absent and refused.
+kokoro	af_heart	3	Heart (US, female)	candidate · Kokoro grade A · default
+kokoro	af_bella	2	Bella (US, female)	candidate · grade A-
+kokoro	bf_emma	21	Emma (UK, female)	candidate · grade B-
+kokoro	am_michael	16	Michael (US, male)	candidate · grade C+
+kokoro	af_sarah	9	Sarah (US, female)	extra
+kokoro	bm_george	26	George (UK, male)	extra
+kitten	expr-voice-4-f	5	Kitten voice 4 (female)	candidate · fallback engine
+kitten	expr-voice-2-m	0	Kitten voice 2 (male)	extra

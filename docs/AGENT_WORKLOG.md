@@ -502,3 +502,656 @@ SE3 40mm", `49DEDF60-8D9E-4977-8630-F1984F2E00ED`) for clean test runs and left
 it for reuse.
 
 **Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T02:06:34+0000: Claude Code (cloud) — Tamago Brain milestone 1 (Brain A–D)
+
+**Agent:** Claude Code (cloud session, no Xcode/Swift, no Ollama)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `146c480` (fast-forwarded from `a93d896` to origin before starting)
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- New: `Gateway/src/brain/**` (orchestrator, response-schema, context-builder, session, maintenance,
+  index, personality/{profile,behavior-policy}, routing/{intent-router,model-router},
+  memory/{extractor,gate,store,retrieve}, relationship/model, world/state, reasoners/{ollama,deterministic},
+  speech/composer, storage/database), `Gateway/bin/tamago.js`, `Gateway/test/brain.test.js`,
+  `Gateway/test/brain-gateway.test.js`, `docs/BRAIN_ARCHITECTURE.md`,
+  `Tests/Fixtures/protocol-v1/responses/ok-nonverbal.json`
+- Modified: `Gateway/src/protocol.js` (nonverbal ok envelope), `Gateway/src/providers/mock.js`
+  (`nonverbal` command), `Gateway/src/config.js` (`TAMAGO_PROVIDER=brain`), `Gateway/src/cli.js`
+  (await brain readiness), `Gateway/test/fixture-cases.js`, `Tests/Fixtures/protocol-v1/manifest.json`
+  (regenerated), `Gateway/package.json` (bin + `brain` script), `Gateway/.env.example`,
+  `Gateway/mock/README.md`, `.gitignore` (`*.sqlite*`), `docs/PROTOCOL_V1.md` (§5.1), `docs/DECISIONS.md`
+  (D-117), `docs/ACCEPTANCE_TESTS.md` (§K), `CLAUDE.md`, `docs/HANDOFF_LOG.md`, this file.
+
+**Work performed:** turned the Mac gateway's "prompt + latest message" into the Tamago Brain per the owner's
+architecture brief, keeping Protocol V1 as the external contract. Details: `docs/BRAIN_ARCHITECTURE.md`.
+
+**Tests/builds actually performed (by me, in the cloud, Node v22.22.2):**
+- `cd Gateway && npm test`: 101 tests, 101 pass (80 pre-existing + 1 new fixture case + 19 brain + 2
+  brain-gateway). No pre-existing test was modified except adding the nonverbal fixture case.
+- `npm run fixtures`: regenerated. The only new file is `ok-nonverbal.json`, and the manifest gained one entry.
+- CLI transcript across a real process restart (`printf … | node bin/tamago.js brain chat`, twice), plus
+  `inspect`, `memories` and `status`.
+- Real gateway process `TAMAGO_PROVIDER=brain TAMAGO_ALLOW_NO_AUTH=1 node src/cli.js`, driven by curl: V1
+  envelopes including the nonverbal one.
+
+**Things NOT verified:** any real LLM (the Ollama reasoner is tested against a stubbed fetch only:
+`UNVERIFIED_LOCAL_PROVIDER`); latency and quality on the owner's 16 GB Mac; the nonverbal envelope on the
+physical Watch (I checked by reading `CharacterStateMachine.handle` that an empty `speechText` skips TTS; I
+didn't run Swift); the Swift fixture tests against the new `ok-nonverbal.json` (not run: no toolchain; it
+decodes as a normal `TamagoResponse` with empty strings); Node 26 on the owner's Mac (built-in
+`node:sqlite`, expected to work).
+
+**Known issues:** English-only rule patterns; the deterministic reasoner is a labeled fallback, not
+intelligence; `node:sqlite` prints an ExperimentalWarning on Node 22 (the CLI suppresses it; the gateway log
+shows it once); tools (Brain E) aren't built, and Tamago says so.
+
+**Cross-agent impact:** the gateway default provider is still `mock`, so nothing changes unless
+`TAMAGO_PROVIDER=brain`. The Swift fixture suite gains one fixture (`ok-nonverbal.json`). `PROTOCOL_V1` §5.1
+documents empty `text`/`speechText` as a nonverbal reaction, which the current Watch client already handles.
+No Apple sources were touched.
+
+**Signed-by:** Claude Code (cloud)
+
+### 2026-09-26T22:22:34-04:00: Claude Code — Storage-disk rule made binding and visible; Brain F blocked
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `9d6148c`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `AGENTS.md` (top callout + new §9 Storage), `CLAUDE.md` (top callout, reminder line),
+`README.md` (one line in Development), `docs/LOCAL_ENVIRONMENT.md` (disk check, Ollama-on-Storage setup),
+this file.
+
+**Work performed:** the owner asked that every agent use the external `/Volumes/Storage` disk rather than
+the internal SSD, and that the rule be visible on GitHub. It existed only in `docs/LOCAL_ENVIRONMENT.md`.
+It's now a callout at the top of `AGENTS.md` and `CLAUDE.md`, plus a full path table in `AGENTS.md` §9
+(builds, Ollama models via `OLLAMA_MODELS`, gateway state via `TAMAGO_STATE_DIR`, eval databases, temp
+files). Paths stay out of source code; code defaults remain portable.
+Brain F step 1 (environment check) stopped as instructed: Ollama is not installed.
+
+**Tests/builds actually performed (by me):** `node --version` → v26.9.0; `which ollama` → not found (no
+app, no `~/.ollama`, nothing on :11434); `df -h` → internal 21 GiB free (90% used), Storage 400 GiB free;
+`du -sh` of CoreSimulator (2.6 GiB), Xcode DerivedData (524 MiB), `~/.npm` (142 MiB);
+`cd Gateway && npm test` → 101/101 pass. Docs-only change; `git diff --check` clean.
+
+**Things NOT verified:** the `launchctl setenv OLLAMA_MODELS` instructions (Ollama isn't installed yet);
+the rendered GitHub callouts (RENDERED GITHUB PAGE NOT VERIFIED at time of writing).
+
+**Known issues:** 524 MiB of Xcode GUI DerivedData remains on the internal disk; left for the owner to
+decide (not deleted).
+
+**Cross-agent impact:** new binding rule for all agents (`AGENTS.md` §9). No code touched.
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T00:18:25-04:00: Claude Code — app icons; first physical iPhone install
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `2d744cd`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `Apple/iPhoneApp/Assets.xcassets/` and `Apple/WatchApp/Assets.xcassets/` (AppIcon, 1024×1024
+single-size), `Apple/Config/Tamago.xcconfig` (`ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`),
+`Assets/CharacterReference/octopus-v001/PROVENANCE.md` (owner's icon exception), this file.
+
+**Work performed:** the owner reported no app icon on the iPhone or the Watch; the project had no asset
+catalog at all. At the owner's direction, `ref_hero_q34.jpg` (the image the owner sent, byte-identical)
+became the icon, unchanged apart from scaling and centering on black. The Watch version is sized so the
+whole octopus fits inside the circular mask. Built the `TamagoPhone` scheme (with the embedded Watch app) for
+the owner's physical iPhone and installed it with `devicectl`.
+
+**Tests/builds actually performed (by me):**
+`xcodebuild build -scheme TamagoPhone -configuration Debug -destination 'platform=iOS,id=<owner iPhone>'
+-derivedDataPath ../.build/DerivedData-device -allowProvisioningUpdates` → BUILD SUCCEEDED, signed with
+automatic team profiles; both bundles contain `Assets.car` and `CFBundleIconName = AppIcon`;
+`xcrun devicectl device install app` → installed on the owner's iPhone (the first attempt over Wi-Fi failed
+with IXRemoteErrorDomain 6; the retry succeeded).
+
+**Things NOT verified:** that the icon appears on the iPhone home screen (the owner hasn't confirmed yet);
+the Watch app. Installing from the iPhone's Watch app spins, then nothing happens. Diagnosis: the Watch
+isn't visible to Xcode (`devicectl`, `xcdevice`), so it isn't in the team provisioning profile (the profile
+lists 2 devices, neither a Watch). The Watch binary was arm64-only (Debug `ONLY_ACTIVE_ARCH`).
+
+**Known issues:** the Watch install is blocked on getting the Watch into a profile (portal registration of
+its UDID) or on a TestFlight route; see HANDOFF.
+
+**Cross-agent impact:** the project gains asset catalogs in the synchronized folders (no `.pbxproj` edit)
+and one xcconfig line. Brain F is paused mid-run (the uncommitted `Gateway/scripts/brain-eval.js` isn't part
+of this commit).
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T00:29:19-04:00: Claude Code — Watch icon sizes, TestFlight readiness audit
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `5073a2f`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/WatchApp/Assets.xcassets/AppIcon.appiconset/*` (single-size replaced with every
+watchOS role/size plus the 1024 marketing icon, all rendered from the same approved-art icon),
+`Apple/WatchApp/Info.plist` (`NSLocalNetworkUsageDescription`), `Apple/Config/Tamago.xcconfig`
+(`INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`), this file.
+
+**Work performed:** the owner saw a generic placeholder for Tamago in the iPhone's Watch app. The Watch bundle
+did contain the icon, but only as one 1024 image; the Watch app on iPhone relies on prerendered sizes
+(companionSettings etc.), so every size is now explicit. TestFlight readiness audit of the built bundles:
+versions match across app, Watch app and complication (0.1.0; the build number is set at archive time);
+`WKApplication`, `WKCompanionAppBundleIdentifier` and `WKRunsIndependentlyOfCompanionApp` are present;
+the complication is embedded; arm64 is the watchOS 27 standard arch (no arm64_32 needed); export compliance
+is now declared; a local-network usage string was added for the Watch.
+The owner confirmed that openPocketCine reached the Watch through TestFlight, and Xcode can't see the Watch,
+so TestFlight is the install route (no Watch UDID needed).
+
+**Tests/builds actually performed (by me):** Release `generic/platform=iOS` build → succeeded, only the
+benign AppIntents metadata warnings; `assetutil --info` on the Watch `Assets.car` shows the sizes,
+including 58/87 px companion icons; `plutil -p` shows the new keys; Debug device build, uninstall and
+reinstall on the owner's iPhone; `xcodebuild archive ... CURRENT_PROJECT_VERSION=2` → ARCHIVE SUCCEEDED
+(`.build/Archives/Tamago-0.1.0-2.xcarchive`, git-ignored, on Storage).
+
+**Things NOT verified:** that the iPhone's Watch app now shows the icon (awaiting the owner); the TestFlight
+upload (needs the App Store Connect app record); anything running on the Watch.
+
+**Known issues:** none new.
+
+**Cross-agent impact:** Watch icon asset layout changed; no Swift or `.pbxproj` edits.
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T00:58:09-04:00: Claude Code — Brain F: real Ollama evaluation, 9 defects fixed, D-118
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `9c9e24b`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Gateway/src/brain/` (orchestrator, memory/{gate,retrieve,store,extractor}, session,
+routing/{intent-router,model-router}, personality/profile, speech/composer, reasoners/ollama header, index
+defaults), `Gateway/test/brain.test.js` (+7 tests), new `Gateway/scripts/brain-eval.js`,
+`Gateway/.env.example`, new `docs/BRAIN_EVAL.md`, `docs/BRAIN_ARCHITECTURE.md`, `docs/DECISIONS.md` (D-118),
+`docs/ACCEPTANCE_TESTS.md` §K, `CLAUDE.md` map, `README.md` (test counts, one line), this file.
+
+**Work performed:** installed Ollama 0.34.4 with the owner's go-ahead (`brew install ollama`), served on
+127.0.0.1 only with models on `/Volumes/Storage/AI/ollama/models`, pulled `llama3.2:3b` (the owner's
+choice: one model, "just for testing"). Wrote `scripts/brain-eval.js` (25-turn script through the real
+orchestrator, database reset per run). Run 1 exposed 9 defects (see BRAIN_EVAL.md), including a **privacy
+defect**: refused secrets and off-the-record sentences were kept verbatim as conversation turns and traces
+and fed to later prompts. Fixed each with a test; runs 2 and 3 confirmed. Owner facts are now answered from
+memory only (no guesses), live information is answered honestly by rule, forget also blanks the
+conversation. Default model recorded in D-118. Labels flipped only for the brain reasoner with
+`llama3.2:3b`; the legacy `providers/ollama.js` stays UNVERIFIED_LOCAL_PROVIDER.
+
+**Tests/builds actually performed (by me):** `npm test` → 108/108 (was 101); three eval runs against the
+real model (13/13, 11/11, 10/10 valid JSON on the first try; warm median ~1 s; Ollama RSS 2.3 GB); a throwaway
+loopback gateway on :8788 driven by curl with V1 requests (incl. the nonverbal envelope); read the eval
+database directly to confirm no secret text is stored.
+
+**Things NOT verified:** any other model; long-term memory quality; the physical Watch; the legacy Ollama provider.
+
+**Known issues:** the 3B model's general knowledge is shaky (octopus hearts half right); some replies lack
+final punctuation (cosmetic). `.env.example` still says TAMAGO_TOKEN is required, which predates D-116's
+identity token (not changed here).
+
+**Cross-agent impact:** brain behavior changes (rule routes for `live_info` and unknown owner facts; the
+persisted-turn format now includes placeholders). Protocol V1 unchanged. The LAN gateway on this Mac was
+restarted with the new code (state in `/Volumes/Storage/AI/TamagoAI`, AGENTS.md §9).
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T00:58:25-04:00: Claude Code — Swift fixture tests updated for the nonverbal reply (were failing)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `c9c8add`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/Shared/Tests/TamagoSharedTests/ProtocolFixtureTests.swift`,
+`Apple/Shared/Tests/TamagoSharedTests/CharacterStateMachineTests.swift`, this file.
+
+**Work performed:** the cloud Brain milestone (`9d6148c`) added `responses/ok-nonverbal.json` and PROTOCOL_V1
+§5.1 without running Swift (no toolchain there). On this Mac the Swift suite failed with 4 issues: the
+manifest count (21 → 22), no expected values for the new fixture, and a rule "text is empty only for
+accepted", which §5.1 relaxes for a nonverbal `ok`. The decoder itself was fine. Test-only fix, plus one new
+test that runs the real fixture through `CharacterStateMachine` (reaction `happy`, haptic `click`, no `.speak`).
+
+**Tests/builds actually performed (by me):** `swift test --scratch-path ../../.build/spm` → 138/138;
+`xcodebuild test -scheme TamagoWatch` on the watchOS 27 simulator (TamagoAI Test SE3 40mm) → 138/138, TEST SUCCEEDED.
+
+**Things NOT verified:** the nonverbal reply on the physical Watch.
+
+**Known issues:** none.
+
+**Cross-agent impact:** closes the "Swift fixture tests against ok-nonverbal.json" item the cloud session left
+unverified; no production Swift touched.
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T01:19:43-04:00: Claude Code — TestFlight live; first physical-Watch pairing attempt fails; build 3 with manual address + error detail
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `03480a4`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/Shared/GatewayTransport.swift` (`PairingOutcome.unreachable(String)`,
+`GatewayClient.describe`, `GatewayConfiguration.manualBaseURL`), `Apple/WatchApp/PairingView.swift` ("Use Mac
+address" + the real reason on failure), `Apple/WatchApp/TamagoConnection.swift` (`pair(code:address:)`),
+`Apple/WatchApp/DebugStateControlsView.swift`, `Apple/Shared/Tests/.../GatewayClientTests.swift` (+1 test,
+extended pairing test), `README.md` (Swift count), this file.
+
+**Work performed:** with the owner (renewed membership), created the App Store Connect record "TamagoAI"
+(bundle `com.cristoxd73.tamawatch.c73x926`), uploaded build 0.1.0 (2), and created the internal group "Owner"
+(automatic distribution) with the account holder as tester. The owner installed it from TestFlight on the
+iPhone; the icon shows correctly. **First physical-Watch evidence:** pairing against the LAN gateway
+(`tamagoai.local` → 192.168.0.74) failed twice with "Couldn't find your Mac on this network", with the
+iPhone's Bluetooth on and then off; the gateway log shows no `/v1/pair` request from the Watch. From the
+iPhone's Safari both `http://tamagoai.local:8787/v1/health` and `http://192.168.0.74:8787/v1/health` work, so
+the LAN and mDNS are fine for Wi-Fi clients. Build 3 adds a typed-address fallback and shows the actual
+failure reason so the next attempt identifies the failing step.
+
+**Tests/builds actually performed (by me):** `swift test` → 139/139; Release archive → ARCHIVE SUCCEEDED;
+export/upload of build 3 → Upload succeeded. Not run in the simulator UI.
+
+**Things NOT verified:** build 3 on the Watch; why the Watch can't reach the Mac (candidates: .local
+resolution on watchOS, local-network access for the app, the Watch's actual Wi-Fi path).
+
+**Known issues:** a typed IP breaks if the Mac's DHCP address changes (reserve it on the router, or re-pair).
+
+**Cross-agent impact:** `PairingOutcome.unreachable` now carries a reason string (source-breaking for any
+other caller; all in-repo callers updated).
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T01:54:03-04:00: Claude Code — first real Watch loop; voice + caption; floating hero art (builds 4 and 5)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `3ff17b4`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `Apple/WatchApp/FloatingCreature.swift`, new `Apple/WatchApp/Assets.xcassets/Creature.imageset`
+(approved art, unchanged), `Apple/WatchApp/TamagoWatchApp.swift` (screen uses FloatingCreature + caption),
+`Apple/WatchApp/TamagoConnection.swift` (caption), `Apple/WatchApp/SpeechOutput.swift` (on by default, audio
+session off-main, speech log lines), `docs/DECISIONS.md` (D-119), `docs/VISUAL_APPROVAL_GATE.md` (#11),
+`Assets/CharacterReference/octopus-v001/PROVENANCE.md`, `docs/DEVICE_TEST_LOG.md`, this file.
+
+**Work performed:** after the owner paired build 3 by address, the loop worked on the real Watch (gateway log +
+brain traces: "My dog is named pixel" → "Got it.", "Whats my dogs name" → "Pixel", 4.4 s with a cold model), but
+the owner perceived nothing. Implemented D-119 (spoken + captioned answers, floating approved art). Found and
+fixed an AVAudioSession main-thread hang risk flagged by the runtime in the simulator log. While the owner
+was in Game Mode, the Xcode app was found suspended (state T) and blocked `xcodebuild` through file
+coordination; resumed only Xcode (`kill -CONT`); many other apps remain suspended and were left alone.
+
+**Tests/builds actually performed (by me):** `xcodebuild build` (TamagoWatch, simulator) → succeeded;
+simulator loop against a loopback test gateway (:8788, eval DB, real llama3.2:3b): hold → system input sheet (mic
+button present, on-device recognition preheated) → suggestion → listening → thinking → speaking with caption
+"Pixel" → Tamago log "speech started (5 chars)" / "speech finished"; archives + uploads of builds 4 and 5 → Upload
+succeeded.
+
+**Things NOT verified:** audibility on the Watch; real dictation on the owner's Watch; builds 4/5 on the device.
+
+**Known issues:** typed IP pairing breaks if the Mac's address changes.
+
+**Cross-agent impact:** the on-screen creature changed (owner-approved); CharacterView remains but is unused on screen.
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T02:02:44-04:00: Claude Code — hold-to-talk: Watch recording + on-device Mac transcription (D-120), build 6
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `07100ce`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** Gateway: new `tools/transcribe/transcribe.swift`, new `src/transcriber.js`, `src/server.js`
+(`POST /v1/audio`, `readBuffer`), `src/protocol.js` (`LIMITS.maxAudioBytes`), `src/cli.js`, `package.json`
+(`build:transcriber`), new `test/audio.test.js`, `Tests/Fixtures/protocol-v1/responses/protocol-info.json`
+(regenerated). Apple: new `WatchApp/VoiceRecorder.swift`, `WatchApp/TamagoConnection.swift` (`beginHold`/`endHold`,
+audio send), `WatchApp/TamagoWatchApp.swift` (hold/release gesture), `WatchApp/Info.plist` (microphone string),
+`Shared/GatewayTransport.swift` (`exchangeAudio`), `Shared/Tests/.../GatewayClientTests.swift` (+1). Docs:
+`PROTOCOL_V1.md` (§15, §13 note), `DECISIONS.md` (D-120), this file.
+
+**Work performed:** see D-120. Also while the owner was in Game Mode: the Xcode app had been suspended and was
+blocking `xcodebuild`; resumed only Xcode (`kill -CONT`).
+
+**Tests/builds actually performed (by me):** `npm test` → 113/113 (incl. the real SpeechAnalyzer helper on
+a `say` recording); `npm run fixtures` (protocol-info only); `swift test` → 140/140; Watch simulator build;
+simulator hold-to-talk run against a loopback test gateway (DEBUG audio-file hook, no mic): 9742 bytes →
+transcribed in 1326 ms → "What's my dog's name?" → "Pixel" → speech started/finished.
+
+**Things NOT verified:** the Watch microphone (permission prompt, recording quality) on the owner's SE 3;
+transcription of real Watch recordings; hold gesture feel on hardware.
+
+**Known issues:** the brain's model calls were ~4.8 s during Game Mode (Ollama deprioritized); Ollama unloads
+the model after 15 min idle (cold start ~1.5 s).
+
+**Cross-agent impact:** new endpoint and a compiled helper under `Gateway/tools/` (git-ignored build output);
+the talk gesture is now hold-and-release. Protocol V1 extended additively (§15).
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T02:32:52-04:00: Claude Code — hold-to-talk verified on the owner's Watch; Mac-side fixes from the real logs
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `0d4e3fc`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Gateway/src/server.js` (spoken "I didn't catch that.", transcript cleanup, warm on health,
+opt-in `keepAudioDir` diagnostics), `Gateway/src/transcriber.js` (`cleanTranscript`), `Gateway/src/cli.js`
+(`TAMAGO_KEEP_AUDIO_DIR`), `Gateway/src/brain/reasoners/ollama.js` (`warm()`, keep-alive 60 min, shared
+options), `Gateway/src/brain/index.js` (provider `warm`), `Gateway/src/brain/personality/profile.js` (no bare
+"No"), `Gateway/test/audio.test.js` (+2), `Gateway/test/brain.test.js` (+1), `Gateway/scripts/brain-eval.js`
+(+1 utterance), `docs/DEVICE_TEST_LOG.md`, this file.
+
+**Work performed:** the owner's first hold-to-talk try returned an empty transcript (silent shrug = "no reply").
+With diagnostics opt-in, three further tries all worked (see DEVICE_TEST_LOG); fixed what the logs showed:
+silent failure, punctuation junk, cold/reloaded model, a bare "No". Recordings measured then deleted; the
+gateway now runs without keeping audio.
+
+**Tests/builds actually performed (by me):** `npm test` → 116/116; real-model eval run 4 (26 turns, 11/11 valid
+JSON first try, median 1.4 s, no regressions; fun facts now answered); real gateway restarted; a health probe
+loaded llama3.2:3b with a 60-min expiry (`/api/ps`).
+
+**Things NOT verified:** why the very first recording transcribed empty (it wasn't kept); the fixes on the Watch
+(no new build needed, all Mac-side).
+
+**Known issues:** SpeechTranscriber sometimes drops a word ("What's my dog?" for "What's my dog's name?").
+
+**Cross-agent impact:** none beyond the gateway.
+
+**Signed-by:** Claude Code
+
+### 2026-09-27T02:36:52-04:00: Claude Code — task brief for the cloud agent: natural voice (docs/handoff/VOICE_TASK.md)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `c92ebe1`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `docs/handoff/VOICE_TASK.md`, this file.
+**Work performed:** at the owner's request, wrote a self-contained, step-by-step task for Claude Code (cloud):
+research local, permissively licensed neural TTS; Mac-side synthesis behind a helper (like the transcriber);
+additive PROTOCOL_V1 §16; Watch playback with AVSpeechSynthesizer fallback (Swift UNVERIFIED in the cloud); a
+setup + listening kit for the local agent. Guardrails: local only, no voice cloning, permissive licenses for code
+and weights, zero npm deps, additive protocol, never delay the text reply, Storage disk for models.
+**Tests/builds actually performed (by me):** none (docs only); `git diff --check`.
+**Things NOT verified:** n/a.
+**Known issues:** none.
+**Cross-agent impact:** assigns the voice work to the cloud agent; the local agent verifies on the Mac/Watch after.
+**Signed-by:** Claude Code
+
+### 2026-09-27T02:44:36-04:00: Claude Code — Xcode Cloud repo side (ci_post_clone) + setup guide
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `f4dc2dd`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `Apple/ci_scripts/ci_post_clone.sh`, `docs/DEVELOPMENT.md` (Xcode Cloud section), this file.
+**Work performed:** checked the owner's membership perks in the browser (active to 2027-09-27; Xcode Cloud,
+WeatherKit, code-level support available). Xcode Cloud's first workflow must be created in the Xcode app, so
+prepared the repo side: a post-clone script that writes the git-ignored `Local.xcconfig` from secret workflow
+variables, plus step-by-step workflow settings (Apple/-only trigger, archive → TestFlight "Owner", next build ≥ 7).
+**Tests/builds actually performed (by me):** dry-ran the script into a temp dir with the real values → identical
+settings to the owner's `Local.xcconfig`; without variables → exits 1 with a clear message.
+**Things NOT verified:** an actual Xcode Cloud build (needs the owner's one-time Xcode setup).
+**Known issues:** none.
+**Cross-agent impact:** new `Apple/ci_scripts/` (Xcode Cloud convention); no project file changes.
+**Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T06:50:10+0000: Claude Code (cloud) — natural voice, part 1: research
+
+**Agent:** Claude Code (cloud; no macOS, Xcode, Swift or Ollama; Hugging Face and GitHub release downloads are blocked by the sandbox proxy)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `f4dc2dd` · **Ending commit SHA:** the commit containing this entry
+**Files changed:** `docs/VOICE_RESEARCH.md` (new), this file.
+**Work performed:** desk survey of local neural TTS (docs/handoff/VOICE_TASK.md step 1): licenses (code and weights), arena evidence,
+size, and how each runs on Apple Silicon without Python/npm; recommendation Kokoro-82M via sherpa-onnx, KittenTTS fallback,
+4 Kokoro voices + 1 Kitten voice as candidates; five OpenAI-named Kokoro voices excluded; espeak-ng GPL note.
+**Tests/builds actually performed:** none (documentation only). No engine was run: model downloads are blocked in this sandbox.
+**Things NOT verified:** every quality/speed claim is from the cited sources, not measured; sherpa-onnx asset names are from
+public references and are re-checked by setup.sh at install time.
+**Cross-agent impact:** none.
+**Signed-by:** Claude Code (cloud)
+
+---
+
+### 2026-09-27T06:57:49+0000: Claude Code (cloud) — natural voice, part 2: gateway synthesis + GET /v1/speech
+
+**Agent:** Claude Code (cloud; no macOS, afconvert, Swift or model downloads)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `ebc30e2` · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- new: `Gateway/src/tts.js`, `Gateway/tools/tts/tamago-tts`, `Gateway/tools/tts/voices.tsv`, `Gateway/test/speech.test.js`,
+  fixture `responses/ok-speech-audio.json`
+- `Gateway/src/server.js`, `src/cli.js`, `src/protocol.js` (validator), `scripts/generate-fixtures.js`, `test/fixture-cases.js`,
+  `test/fixtures.test.js`, `protocol-info.json` + `manifest.json` (regenerated), `.env.example`, `.gitignore`
+- `docs/DECISIONS.md` (D-121), `docs/PROTOCOL_V1.md` (§16), `docs/CREATURE_SPEC.md` (§9.4 note), `docs/UPSTREAM_REUSE.md`,
+  `THIRD_PARTY_NOTICES.md`, this file
+
+**Work performed:**
+- Optional `speechAudio` on ok replies with speech. Background synthesis keyed by requestId (bounded to 32 entries, 2-min TTL,
+  served once). `GET /v1/speech/<id>` waits up to 2.5 s, else 503.
+- Text replies never wait for audio. No text or audio in logs.
+- The helper wraps sherpa-onnx (Kokoro/Kitten) or `say`, then `afconvert` to AAC. Text is passed via a 0600 temp file.
+- OpenAI-named voices are refused in both layers.
+
+**Tests/builds actually performed (by me):** `npm test`: 134 tests, 132 pass, 0 fail, 2 skipped (real Kokoro and the real transcriber, which
+need the Mac). The helper was tested with fake `sherpa-onnx-offline-tts`/`afconvert` binaries that record argv.
+**Things NOT verified:** the real sherpa-onnx CLI flags and speaker ids (from public docs, not run), afconvert conversion, latency and size
+budgets, any audio quality. All of this is UNVERIFIED until setup.sh runs on the owner's Mac.
+**Known issues:** none.
+**Cross-agent impact:** Protocol V1 is additive (new optional field + endpoint + `outputTypes` in /v1/protocol). The manifest now has 23 fixtures, so the
+Swift `ProtocolFixtureTests` count must move to 23 (done in part 3).
+**Signed-by:** Claude Code (cloud)
+
+---
+
+### 2026-09-27T07:00:21+0000: Claude Code (cloud) — natural voice, part 3: Watch fetches and plays the Mac voice
+
+**Agent:** Claude Code (cloud; **no Swift toolchain or Xcode**)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `7c5d441` · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- `Apple/Shared/TamagoProtocolV1.swift`: `TamagoSpeechAudio`, optional `TamagoResponse.speechAudio`, `TamagoProtocolInfo.outputTypes`
+- `Apple/Shared/GatewayTransport.swift`: `speechAudio(path:timeout:)`
+- new `Apple/WatchApp/AudioReplyPlayer.swift`
+- `Apple/WatchApp/TamagoConnection.swift`
+- tests: `GatewayClientTests.swift` (StubFetch `.bytes` + 6 tests), `ProtocolFixtureTests.swift` (23 fixtures, ok-speech-audio)
+- this file
+
+**Work performed:**
+- The response's `speechAudio` is remembered by requestId just before `apply(.response)`. `.speak` fetches `/v1/speech/<id>` (2.5 s budget,
+  documented path shape only) and plays it with AVAudioPlayer (session `.playback`/`.voicePrompt`, activated and deactivated off-main).
+- Anything else falls back to AVSpeechSynthesizer as before. The watchdog covers the fetch plus the real clip duration, and `.stopSpeech` stops both
+  players and the fetch.
+- `CharacterStateMachine` is untouched. No project file edits (synchronized folder).
+
+**Tests/builds actually performed (by me):** none for Swift. It can't be compiled here. Gateway `npm test` is still 132 pass / 0 fail / 2 skipped.
+**Things NOT verified:** that any of this compiles (Swift 6 strict concurrency especially), AVAudioPlayer AAC playback on watchOS, audibility,
+and the fallback timing on a device. All touched Swift files are marked UNVERIFIED.
+**Known issues:** none known.
+**Cross-agent impact:** the local agent must run `swift test` and the watchOS scheme before any TestFlight build.
+**Signed-by:** Claude Code (cloud)
+### 2026-09-27T03:00:50-04:00: Claude Code — Xcode Cloud without custom variables; version 0.1.1
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `8b942e2`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/ci_scripts/ci_post_clone.sh` (falls back to Xcode Cloud's `CI_BUNDLE_ID`/`CI_TEAM_ID`),
+`Apple/AppleTamago.xcodeproj/project.pbxproj` (`MARKETING_VERSION` 0.1.0 → 0.1.1, 8 lines, nothing else),
+`docs/DEVELOPMENT.md`, this file.
+**Work performed:** the owner chose to drive Xcode Cloud through the App Store Connect API. The API can't set
+workflow environment variables (Apple docs + a known App-Store-Connect-CLI issue), so the post-clone script
+now uses Xcode Cloud's built-in values instead. The owner's first Xcode Cloud run (a plain Build action on `main`
+@146c480) passed, which confirms the project builds there. Version 0.1.1 avoids build-number clashes with the
+local 0.1.0 uploads 2–6.
+**Tests/builds actually performed (by me):** post-clone script in four environments (built-ins → identical to the
+owner's `Local.xcconfig`; bundle only → no team line; workflow variables → identical; nothing → exit 1);
+Release `generic/platform=iOS` build → succeeded, `CFBundleShortVersionString` 0.1.1.
+**Things NOT verified:** an Xcode Cloud archive with this script (not run yet).
+**Known issues:** none.
+**Cross-agent impact:** the app version is now 0.1.1.
+**Signed-by:** Claude Code
+
+### 2026-09-27T03:02:32-04:00: Claude Code — verified the cloud voice work on the Mac; fixed a compile error
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `15ea94a` (my Xcode Cloud commit, rebased onto the cloud agent's `90b8c9e`)
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/WatchApp/AudioReplyPlayer.swift` (`AVFileType.m4a.rawValue` → its string value
+`"com.apple.m4a-audio"`; header), new `Apple/AppleTamago.xcodeproj/xcshareddata/xcodecloud/manifest.json` (created
+by Xcode when the owner set up Xcode Cloud; product IDs only), this file.
+**Work performed:** my push was rejected because the cloud agent had pushed natural-voice parts 1–3 meanwhile;
+rebased (only the append-only worklog conflicted; kept both). Then ran the combined code on this Mac: the cloud
+agent's Swift didn't compile (`AVFileType` is in AVFoundation, not imported). Fixed with the equivalent string.
+**Tests/builds actually performed (by me):** `npm test` → 134 tests, 133 pass, 1 skipped (the cloud agent's
+real-engine TTS test: engine not installed yet); `swift test` → 147/147; TamagoWatch simulator build → failed on
+`AudioReplyPlayer.swift:33`, then succeeded after the fix.
+**Things NOT verified:** the voice pipeline end to end (the TTS engine isn't installed on the Mac yet).
+**Known issues:** none new.
+**Cross-agent impact:** fixes the cloud agent's UNVERIFIED Swift so Xcode Cloud archives of this branch can build.
+**Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T07:03:27+0000: Claude Code (cloud) — natural voice, part 4: setup kit + listening page
+
+**Agent:** Claude Code (cloud; not macOS; GitHub release downloads blocked)
+**Branch:** `claude/great-volta-ogpuw8` · **Starting commit SHA:** `90b8c9e` · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- new: `Gateway/tools/tts/setup.sh`, `Gateway/scripts/voice-samples.js`
+- `Gateway/package.json` (`voice-samples` script)
+- `docs/DEVELOPMENT.md` (Natural voice section), `docs/HANDOFF_LOG.md`, this file
+
+**Work performed:**
+- setup.sh installs the sherpa-onnx runtime and Kokoro (Kitten optional) to `$TAMAGO_TTS_MODEL_DIR` (default `/Volumes/Storage/AI/tts`). It refuses
+  if Storage isn't mounted, prints each download's URL, size and license, and asks first. It keeps a SHA-256 trust-on-first-use lock file and runs a
+  `--selftest`.
+- voice-samples.js renders 6 lines × installed voices × 2 speeds through the gateway's own helper, measures ms and bytes, and writes
+  `results.json` + `index.html`. The page has a "Choose this one" button that shows the env line to give the agent.
+
+**Tests/builds actually performed (by me):** `bash -n setup.sh`; setup.sh refuses on Linux as designed. voice-samples.js ran end to end against a
+fake helper (72 clips, page rendered and screenshotted in headless Chromium). `npm test`: 132 pass / 0 fail / 2 skipped.
+**Things NOT verified:** setup.sh has never downloaded anything. The release asset names, the archive layout, checksums, and all real timings and
+sizes are unverified.
+**Cross-agent impact:** none beyond the new npm script.
+**Signed-by:** Claude Code (cloud)
+
+### 2026-09-27T03:17:07-04:00: Claude Code — natural voice installed and verified locally; owner chose Kokoro af_heart 0.9×
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `addf7c7`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Gateway/tools/tts/tamago-tts` (`--num-threads`, default 4 via `TAMAGO_TTS_THREADS`),
+`docs/DECISIONS.md` (D-121 addendum), this file.
+**Work performed:** with the owner's approval (sources and sizes shown first), ran the cloud agent's
+`tools/tts/setup.sh --kitten`: sherpa-onnx 1.13.8 (42 MB), Kokoro-82M v1.0 (334 MB), KittenTTS nano (26 MB) →
+`/Volumes/Storage/AI/tts`, SHA-256 recorded; all URLs worked first time. Generated the 96-clip listening page;
+the owner picked af_heart at 0.9×. Found the helper ran sherpa-onnx single-threaded; 4 threads halves latency.
+Real gateway restarted with voice in + out.
+**Tests/builds actually performed (by me):** setup self-test (both engines OK); timing 1 vs 4 threads on three
+lengths; simulator run against a loopback test gateway with TTS: transcribe 319 ms, reply 1404 ms, synth 1146 ms
+(7573 B), Watch log "reply audio started … finished (ok: true)".
+**Things NOT verified:** hearing it on the owner's Watch (TestFlight build next).
+**Known issues:** synthesis competes with Ollama for CPU.
+**Cross-agent impact:** confirms the cloud agent's setup kit and gateway path work on the real Mac.
+**Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T07:29:38+0000: Claude Code (cloud) — iPhone widgets (D-122), on review branch `claude/iphone-widgets`
+
+**Agent:** Claude Code (cloud; no Xcode or Swift toolchain)
+**Branch:** `claude/iphone-widgets` (off `claude/great-volta-ogpuw8` at `0429e59`, for another agent to review and merge) · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- new `Apple/PhoneWidget/` (2 Swift files, Info.plist, Assets.xcassets with CreatureCutout)
+- new `tools/widget-art/make_cutout.py`, `docs/WIDGETS.md`, `docs/widgets/layout-mock.png`
+- `docs/DECISIONS.md` (D-122), `Assets/CharacterReference/octopus-v001/PROVENANCE.md` (widget exception), `Apple/README.md`
+- `docs/HANDOFF_LOG.md`, this file
+
+**Work performed:**
+- Read Apple's HIG widget spec (the iOS dimensions table, families per device, rendering modes) and the WidgetKit docs.
+- Wrote a static widget for all 6 iPhone families. The art is aspect-fitted, never distorted, and a tap opens the app via `widgetURL`.
+- Made a transparent cutout of the approved hero art, because tinted/clear Home Screens paint opaque images white. The eyes are kept and three trapped
+  black pockets between the tentacles were removed.
+- The Xcode target is left to the Mac (CLAUDE.md: no project file edits in the cloud), with exact steps in docs/WIDGETS.md §4.
+
+**Tests/builds actually performed (by me):** checked the cutout visually on black, light and tinted backgrounds. Drew a Python layout mock at the HIG point sizes for the
+largest and smallest iPhones. `npm test` passes unchanged. No Swift compile.
+**Things NOT verified:** that it compiles, renders or opens the app. How tinted/clear/vibrant modes actually look.
+**Known issues:** the large widget upscales the 692 px art about 1.4× at @3x.
+**Cross-agent impact:** none until the target is added. TamagoPhone, the Watch app, the complication, the gateway and the protocol are untouched.
+**Signed-by:** Claude Code (cloud)
+### 2026-09-27T05:23:21-04:00: Claude Code — Watch complications / Smart Stack widget with the octopus
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `0429e59`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/Complication/TamagoComplication.swift` (rewritten), new `Apple/Complication/Assets.xcassets`
+(Octopus @2x/@3x from the approved art, scaled on black), `Apple/Complication/README.md`,
+`Apple/Config/Tamago.xcconfig` (app icon name per target via `TAMAGO_APPICON_$(TARGET_NAME)`), this file.
+**Work performed:** the owner asked for widgets. The placeholder complication showed an SF "face.smiling" symbol
+(the creature has no face) and the word "idle". Now: circular (octopus on black), corner (octopus + curved
+"Tamago"), rectangular / Smart Stack (octopus + "Tamago" + "Hold to talk"), inline ("Tamago"); tap opens the app;
+`.desaturated` accented rendering keeps the octopus white on tinted faces. Also shipped TestFlight 0.1.1 (100)
+with the owner's voice (previous entry) before this.
+**Tests/builds actually performed (by me):** TamagoWatch simulator build → succeeded (after fixing: global AppIcon
+name hitting the complication's new catalog; `widgetAccentedRenderingMode` must precede `scaledToFit`);
+`assetutil`: the complication's catalog holds "Octopus", the Watch app still has its AppIcon set. Saw the octopus app
+icon in the simulator's app grid.
+**Things NOT verified:** the complications rendered on a watch face (the simulator's face editor didn't respond
+to automated long-press); on the owner's Watch.
+**Known issues:** Xcode was suspended again by the owner's Game Mode tool and blocked `xcodebuild`; resumed only
+Xcode and its build service.
+**Cross-agent impact:** complication target now has an asset catalog; app-icon setting is per target.
+**Signed-by:** Claude Code
+
+### 2026-09-27T05:43:05-04:00: Claude Code — iPhone app screen; iPhone widget staged (project-file edit blocked)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `ab233c5`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/iPhoneApp/TamagoPhoneApp.swift` (octopus on black + "Tamago lives on your Apple Watch…",
+replacing "Apple Tamago · Companion · protocol v1"), new `Apple/iPhoneApp/Assets.xcassets/Octopus.imageset`
+(approved art, unchanged), this file.
+**Work performed:** the owner found no Tamago option when adding an iPhone widget: there is no iOS widget target
+(only the Watch complication). Adding one needs a new target in `AppleTamago.xcodeproj`; my scripted
+project-file edit was **blocked by the permission classifier** ("shared resource"); nothing in the project file
+changed. Staged the complete widget (Home Screen small/medium + Lock Screen circular/rectangular/inline, approved
+art) outside the repo in `.build/staging/TamagoPhoneWidget/` pending the owner's decision.
+**Tests/builds actually performed (by me):** TamagoPhone simulator build → succeeded; screenshot in the iPhone 18
+Pro simulator shows the new screen.
+**Things NOT verified:** the widget (no target yet).
+**Known issues:** the iPhone launch screen is still white (needs an Info.plist / project setting).
+**Cross-agent impact:** none; the project file is untouched.
+**Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T07:14:24-04:00: Codex: widget rendering fix and release integration
+
+- Agent: Codex (local); branch: `codex/widget-rendering-fix`.
+- Starting SHA: `d741044273f60621dc96ce96296389c110f17826`; merged `cbea65dad916c32ae60466e509503edc0b5f28c6`.
+- Ending SHA: this entry is part of the integration commit (not known before commit).
+- Files changed by this task: `Apple/AppleTamago.xcodeproj/project.pbxproj`, `Apple/Complication/TamagoComplication.swift`,
+  complication Octopus asset catalog, `Apple/PhoneWidget/{TamagoPhoneWidgets,CreatureWidgetView}.swift`,
+  `docs/{WIDGETS,AGENT_WORKLOG,HANDOFF_LOG,DEVICE_TEST_LOG}.md`.
+- Work: added/embedded native iPhone WidgetKit target; all seven iPhone families including iOS 27 portrait XL;
+  inline octopus labels on both platforms; exact existing transparent cutout reused on Watch; removed opaque
+  circular foreground background; retained documented `.desaturated` rendering. Version 0.1.2 across targets.
+- Apple sources: WidgetKit accented rendering/Liquid Glass guidance; WWDC26 WidgetKit foundations; local Xcode 27 SDK.
+- Commands personally run: `swift test --package-path Apple/Shared --scratch-path .build/spm` (147 passed);
+  `cd Gateway && npm test` (132 passed, 2 skipped);
+  `xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'generic/platform=iOS Simulator' -derivedDataPath .build/DerivedData CODE_SIGNING_ALLOWED=NO` (succeeded);
+  `xcodebuild archive -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'generic/platform=iOS' -configuration Release -derivedDataPath .build/DerivedData -archivePath .build/release-check/Tamago-0.1.2.xcarchive CODE_SIGNING_ALLOWED=NO` (succeeded).
+- Archive inspection: phone app, phone extension, Watch app and Watch extension each have version 0.1.2 and compiled assets.
+  Cutout SHA-256 matches byte-for-byte across extensions. Xcode warnings only: no AppIntents dependency/metadata.
+- UNIT_TESTED_ONLY: shared Swift and gateway tests. UNVERIFIED: new widget appearance/taps on hardware,
+  all-family simulator rendering, StandBy/CarPlay, reduced luminance, and signed cloud distribution at this checkpoint.
+- Known limits: native Xcode/Device Hub accessibility timed out; simulator app installed/launched but not widget-render verified.
+  One first test attempt failed because the log directory did not yet exist; rerun passed. Direct simctl screenshot file save
+  was denied by the simulator service's external-volume permissions. No signing credentials or device settings changed.
+- Cross-agent impact: preserved both branches and both sides of the append-only worklog conflict. Original checkout and
+  untracked 3D work untouched. No third-party art/code added. TestFlight workflow preparation by delegated Codex agent
+  was independently inspected: Archive iOS / TamagoPhone / Owner internal-testing post-action, main trigger.
+- Signed-by: Codex

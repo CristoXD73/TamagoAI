@@ -1,0 +1,9 @@
+{
+  "id" : "9a9adef5-a602-415c-a8d7-acf0950321d5",
+  "targets" : [
+    {
+      "id" : "a63584bc-ff6e-460d-a5cc-b493f657dd9d",
+      "name" : "TamagoPhone"
+    }
+  ]
+}

@@ -7,5 +7,9 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tamago listens while you hold it, and sends what you say to your Mac.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Tamago talks to its brain on your Mac over your home network.</string>
 </dict>
 </plist>

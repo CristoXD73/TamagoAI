@@ -37,7 +37,8 @@ private struct RootView: View {
     var body: some View {
         TabView(selection: $selectedPage) {
             CharacterScreen(controller: controller, creatureController: creatureController,
-                            isVisible: selectedPage == 0, onTalk: talk)
+                            isVisible: selectedPage == 0, caption: connection.caption,
+                            onHoldStart: holdStarted, onHoldEnd: { connection.endHold() })
                 .tag(0)
             #if DEBUG
             NavigationStack {
@@ -98,6 +99,12 @@ private struct RootView: View {
         }
     }
 
+    private func holdStarted() {
+        Task {
+            if await connection.beginHold() == .needsPairing { showPairing = true }
+        }
+    }
+
     private func talk() {
         if connection.beginTalking() == .needsPairing {
             showPairing = true
@@ -109,7 +116,9 @@ private struct CharacterScreen: View {
     var controller: CharacterInteractionController
     var creatureController: CreatureBehaviorController
     var isVisible: Bool
-    var onTalk: () -> Void
+    var caption: String?
+    var onHoldStart: () -> Void
+    var onHoldEnd: () -> Void
 
     var body: some View {
         // D-114: "pure black background... a tiny dark habitat," full-bleed
@@ -121,8 +130,10 @@ private struct CharacterScreen: View {
         // the *background* only, leaving the content inside the safe area.
         // `.ignoresSafeArea()` belongs on this ZStack. DEBUG builds measure the
         // stage and show ✓/✗ in the diagnostics panel (StageMetrics).
-        ZStack(alignment: .bottom) {
-            CharacterView(state: controller.state, creatureController: creatureController, isVisible: isVisible)
+        ZStack(alignment: .top) {
+            // D-119 (owner direction): the approved art, gently floating. The
+            // procedural CharacterView (D-114) stays in the repo but off screen.
+            FloatingCreature(isVisible: isVisible, caption: caption)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #if DEBUG
                 .background(GeometryReader { geo in
@@ -135,14 +146,16 @@ private struct CharacterScreen: View {
             Text(controller.state.visual.rawValue)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .padding(.bottom, 2)
+                .padding(.top, 2)
             #endif
         }
         .background(Color.black)
         .ignoresSafeArea()
         // CREATURE_SPEC §4: "press and hold ≥ 0.45 s anywhere" is the talk
         // trigger. A plain tap still belongs to the creature (approach/attention).
-        .onLongPressGesture(minimumDuration: 0.45, perform: onTalk)
+        // D-120: hold to talk, release to send (recording while held).
+        .onLongPressGesture(minimumDuration: 0.45, maximumDistance: 40, perform: onHoldStart,
+                            onPressingChanged: { pressing in if !pressing { onHoldEnd() } })
     }
 }
 

@@ -10,6 +10,8 @@ import {
   REQUEST_FIXTURES,
   RAW_REQUEST_FIXTURES,
   RESPONSE_CASES,
+  SPEECH_CASES,
+  stubSynthesizer,
   CLIENT_FIXTURE_DESCRIPTIONS,
 } from '../test/fixture-cases.js';
 
@@ -55,6 +57,18 @@ try {
   });
 } finally {
   await gw.close();
+}
+
+const speechGw = await startGateway({ timeoutMs: FIXTURE_TIMEOUT_MS, synthesizer: stubSynthesizer() });
+try {
+  for (const c of SPEECH_CASES) {
+    const res = await post(speechGw.base, c.body);
+    if (res.status !== c.httpStatus) throw new Error(`${c.file}: expected HTTP ${c.httpStatus}, got ${res.status}`);
+    write(`responses/${c.file}`, res.body);
+    manifest.push({ path: `responses/${c.file}`, kind: 'response', source: 'gateway', httpStatus: c.httpStatus, description: c.description });
+  }
+} finally {
+  await speechGw.close();
 }
 
 for (const [file, description] of Object.entries(CLIENT_FIXTURE_DESCRIPTIONS)) {

@@ -34,6 +34,7 @@ Sources of truth that must agree:
 | `GET` | `/v1/protocol` | no | version negotiation + enum discovery |
 | `POST` | `/v1/request` | yes | one user utterance → one answer |
 | `POST` | `/v1/pair` | no (pairing code) | exchange a one-time code for the token (§14) |
+| `POST` | `/v1/audio` | yes | hold-to-talk: recorded audio, transcribed on the Mac, answered like `/v1/request` (§15) |
 
 ## 2. `GET /v1/health`
 
@@ -101,12 +102,20 @@ has something to show, say, and play.
 | `protocolVersion` | integer | `1` |
 | `requestId` | string \| null | Echo of the request. `null` **only** on errors raised before a UUID could be read (malformed JSON, auth failure). |
 | `status` | enum | `ok` \| `accepted` \| `error` |
-| `text` | string | Short display text (≤1000 chars; gateway truncates). Empty only for `accepted`. |
-| `speechText` | string | What TTS should say. Defaults to `text`. |
+| `text` | string | Short display text (≤1000 chars; gateway truncates). Empty only for `accepted` or a nonverbal reaction (§5.1). |
+| `speechText` | string | What TTS should say. Defaults to `text`. Empty = say nothing (§5.1). |
 | `characterState` | enum | See §6 |
 | `haptic` | enum | See §7 |
 | `followUpExpected` | boolean | `true` → Watch may go straight back to `listening` after speaking |
 | `error` | object | Present **iff** `status == "error"`: `{ code, message, retryable }` |
+
+### 5.1 Nonverbal reactions (clarification, 2026-09-27, D-117)
+
+An `ok` response **may** carry `text: ""` and `speechText: ""`. That means Tamago answers with no
+words, only `characterState` + `haptic` (e.g. "Thanks." → a pleased settle and a click). Clients MUST
+NOT speak an empty `speechText`. This is backward compatible: the existing Watch client already
+skips TTS for an empty `speechText` (`CharacterStateMachine.handle`) and doesn't display `text`.
+Fixture: `responses/ok-nonverbal.json`. The mock provider produces one for the input `nonverbal`.
 
 `status` meanings:
 
@@ -217,7 +226,7 @@ hostnames).
 
 ## 13. Explicitly not in v1
 
-Audio upload, streaming or partial responses, polling for `accepted` results,
+Streaming audio or partial responses (a single recorded clip was added later as §15, D-120), polling for `accepted` results,
 conversation history or memory, multiple providers chosen by the client, a tool
 catalog, server push, cellular or remote access.
 
@@ -248,3 +257,65 @@ Whitespace in the code is ignored. The gateway never logs the code or the
 token. These bodies are pairing-only and are **not** §5 response envelopes.
 Security properties and known gaps are in D-116: plain HTTP means the token is
 readable on the LAN, and nothing authenticates the gateway to the Watch.
+
+## 15. Audio input (added in D-120; backward compatible)
+
+Hold-to-talk. The Watch records while the owner holds the creature and sends the clip; the Mac transcribes it
+**on-device** (Apple SpeechAnalyzer, `Gateway/tools/transcribe`) and then treats the transcript exactly like a
+`/v1/request` text request (same provider, dedupe, timeout, envelope).
+
+```
+POST /v1/audio
+authorization: Bearer <token>
+content-type: audio/mp4            (16 kHz mono AAC from the Watch; audio/wav and audio/aiff also accepted)
+x-tamago-request-id: <UUID>        (required; the dedupe key, as in §3)
+x-tamago-protocol-version: 1       (optional; anything else → unsupported_protocol)
+<body: the audio bytes, ≤ LIMITS.maxAudioBytes = 1 MiB>
+```
+
+- **Response:** the normal §5 envelope, plus `transcript` (what the Mac heard). Clients that don't know the
+  field ignore it (unknown top-level fields are allowed, §5).
+- **Nothing heard:** `ok`, nonverbal (§5.1), `characterState: confused`, `haptic: notification`, `transcript: ""`.
+- **Errors:** `auth_failed` (401), `invalid_request` (missing/invalid request ID, non-audio content type, empty
+  body), `payload_too_large` (413), `provider_unavailable` (503, no transcriber on this Mac: run
+  `npm run build:transcriber`), `provider_error` (the audio couldn't be transcribed).
+- **Privacy:** the audio exists only in a private temp directory while it's transcribed, then is deleted; neither
+  audio nor transcript is logged (the log line has request ID, byte count and timings only).
+- **Discovery:** `GET /v1/protocol` lists `inputTypes: ["text", "audio"]` when voice input is available.
+
+## 16. Speech audio output (added in D-121; backward compatible)
+
+Natural voice. The **Mac** synthesizes the reply's `speechText` with a local neural voice (sherpa-onnx +
+Kokoro-82M, `Gateway/tools/tts`, D-121) and the Watch fetches and plays it. The text reply **never waits** for
+audio. Synthesis starts in the background when the reply is ready, and the Watch fetches the audio afterwards.
+
+- **Response field (optional):** an `ok` response with non-empty `speechText` may carry
+  ```json
+  "speechAudio": { "path": "/v1/speech/<requestId>", "format": "audio/mp4", "voice": "af_heart" }
+  ```
+  It's present only when the gateway has a synthesizer configured (`TAMAGO_TTS`). It's never present on errors or
+  on nonverbal replies (§5.1). `voice` is informational. Clients that don't know the field ignore it, as §5 allows
+  unknown top-level fields. `/v1/audio` replies (§15) carry it the same way.
+- **Fetch:**
+  ```
+  GET /v1/speech/<requestId>
+  authorization: Bearer <token>
+  ```
+  - `200`: `content-type: audio/mp4` (AAC, mono, 24 kHz, ~32 kbps; a 2-sentence reply is ~20–60 KB),
+    `cache-control: no-store`. The audio is **served once** and then deleted.
+  - If synthesis is still running, the gateway holds the request for up to 2.5 s.
+  - `503 provider_unavailable`: not ready within that wait, or synthesis failed.
+  - `404 not_found`: unknown, already served, or expired (2 min, max 32 held).
+  - `400 invalid_request`: not a UUID.
+  - `401 auth_failed`.
+  - Error bodies are the normal §5 error envelope.
+- **Client rule (binding):** every non-200 result, a timeout (the Watch's budget is ~2.5 s), or a playback
+  failure means **speak `speechText` with the built-in voice exactly as before**. The creature must never stay in
+  `speaking` because audio was missing.
+- **Discovery:** `GET /v1/protocol` lists `outputTypes: ["text", "speech-audio"]` when a synthesizer is
+  configured, and `["text"]` otherwise.
+- **Privacy:** the reply text goes to the local helper in a private temp file (never a command line). The audio
+  lives in memory until it's fetched or expires. Neither text nor audio is logged: the log line has the request
+  ID, engine, voice, byte count and timings only. Nothing leaves the Mac. No cloud TTS, no API keys.
+- **Voices named after OpenAI voices are refused** (`af_alloy`, `af_nova`, `am_echo`, `am_onyx`, `bm_fable`), as is
+  any voice cloning. See `docs/VOICE_RESEARCH.md`.

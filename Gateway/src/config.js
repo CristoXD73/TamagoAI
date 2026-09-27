@@ -1,6 +1,7 @@
 import { hostname } from 'node:os';
 import { createMockProvider } from './providers/mock.js';
 import { createOllamaProvider } from './providers/ollama.js';
+import { brainOptionsFromEnv, createBrainProvider } from './brain/index.js';
 import { defaultStateDir, loadOrCreateIdentity } from './identity.js';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost']);
@@ -44,8 +45,10 @@ export function loadConfig(env = process.env, { loadIdentity = () => loadOrCreat
       baseUrl: env.OLLAMA_URL ?? 'http://127.0.0.1:11434',
       model: env.OLLAMA_MODEL,
     });
+  } else if (providerName === 'brain') {
+    provider = createBrainProvider(brainOptionsFromEnv(env));
   } else {
-    throw new Error(`Unknown TAMAGO_PROVIDER "${providerName}" (expected mock or ollama).`);
+    throw new Error(`Unknown TAMAGO_PROVIDER "${providerName}" (expected mock, ollama or brain).`);
   }
 
   return {
