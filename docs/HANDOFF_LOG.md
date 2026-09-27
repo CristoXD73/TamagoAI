@@ -1376,3 +1376,21 @@ review and merge it.
 4. Merge into `claude/great-volta-ogpuw8`.
 
 **Do not redo:** the size research, the cutout (use `tools/widget-art/make_cutout.py` if the art changes).
+
+---
+
+### 2026-09-27T07:14:24-04:00: Codex: release 0.1.2 widget corrections
+Branch: `codex/widget-rendering-fix`.
+Commits: integration of d741044 and cbea65d plus this fix (SHA pending commit).
+Files: Xcode project, Watch cutout/complication, iPhone widget layouts/configuration, widget documentation and logs.
+Upstream source reused: none; existing approved art copied without pixel changes.
+Tests: exact commands and results in matching AGENT_WORKLOG entry. Swift 147 pass; gateway 132 pass/2 skipped;
+iOS simulator build and unsigned Release archive succeeded; both extensions and asset catalogs embedded.
+Physical evidence: owner's white complication/tap-to-open report in DEVICE_TEST_LOG (prior release).
+Verification: UNIT_TESTED_ONLY for automated tests; UNVERIFIED for new widget UI on hardware.
+Known risks: no actual all-family rendered visual check because native UI automation timed out; larger art can soften
+when scaled beyond the existing 692-pixel source. Cloud signing/distribution is still pending at this checkpoint.
+Next recommended task (ONE): install 0.1.2 from TestFlight and record the seven iPhone families and four Watch families
+across default/tinted/clear and reduced luminance in DEVICE_TEST_LOG.
+Do not redo: transparent cutout generation, native widget target integration, latest-branch merge, voice engine setup.
+Signed-by: Codex

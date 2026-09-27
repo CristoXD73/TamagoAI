@@ -1080,3 +1080,78 @@ largest and smallest iPhones. `npm test` passes unchanged. No Swift compile.
 **Known issues:** the large widget upscales the 692 px art about 1.4× at @3x.
 **Cross-agent impact:** none until the target is added. TamagoPhone, the Watch app, the complication, the gateway and the protocol are untouched.
 **Signed-by:** Claude Code (cloud)
+### 2026-09-27T05:23:21-04:00: Claude Code — Watch complications / Smart Stack widget with the octopus
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `0429e59`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/Complication/TamagoComplication.swift` (rewritten), new `Apple/Complication/Assets.xcassets`
+(Octopus @2x/@3x from the approved art, scaled on black), `Apple/Complication/README.md`,
+`Apple/Config/Tamago.xcconfig` (app icon name per target via `TAMAGO_APPICON_$(TARGET_NAME)`), this file.
+**Work performed:** the owner asked for widgets. The placeholder complication showed an SF "face.smiling" symbol
+(the creature has no face) and the word "idle". Now: circular (octopus on black), corner (octopus + curved
+"Tamago"), rectangular / Smart Stack (octopus + "Tamago" + "Hold to talk"), inline ("Tamago"); tap opens the app;
+`.desaturated` accented rendering keeps the octopus white on tinted faces. Also shipped TestFlight 0.1.1 (100)
+with the owner's voice (previous entry) before this.
+**Tests/builds actually performed (by me):** TamagoWatch simulator build → succeeded (after fixing: global AppIcon
+name hitting the complication's new catalog; `widgetAccentedRenderingMode` must precede `scaledToFit`);
+`assetutil`: the complication's catalog holds "Octopus", the Watch app still has its AppIcon set. Saw the octopus app
+icon in the simulator's app grid.
+**Things NOT verified:** the complications rendered on a watch face (the simulator's face editor didn't respond
+to automated long-press); on the owner's Watch.
+**Known issues:** Xcode was suspended again by the owner's Game Mode tool and blocked `xcodebuild`; resumed only
+Xcode and its build service.
+**Cross-agent impact:** complication target now has an asset catalog; app-icon setting is per target.
+**Signed-by:** Claude Code
+
+### 2026-09-27T05:43:05-04:00: Claude Code — iPhone app screen; iPhone widget staged (project-file edit blocked)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `ab233c5`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/iPhoneApp/TamagoPhoneApp.swift` (octopus on black + "Tamago lives on your Apple Watch…",
+replacing "Apple Tamago · Companion · protocol v1"), new `Apple/iPhoneApp/Assets.xcassets/Octopus.imageset`
+(approved art, unchanged), this file.
+**Work performed:** the owner found no Tamago option when adding an iPhone widget: there is no iOS widget target
+(only the Watch complication). Adding one needs a new target in `AppleTamago.xcodeproj`; my scripted
+project-file edit was **blocked by the permission classifier** ("shared resource"); nothing in the project file
+changed. Staged the complete widget (Home Screen small/medium + Lock Screen circular/rectangular/inline, approved
+art) outside the repo in `.build/staging/TamagoPhoneWidget/` pending the owner's decision.
+**Tests/builds actually performed (by me):** TamagoPhone simulator build → succeeded; screenshot in the iPhone 18
+Pro simulator shows the new screen.
+**Things NOT verified:** the widget (no target yet).
+**Known issues:** the iPhone launch screen is still white (needs an Info.plist / project setting).
+**Cross-agent impact:** none; the project file is untouched.
+**Signed-by:** Claude Code
+
+---
+
+### 2026-09-27T07:14:24-04:00: Codex: widget rendering fix and release integration
+
+- Agent: Codex (local); branch: `codex/widget-rendering-fix`.
+- Starting SHA: `d741044273f60621dc96ce96296389c110f17826`; merged `cbea65dad916c32ae60466e509503edc0b5f28c6`.
+- Ending SHA: this entry is part of the integration commit (not known before commit).
+- Files changed by this task: `Apple/AppleTamago.xcodeproj/project.pbxproj`, `Apple/Complication/TamagoComplication.swift`,
+  complication Octopus asset catalog, `Apple/PhoneWidget/{TamagoPhoneWidgets,CreatureWidgetView}.swift`,
+  `docs/{WIDGETS,AGENT_WORKLOG,HANDOFF_LOG,DEVICE_TEST_LOG}.md`.
+- Work: added/embedded native iPhone WidgetKit target; all seven iPhone families including iOS 27 portrait XL;
+  inline octopus labels on both platforms; exact existing transparent cutout reused on Watch; removed opaque
+  circular foreground background; retained documented `.desaturated` rendering. Version 0.1.2 across targets.
+- Apple sources: WidgetKit accented rendering/Liquid Glass guidance; WWDC26 WidgetKit foundations; local Xcode 27 SDK.
+- Commands personally run: `swift test --package-path Apple/Shared --scratch-path .build/spm` (147 passed);
+  `cd Gateway && npm test` (132 passed, 2 skipped);
+  `xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'generic/platform=iOS Simulator' -derivedDataPath .build/DerivedData CODE_SIGNING_ALLOWED=NO` (succeeded);
+  `xcodebuild archive -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'generic/platform=iOS' -configuration Release -derivedDataPath .build/DerivedData -archivePath .build/release-check/Tamago-0.1.2.xcarchive CODE_SIGNING_ALLOWED=NO` (succeeded).
+- Archive inspection: phone app, phone extension, Watch app and Watch extension each have version 0.1.2 and compiled assets.
+  Cutout SHA-256 matches byte-for-byte across extensions. Xcode warnings only: no AppIntents dependency/metadata.
+- UNIT_TESTED_ONLY: shared Swift and gateway tests. UNVERIFIED: new widget appearance/taps on hardware,
+  all-family simulator rendering, StandBy/CarPlay, reduced luminance, and signed cloud distribution at this checkpoint.
+- Known limits: native Xcode/Device Hub accessibility timed out; simulator app installed/launched but not widget-render verified.
+  One first test attempt failed because the log directory did not yet exist; rerun passed. Direct simctl screenshot file save
+  was denied by the simulator service's external-volume permissions. No signing credentials or device settings changed.
+- Cross-agent impact: preserved both branches and both sides of the append-only worklog conflict. Original checkout and
+  untracked 3D work untouched. No third-party art/code added. TestFlight workflow preparation by delegated Codex agent
+  was independently inspected: Archive iOS / TamagoPhone / Owner internal-testing post-action, main trigger.
+- Signed-by: Codex

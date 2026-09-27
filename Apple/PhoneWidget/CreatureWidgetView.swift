@@ -1,31 +1,5 @@
-// CreatureWidgetView.swift
-//
-// VERIFICATION: UNVERIFIED (written in the cloud, not compiled or rendered).
-//
-// Layout per iPhone widget family (D-122, docs/WIDGETS.md). Sizes from the Apple HIG
-// (Widgets > Specifications) for the smallest and largest current iPhones:
-//
-//   family                375×667 pt screen   430×932 pt screen
-//   systemSmall           148×148             170×170
-//   systemMedium          321×148             364×170
-//   systemLarge           321×324             364×382
-//   accessoryCircular      68×68               76×76
-//   accessoryRectangular  153×68              172×76
-//   accessoryInline       225×26              257×26
-//
-// Never distorted: the art keeps its own aspect ratio (≈ 0.705 wide:tall) and is
-// fitted, never stretched or cropped, in every family. Sizes come from the space
-// SwiftUI proposes, not hardcoded points, so every iPhone size works. Margins follow
-// the HIG: 16 pt for text, 11 pt around graphics.
-//
-// Rendering modes (Apple: "Optimizing your widget for accented rendering mode
-// and Liquid Glass"):
-//   fullColor (Home Screen light/dark, StandBy, CarPlay): octopus on black.
-//   accented (tinted/clear Home Screen): the system removes the background and
-//     would paint any *opaque* image solid white, so the art is a cutout with a
-//     transparent background, rendered `.desaturated` to keep the eyes and shading.
-//   vibrant (Lock Screen, StandBy at night): brightness drives vibrancy, and the white
-//     octopus with dark eyes reads well.
+// Family-specific layouts using the approved transparent cutout.
+// Verification and Apple rendering guidance: docs/WIDGETS.md.
 
 import SwiftUI
 import WidgetKit
@@ -71,7 +45,7 @@ struct CreatureWidgetView: View {
             .padding(.leading, 16)
             .padding(.trailing, 16)
 
-        case .systemLarge:
+        case .systemLarge, .systemExtraLargePortrait:
             VStack(spacing: 8) {
                 CreatureArt()
                     .padding(.top, 16)
@@ -108,9 +82,8 @@ struct CreatureWidgetView: View {
             }
 
         case .accessoryInline:
-            // Inline widgets show a single line of text (images there are
-            // reduced to symbols), so the name stands in for the octopus.
-            Text("Tamago")
+            // WidgetKit reduces inline artwork to a small monochrome symbol.
+            Label("Tamago", image: "CreatureCutout")
 
         default:
             CreatureArt()
@@ -139,7 +112,7 @@ struct CreatureArt: View {
 private extension WidgetFamily {
     var isSystem: Bool {
         switch self {
-        case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge: true
+        case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .systemExtraLargePortrait: true
         default: false
         }
     }
@@ -151,3 +124,5 @@ private extension WidgetFamily {
 #Preview("Circular", as: .accessoryCircular) { TamagoCreatureWidget() } timeline: { CreatureEntry(date: .now) }
 #Preview("Rectangular", as: .accessoryRectangular) { TamagoCreatureWidget() } timeline: { CreatureEntry(date: .now) }
 #Preview("Inline", as: .accessoryInline) { TamagoCreatureWidget() } timeline: { CreatureEntry(date: .now) }
+
+#Preview("Extra Large Portrait", as: .systemExtraLargePortrait) { TamagoCreatureWidget() } timeline: { CreatureEntry(date: .now) }

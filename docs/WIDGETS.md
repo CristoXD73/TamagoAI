@@ -1,8 +1,9 @@
 # iPhone widgets (D-122)
 
-**Status: UNVERIFIED.** Written in the cloud, without Xcode. The sources, art and this setup guide are
-in the repo, but the Xcode target doesn't exist yet (the project file is only edited on the Mac, per
-CLAUDE.md). §4 is the one-time setup for the agent on the Mac.
+**Build status (2026-09-27):** Xcode 27 simulator build and unsigned Release archive succeed with
+both extensions embedded. Shared Swift: 147 tests pass; gateway: 132 pass, 2 skipped.
+**Visual status: UNVERIFIED on hardware after this fix.** Native Xcode/Device Hub UI automation timed out,
+so compile success is not evidence that all widget appearances were rendered. See the release handoff.
 
 **Scope (owner, 2026-09-27):** put our octopus in every iPhone widget size, and have a tap open the app.
 Nothing else yet. Later passes can add mood, the last reply, or a talk button.
@@ -27,12 +28,13 @@ Nothing else yet. Later passes can add mood, the last reply, or a talk button.
 
 **Which families iPhone supports:**
 
-- Home Screen / Today View: **small, medium, large**. Small also appears in **StandBy** and **CarPlay**,
+- Home Screen / Today View: **small, medium, large, extra-large portrait (iOS 27)**. Small also appears in **StandBy** and **CarPlay**,
   scaled up with the background removed.
 - Lock Screen: **accessory circular, rectangular, inline**.
-- Not on iPhone: **extra large** (iPad, Mac and Vision Pro) and **accessory corner** (Apple Watch only).
+- Not on iPhone: **landscape extra large** (iPad, Mac and Vision Pro) and **accessory corner** (Apple Watch only).
 
-So the widget ships exactly those six families.
+The widget ships all seven iPhone families, including `systemExtraLargePortrait`, introduced on iOS 27.
+The older size table and mock above predate this new family; layouts adapt to the size proposed by WidgetKit.
 
 ## 2. Keeping the octopus undistorted
 
@@ -44,7 +46,7 @@ So the widget ships exactly those six families.
   - **Square families** (small, circular): the octopus is centered and limited by height.
   - **Wide families** (medium, rectangular): the octopus sits on the left at full height and the name
     fills the rest.
-  - **Large:** the octopus fills most of the widget, with the name below.
+  - **Large and extra-large portrait:** the octopus fills most of the widget, with the name below.
 - **Margins** (HIG): 16 pt around text and 11 pt around graphics. Default content margins are turned off
   (`contentMarginsDisabled`), so each family can use these exact values.
 - **The black background had to go.** On tinted and clear Home Screens (iOS 18+ / Liquid Glass), the
@@ -70,8 +72,8 @@ So the widget ships exactly those six families.
 
 | Path | What |
 |---|---|
-| `Apple/PhoneWidget/TamagoPhoneWidgets.swift` | `@main` widget bundle, the widget configuration (6 families, `widgetURL`), a static timeline (one entry, `.never`) |
-| `Apple/PhoneWidget/CreatureWidgetView.swift` | layout per family, container background, accessibility label, Xcode previews for all 6 |
+| `Apple/PhoneWidget/TamagoPhoneWidgets.swift` | `@main` widget bundle, the widget configuration (7 families, `widgetURL`), a static timeline (one entry, `.never`) |
+| `Apple/PhoneWidget/CreatureWidgetView.swift` | layout per family, container background, accessibility label, Xcode previews for all 7 |
 | `Apple/PhoneWidget/Assets.xcassets/CreatureCutout.imageset` | the cutout PNG |
 | `Apple/PhoneWidget/Info.plist` | `NSExtensionPointIdentifier = com.apple.widgetkit-extension` (same as the complication) |
 | `tools/widget-art/make_cutout.py` | regenerates the cutout from the approved art (Python + Pillow + NumPy) |
@@ -79,50 +81,31 @@ So the widget ships exactly those six families.
 - **Tap:** tapping any size opens the app. `widgetURL` is `tamago://widget/creature`. The iPhone app doesn't
   need a URL scheme for widget taps and currently ignores the URL. It can route on it later with
   `.onOpenURL`.
-- **Nothing else changed:** `TamagoPhone`, the Watch app, the complication, the gateway and the protocol are
-  untouched.
+## 4. Build integration and watchOS 27 correction
 
-## 4. One-time Xcode setup (agent on the Mac)
+`Apple/AppleTamago.xcodeproj` now contains `TamagoPhoneWidget`, synchronized with `Apple/PhoneWidget`,
+embedded in `TamagoPhone/PlugIns`. `Info.plist` is excluded from copied resources. The extension uses
+Automatic signing and the existing local/cloud configuration; there are no new credentials or App Groups.
+All app/extension marketing versions are 0.1.2.
 
-1. **Create the target.** Open `Apple/AppleTamago.xcodeproj`, then File ▸ New ▸ Target ▸ iOS ▸ **Widget
-   Extension**.
-   - Product name `TamagoPhoneWidget`.
-   - **Uncheck** Include Live Activity, Include Control and Include Configuration App Intent.
-   - Embed in **TamagoPhone**. When asked, don't activate the new scheme (or do; it's harmless).
-2. **Swap in the repo's folder.** Delete the template folder Xcode generated (`TamagoPhoneWidget/`: move it to
-   the Trash). Then add the existing **`Apple/PhoneWidget`** folder to the new target as a *synchronized
-   folder*: drag it into the project navigator and choose "Create folders". Target membership:
-   TamagoPhoneWidget only.
-3. **Keep Info.plist out of the resources.** In the synchronized folder's target membership exceptions, exclude
-   `Info.plist`, as the complication does.
-4. **Build settings for TamagoPhoneWidget** (mirror `TamagoComplication`):
-   - Base configuration: `Tamago.xcconfig`
-   - `PRODUCT_BUNDLE_IDENTIFIER = $(TAMAGO_BUNDLE_PREFIX).widget`
-   - `INFOPLIST_FILE = PhoneWidget/Info.plist`, `GENERATE_INFOPLIST_FILE = YES`,
-     `INFOPLIST_KEY_CFBundleDisplayName = Tamago`
-   - `IPHONEOS_DEPLOYMENT_TARGET = 27.0`, `SDKROOT = iphoneos`, `TARGETED_DEVICE_FAMILY = 1`,
-     `SKIP_INSTALL = YES`
-   - `SWIFT_VERSION = 6.0`, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`,
-     `SWIFT_APPROACHABLE_CONCURRENCY = YES`
-   - `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` equal to TamagoPhone's (App Store validation needs
-     them to match)
-   - `LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks`
-   - Signing: Automatic, team from `Local.xcconfig` (never commit it).
-5. **Check it builds:**
-   ```sh
-   cd Apple && xcodebuild build -project AppleTamago.xcodeproj -scheme TamagoPhone \
-     -destination 'generic/platform=iOS Simulator' -derivedDataPath ../.build/DerivedData
-   ```
-   Then make sure nothing else broke: the `TamagoWatch` scheme test and
-   `swift test --scratch-path ../../.build/spm` in `Apple/Shared`.
-6. **Look at it.**
-   - Canvas: the six `#Preview`s in `CreatureWidgetView.swift`.
-   - iPhone simulator, Home Screen: add small, medium and large. Try Customize ▸ Dark, Tinted and Clear.
-   - Lock Screen: add circular, rectangular and inline.
-   - StandBy: optional. It needs a device on charge in landscape.
-   - Tap each widget: the app must open.
-7. **TestFlight:** the extension brings a new bundle ID (`<prefix>.widget`). Automatic signing, locally or in Xcode
-   Cloud, registers it. Watch for the first archive's signing step.
+The Watch extension uses an exact copy of `CreatureCutout.png` as `Octopus.png`. The previous artwork
+had an opaque black background, and circular content also drew an opaque black `Color` layer. In
+accented rendering, that foreground layer can become a solid white disk. It is removed; the only black
+background is the system-managed `containerBackground`. The image keeps `.desaturated` so shading and
+eyes can survive accented rendering. Apple explicitly says watchOS ignores `.fullColor` overrides.
+All four Watch families remain; inline now includes the small octopus symbol with its name.
+
+The original opaque artwork and the user's white-complication report are evidence for this diagnosis;
+the fix still requires confirmation on that physical watch face. Inline layouts are system-templated
+symbols, so they cannot show the same photographic detail as larger families.
+
+Release acceptance on hardware:
+- Check Watch circular, corner, rectangular/Smart Stack and inline in a supported face, including tinted
+  faces and reduced luminance. The creature must remain recognizable; tap must open Tamago.
+- Check iPhone small, medium, large and extra-large portrait in Default, Dark, Tinted and Clear.
+- Check circular, rectangular and inline on the Lock Screen; tap each to open Tamago.
+- Check the small widget in StandBy/CarPlay when those contexts are available.
+- After updating, remove/re-add a widget only if the system continues showing its old cached snapshot.
 
 ## 5. Not done, on purpose
 
@@ -148,3 +131,8 @@ So the widget ships exactly those six families.
   https://developer.apple.com/documentation/swiftui/widgetconfiguration/contentmarginsdisabled()
 - `showsWidgetContainerBackground`:
   https://developer.apple.com/documentation/swiftui/environmentvalues/showswidgetcontainerbackground
+
+- Apple WWDC26, WidgetKit foundations (new iOS 27 portrait XL):
+  https://developer.apple.com/videos/play/wwdc2026/277/
+- `systemExtraLargePortrait`:
+  https://developer.apple.com/documentation/widgetkit/widgetfamily/systemextralargeportrait

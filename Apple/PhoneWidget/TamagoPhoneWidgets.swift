@@ -1,21 +1,5 @@
-// TamagoPhoneWidgets.swift
-//
-// VERIFICATION: UNVERIFIED (written in the cloud, not compiled). This folder
-// is not yet an Xcode target: docs/WIDGETS.md §4 has the one-time setup on the
-// Mac. Same provider pattern and build settings as Apple/Complication, which
-// compiles with this project's MainActor-default isolation.
-//
-// iPhone widgets (D-122): the approved octopus (static, unchanged art with its
-// black background removed) in every iPhone widget family. Tapping any of them
-// opens the Tamago app; nothing else yet. No motion, so no Visual Approval
-// Gate prototype is needed (AGENTS.md §7); the art itself is owner-approved
-// (Assets/CharacterReference/octopus-v001/PROVENANCE.md).
-//
-// Families (Apple HIG, Widgets > Specifications, iOS dimensions):
-//   Home Screen / Today View: systemSmall, systemMedium, systemLarge
-//     (systemSmall also appears in StandBy and CarPlay, scaled up, background removed)
-//   Lock Screen: accessoryCircular, accessoryRectangular, accessoryInline
-//   systemExtraLarge is iPad-only; accessoryCorner is Apple Watch-only.
+// Static approved artwork; seven iPhone families, including iOS 27 portrait XL.
+// The extension is embedded by TamagoPhone. See docs/WIDGETS.md.
 
 import SwiftUI
 import WidgetKit
@@ -44,7 +28,7 @@ struct TamagoCreatureWidget: Widget {
         // 11 pt around art), so the art can use the full height of each size.
         .contentMarginsDisabled()
         .supportedFamilies([
-            .systemSmall, .systemMedium, .systemLarge,
+            .systemSmall, .systemMedium, .systemLarge, .systemExtraLargePortrait,
             .accessoryCircular, .accessoryRectangular, .accessoryInline,
         ])
     }
