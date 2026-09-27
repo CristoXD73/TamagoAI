@@ -150,6 +150,29 @@ struct GatewayClientTests {
         #expect(await makeClient(stub).pair(code: "000000") == .unreachable("Unexpected answer (HTTP 500)"))
     }
 
+    @Test func audioIsPostedWithIdentityHeadersAndAnsweredLikeARequest() async throws {
+        let rid = "3f2b8c1e-9a4d-4e7b-8c2a-1d5e6f7a8b9c"
+        let stub = StubFetch(.success(json: #"{"protocolVersion":1,"requestId":"\#(rid)","status":"ok","text":"Pixel","speechText":"Pixel","characterState":"idle","haptic":"none","followUpExpected":false,"transcript":"What's my dog's name?"}"#))
+        let audio = Data([0x00, 0x01, 0x02])
+        let exchange = await makeClient(stub).exchangeAudio(audio, requestId: rid)
+        #expect(exchange.reachedGateway)
+        #expect(exchange.response.speechText == "Pixel")
+        let sent = try #require(stub.captured)
+        #expect(sent.url?.path == "/v1/audio")
+        #expect(sent.httpMethod == "POST")
+        #expect(sent.value(forHTTPHeaderField: "content-type") == "audio/mp4")
+        #expect(sent.value(forHTTPHeaderField: "x-tamago-request-id") == rid)
+        #expect(sent.value(forHTTPHeaderField: "x-tamago-protocol-version") == "1")
+        #expect(sent.value(forHTTPHeaderField: "authorization") == "Bearer test-token-0123456789")
+        #expect(sent.httpBody == audio)
+
+        stub.next = .failure(URLError(.cannotConnectToHost))
+        let down = await makeClient(stub).exchangeAudio(audio, requestId: rid)
+        #expect(!down.reachedGateway)
+        #expect(down.response.error?.code == .gatewayUnavailable)
+        #expect(down.response.requestId == rid)
+    }
+
     @Test func manualAddressBecomesAGatewayURL() {
         #expect(GatewayConfiguration.manualBaseURL(from: "192.168.0.74")?.absoluteString == "http://192.168.0.74:8787")
         #expect(GatewayConfiguration.manualBaseURL(from: " 192.168.0.74:9000 ")?.absoluteString == "http://192.168.0.74:9000")

@@ -37,7 +37,8 @@ private struct RootView: View {
     var body: some View {
         TabView(selection: $selectedPage) {
             CharacterScreen(controller: controller, creatureController: creatureController,
-                            isVisible: selectedPage == 0, caption: connection.caption, onTalk: talk)
+                            isVisible: selectedPage == 0, caption: connection.caption,
+                            onHoldStart: holdStarted, onHoldEnd: { connection.endHold() })
                 .tag(0)
             #if DEBUG
             NavigationStack {
@@ -98,6 +99,12 @@ private struct RootView: View {
         }
     }
 
+    private func holdStarted() {
+        Task {
+            if await connection.beginHold() == .needsPairing { showPairing = true }
+        }
+    }
+
     private func talk() {
         if connection.beginTalking() == .needsPairing {
             showPairing = true
@@ -110,7 +117,8 @@ private struct CharacterScreen: View {
     var creatureController: CreatureBehaviorController
     var isVisible: Bool
     var caption: String?
-    var onTalk: () -> Void
+    var onHoldStart: () -> Void
+    var onHoldEnd: () -> Void
 
     var body: some View {
         // D-114: "pure black background... a tiny dark habitat," full-bleed
@@ -145,7 +153,9 @@ private struct CharacterScreen: View {
         .ignoresSafeArea()
         // CREATURE_SPEC §4: "press and hold ≥ 0.45 s anywhere" is the talk
         // trigger. A plain tap still belongs to the creature (approach/attention).
-        .onLongPressGesture(minimumDuration: 0.45, perform: onTalk)
+        // D-120: hold to talk, release to send (recording while held).
+        .onLongPressGesture(minimumDuration: 0.45, maximumDistance: 40, perform: onHoldStart,
+                            onPressingChanged: { pressing in if !pressing { onHoldEnd() } })
     }
 }
 

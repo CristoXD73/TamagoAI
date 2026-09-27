@@ -34,6 +34,7 @@ Sources of truth that must agree:
 | `GET` | `/v1/protocol` | no | version negotiation + enum discovery |
 | `POST` | `/v1/request` | yes | one user utterance → one answer |
 | `POST` | `/v1/pair` | no (pairing code) | exchange a one-time code for the token (§14) |
+| `POST` | `/v1/audio` | yes | hold-to-talk: recorded audio, transcribed on the Mac, answered like `/v1/request` (§15) |
 
 ## 2. `GET /v1/health`
 
@@ -225,7 +226,7 @@ hostnames).
 
 ## 13. Explicitly not in v1
 
-Audio upload, streaming or partial responses, polling for `accepted` results,
+Streaming audio or partial responses (a single recorded clip was added later as §15, D-120), polling for `accepted` results,
 conversation history or memory, multiple providers chosen by the client, a tool
 catalog, server push, cellular or remote access.
 
@@ -256,3 +257,28 @@ Whitespace in the code is ignored. The gateway never logs the code or the
 token. These bodies are pairing-only and are **not** §5 response envelopes.
 Security properties and known gaps are in D-116: plain HTTP means the token is
 readable on the LAN, and nothing authenticates the gateway to the Watch.
+
+## 15. Audio input (added in D-120; backward compatible)
+
+Hold-to-talk. The Watch records while the owner holds the creature and sends the clip; the Mac transcribes it
+**on-device** (Apple SpeechAnalyzer, `Gateway/tools/transcribe`) and then treats the transcript exactly like a
+`/v1/request` text request (same provider, dedupe, timeout, envelope).
+
+```
+POST /v1/audio
+authorization: Bearer <token>
+content-type: audio/mp4            (16 kHz mono AAC from the Watch; audio/wav and audio/aiff also accepted)
+x-tamago-request-id: <UUID>        (required; the dedupe key, as in §3)
+x-tamago-protocol-version: 1       (optional; anything else → unsupported_protocol)
+<body: the audio bytes, ≤ LIMITS.maxAudioBytes = 1 MiB>
+```
+
+- **Response:** the normal §5 envelope, plus `transcript` (what the Mac heard). Clients that don't know the
+  field ignore it (unknown top-level fields are allowed, §5).
+- **Nothing heard:** `ok`, nonverbal (§5.1), `characterState: confused`, `haptic: notification`, `transcript: ""`.
+- **Errors:** `auth_failed` (401), `invalid_request` (missing/invalid request ID, non-audio content type, empty
+  body), `payload_too_large` (413), `provider_unavailable` (503, no transcriber on this Mac: run
+  `npm run build:transcriber`), `provider_error` (the audio couldn't be transcribed).
+- **Privacy:** the audio exists only in a private temp directory while it's transcribed, then is deleted; neither
+  audio nor transcript is logged (the log line has request ID, byte count and timings only).
+- **Discovery:** `GET /v1/protocol` lists `inputTypes: ["text", "audio"]` when voice input is available.

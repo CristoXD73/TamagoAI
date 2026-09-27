@@ -56,6 +56,12 @@ final class TamagoConnection {
     /// little after (D-119), then cleared.
     private(set) var caption: String?
     @ObservationIgnored private var captionClear: Task<Void, Never>?
+    /// D-120 hold-to-talk: recording while the owner holds the creature.
+    @ObservationIgnored private let recorder = VoiceRecorder()
+    @ObservationIgnored private var holding = false
+    @ObservationIgnored private var recording = false
+    /// The clip to send instead of text for the request with this ID.
+    @ObservationIgnored private var pendingAudio: (requestId: String, data: Data)?
     @ObservationIgnored private var probeTask: Task<Void, Never>?
     @ObservationIgnored private var beat: Task<Void, Never>?
     @ObservationIgnored private var isActive = false
@@ -139,6 +145,46 @@ final class TamagoConnection {
         return .listening
     }
 
+    /// Hold started (≥ 0.45 s, CREATURE_SPEC §4): record until `endHold()`.
+    /// Falls back to the system input sheet when the microphone isn't usable.
+    func beginHold() async -> TalkOutcome {
+        holding = true
+        guard let controller else { return .notNow }
+        guard canTalk else { return .needsPairing }
+        controller.apply(.userActivated)
+        guard controller.state.visual == .listening else { return .notNow }
+        switch await recorder.start() {
+        case .recording:
+            recording = true
+            WKInterfaceDevice.current().play(.start)
+            // Released while the microphone was still starting up.
+            if !holding { endHold() }
+            return .listening
+        case .askedForPermission:
+            controller.apply(.cancel)
+            return .notNow
+        case .unavailable:
+            controller.apply(.cancel)
+            return beginTalking()
+        }
+    }
+
+    /// Hold released: send what was recorded (too short = cancelled).
+    func endHold() {
+        holding = false
+        guard recording else { return }
+        recording = false
+        guard let audio = recorder.stop() else {
+            controller?.apply(.cancel)
+            return
+        }
+        let id = UUID()
+        pendingAudio = (id.uuidString.lowercased(), audio)
+        // The reducer only knows transcripts; the text is a placeholder, the
+        // request goes out as audio (see `.sendRequest`) and the Mac transcribes.
+        controller?.apply(.transcript(text: "(voice)", requestId: id))
+    }
+
     // MARK: Pairing (D-116)
 
     /// Pairs with the Mac at `address` if given (typed on the pairing screen,
@@ -200,8 +246,14 @@ final class TamagoConnection {
                 lastRequestID = request.requestId
                 let startedAt = Date()
                 Self.log.debug("request \(request.requestId, privacy: .public) sent")
+                let audio = pendingAudio?.requestId == request.requestId.lowercased() ? pendingAudio?.data : nil
+                pendingAudio = nil
                 inFlightTask = Task { [weak self, client] in
-                    let exchange = await client.exchange(request)
+                    let exchange = if let audio {
+                        await client.exchangeAudio(audio, requestId: request.requestId)
+                    } else {
+                        await client.exchange(request)
+                    }
                     guard let self, !Task.isCancelled else { return }
                     let ms = Int(Date().timeIntervalSince(startedAt) * 1000)
                     self.lastRoundTripMS = ms

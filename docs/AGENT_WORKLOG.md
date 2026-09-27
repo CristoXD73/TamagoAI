@@ -793,3 +793,36 @@ succeeded.
 **Cross-agent impact:** the on-screen creature changed (owner-approved); CharacterView remains but is unused on screen.
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T02:02:44-04:00: Claude Code — hold-to-talk: Watch recording + on-device Mac transcription (D-120), build 6
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `07100ce`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** Gateway: new `tools/transcribe/transcribe.swift`, new `src/transcriber.js`, `src/server.js`
+(`POST /v1/audio`, `readBuffer`), `src/protocol.js` (`LIMITS.maxAudioBytes`), `src/cli.js`, `package.json`
+(`build:transcriber`), new `test/audio.test.js`, `Tests/Fixtures/protocol-v1/responses/protocol-info.json`
+(regenerated). Apple: new `WatchApp/VoiceRecorder.swift`, `WatchApp/TamagoConnection.swift` (`beginHold`/`endHold`,
+audio send), `WatchApp/TamagoWatchApp.swift` (hold/release gesture), `WatchApp/Info.plist` (microphone string),
+`Shared/GatewayTransport.swift` (`exchangeAudio`), `Shared/Tests/.../GatewayClientTests.swift` (+1). Docs:
+`PROTOCOL_V1.md` (§15, §13 note), `DECISIONS.md` (D-120), this file.
+
+**Work performed:** see D-120. Also while the owner was in Game Mode: the Xcode app had been suspended and was
+blocking `xcodebuild`; resumed only Xcode (`kill -CONT`).
+
+**Tests/builds actually performed (by me):** `npm test` → 113/113 (incl. the real SpeechAnalyzer helper on
+a `say` recording); `npm run fixtures` (protocol-info only); `swift test` → 140/140; Watch simulator build;
+simulator hold-to-talk run against a loopback test gateway (DEBUG audio-file hook, no mic): 9742 bytes →
+transcribed in 1326 ms → "What's my dog's name?" → "Pixel" → speech started/finished.
+
+**Things NOT verified:** the Watch microphone (permission prompt, recording quality) on the owner's SE 3;
+transcription of real Watch recordings; hold gesture feel on hardware.
+
+**Known issues:** the brain's model calls were ~4.8 s during Game Mode (Ollama deprioritized); Ollama unloads
+the model after 15 min idle (cold start ~1.5 s).
+
+**Cross-agent impact:** new endpoint and a compiled helper under `Gateway/tools/` (git-ignored build output);
+the talk gesture is now hold-and-release. Protocol V1 extended additively (§15).
+
+**Signed-by:** Claude Code

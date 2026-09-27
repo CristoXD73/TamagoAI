@@ -898,3 +898,23 @@ off-LAN exposure).
   on the Mac) needs an audio upload in the protocol and the owner's agreement; not built.
 - **Verification:** `SIMULATOR_VERIFIED_ONLY` for caption + speech start/finish (Tamago's own `speech` log lines);
   audibility on the Watch speaker UNVERIFIED.
+
+### D-120 Hold-to-talk: the Watch records, the Mac transcribes on-device (`POST /v1/audio`)
+
+- **Why:** on the owner's SE 3 the system input sheet opened with a keyboard; the owner: "it tells me to type
+  and it's not really possible on the watch", and asked for the mic to be tested. On watchOS 27 the `.plain`
+  sheet opens with mic/handwriting buttons rather than straight into dictation (seen in the simulator).
+- **Decision:** hold the creature ≥ 0.45 s → record (16 kHz mono AAC via `AVAudioRecorder`, `.start` haptic),
+  release → `POST /v1/audio` (PROTOCOL_V1 §15, additive, not V2). The Mac transcribes with Apple
+  **SpeechAnalyzer/SpeechTranscriber** (on-device, en_CA model already installed, no permission prompt) through a
+  small compiled helper `Gateway/tools/transcribe` (`npm run build:transcriber`), then the transcript is an
+  ordinary request. The system input sheet stays as the fallback when the microphone is unavailable or denied.
+- **Reverses an earlier owner instruction, knowingly:** the D-116 pass said "Do not build a fake custom
+  microphone system just to avoid Apple's UI". This isn't a fake pipeline (real recording, real on-device
+  transcription), and the owner's hardware experience of Apple's UI changed the premise. **Owner may veto**;
+  removing it means reverting `VoiceRecorder` + `beginHold` and the `/v1/audio` route.
+- **Zero-dependency gateway (D-002):** unchanged for npm. The helper is a Swift source compiled locally with the
+  Xcode toolchain; without it the endpoint answers `provider_unavailable` and nothing else changes.
+- **Evidence:** real transcription on the owner's Mac (`say` → "What's my dog's name?", 1.3–1.4 s); gateway tests
+  113/113 including the real helper; simulator hold → upload (9.7 KB) → transcript → brain "Pixel" → speech
+  started/finished (`SIMULATOR_VERIFIED_ONLY`). Real Watch microphone capture: UNVERIFIED.

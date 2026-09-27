@@ -134,25 +134,42 @@ public actor GatewayClient {
                                     timeoutInterval: configuration.requestTimeout)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
+        guard let body = try? encoder.encode(request) else {
+            return GatewayExchange(response: synthesized(for: request.requestId, code: .gatewayUnavailable, message: "Could not encode request."), reachedGateway: false)
+        }
+        urlRequest.httpBody = body
+        return await perform(urlRequest, requestId: request.requestId)
+    }
+
+    /// POST `/v1/audio` (PROTOCOL_V1 §15): hold-to-talk. The Mac transcribes
+    /// the recording on-device and answers exactly like `/v1/request`.
+    public func exchangeAudio(_ audio: Data, contentType: String = "audio/mp4", requestId: String) async -> GatewayExchange {
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/audio"),
+                                    timeoutInterval: configuration.requestTimeout)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue(contentType, forHTTPHeaderField: "content-type")
+        urlRequest.setValue(requestId, forHTTPHeaderField: "x-tamago-request-id")
+        urlRequest.setValue(String(TamagoProtocol.version), forHTTPHeaderField: "x-tamago-protocol-version")
+        urlRequest.httpBody = audio
+        return await perform(urlRequest, requestId: requestId)
+    }
+
+    private func perform(_ request: URLRequest, requestId: String) async -> GatewayExchange {
+        var urlRequest = request
         if let token = configuration.authToken {
             urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
         }
-        guard let body = try? encoder.encode(request) else {
-            return GatewayExchange(response: synthesized(for: request, code: .gatewayUnavailable, message: "Could not encode request."), reachedGateway: false)
-        }
-        urlRequest.httpBody = body
-
         let data: Data
         do {
             data = try await fetch(urlRequest).0
         } catch let error as URLError where error.code == .timedOut {
-            return GatewayExchange(response: synthesized(for: request, code: .timeout, message: "No answer within \(Int(configuration.requestTimeout))s."), reachedGateway: false)
+            return GatewayExchange(response: synthesized(for: requestId, code: .timeout, message: "No answer within \(Int(configuration.requestTimeout))s."), reachedGateway: false)
         } catch {
-            return GatewayExchange(response: synthesized(for: request, code: .gatewayUnavailable, message: "Gateway is not reachable."), reachedGateway: false)
+            return GatewayExchange(response: synthesized(for: requestId, code: .gatewayUnavailable, message: "Gateway is not reachable."), reachedGateway: false)
         }
         guard let response = try? decoder.decode(TamagoResponse.self, from: data) else {
             // Something answered, but not in protocol v1 — treat as unusable.
-            return GatewayExchange(response: synthesized(for: request, code: .gatewayUnavailable, message: "Gateway returned an unreadable response."), reachedGateway: false)
+            return GatewayExchange(response: synthesized(for: requestId, code: .gatewayUnavailable, message: "Gateway returned an unreadable response."), reachedGateway: false)
         }
         return GatewayExchange(response: response, reachedGateway: true)
     }
@@ -239,9 +256,9 @@ public actor GatewayClient {
         var gatewayId: String?
     }
 
-    private func synthesized(for request: TamagoRequest, code: TamagoErrorCode, message: String) -> TamagoResponse {
+    private func synthesized(for requestId: String, code: TamagoErrorCode, message: String) -> TamagoResponse {
         TamagoResponse(
-            requestId: request.requestId, status: .error, text: "", speechText: "",
+            requestId: requestId, status: .error, text: "", speechText: "",
             characterState: .idle, haptic: .none, followUpExpected: false,
             error: TamagoErrorInfo(code: code, message: message, retryable: true)
         )

@@ -2,6 +2,7 @@
 import { loadConfig } from './config.js';
 import { createGateway, GATEWAY_VERSION } from './server.js';
 import { createPairingWindow, PAIRING_DEFAULTS } from './pairing.js';
+import { createTranscriberFromEnv } from './transcriber.js';
 import { pickLanIPv4, startAdvertising, WELL_KNOWN_HOST } from './advertise.js';
 
 const logger = {
@@ -35,7 +36,8 @@ if (config.provider.ready) {
 }
 
 const pairing = config.pairingEnabled ? createPairingWindow() : null;
-const server = createGateway({ ...config, pairing, logger });
+const transcriber = createTranscriberFromEnv(process.env);
+const server = createGateway({ ...config, pairing, transcriber, logger });
 
 let advertiser = null;
 let ipWatch = null;
@@ -48,6 +50,7 @@ server.listen(config.port, config.host, () => {
     host: config.host,
     port,
     provider: config.provider.name,
+    voiceInput: transcriber ? transcriber.name : 'unavailable (npm run build:transcriber)',
     authRequired: config.authToken !== null,
     gatewayId: config.gatewayId,
   });
