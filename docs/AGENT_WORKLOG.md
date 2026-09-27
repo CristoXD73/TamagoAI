@@ -1055,6 +1055,31 @@ lengths; simulator run against a loopback test gateway with TTS: transcribe 319 
 **Cross-agent impact:** confirms the cloud agent's setup kit and gateway path work on the real Mac.
 **Signed-by:** Claude Code
 
+---
+
+### 2026-09-27T07:29:38+0000: Claude Code (cloud) — iPhone widgets (D-122), on review branch `claude/iphone-widgets`
+
+**Agent:** Claude Code (cloud; no Xcode or Swift toolchain)
+**Branch:** `claude/iphone-widgets` (off `claude/great-volta-ogpuw8` at `0429e59`, for another agent to review and merge) · **Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- new `Apple/PhoneWidget/` (2 Swift files, Info.plist, Assets.xcassets with CreatureCutout)
+- new `tools/widget-art/make_cutout.py`, `docs/WIDGETS.md`, `docs/widgets/layout-mock.png`
+- `docs/DECISIONS.md` (D-122), `Assets/CharacterReference/octopus-v001/PROVENANCE.md` (widget exception), `Apple/README.md`
+- `docs/HANDOFF_LOG.md`, this file
+
+**Work performed:**
+- Read Apple's HIG widget spec (the iOS dimensions table, families per device, rendering modes) and the WidgetKit docs.
+- Wrote a static widget for all 6 iPhone families. The art is aspect-fitted, never distorted, and a tap opens the app via `widgetURL`.
+- Made a transparent cutout of the approved hero art, because tinted/clear Home Screens paint opaque images white. The eyes are kept and three trapped
+  black pockets between the tentacles were removed.
+- The Xcode target is left to the Mac (CLAUDE.md: no project file edits in the cloud), with exact steps in docs/WIDGETS.md §4.
+
+**Tests/builds actually performed (by me):** checked the cutout visually on black, light and tinted backgrounds. Drew a Python layout mock at the HIG point sizes for the
+largest and smallest iPhones. `npm test` passes unchanged. No Swift compile.
+**Things NOT verified:** that it compiles, renders or opens the app. How tinted/clear/vibrant modes actually look.
+**Known issues:** the large widget upscales the 692 px art about 1.4× at @3x.
+**Cross-agent impact:** none until the target is added. TamagoPhone, the Watch app, the complication, the gateway and the protocol are untouched.
+**Signed-by:** Claude Code (cloud)
 ### 2026-09-27T05:23:21-04:00: Claude Code — Watch complications / Smart Stack widget with the octopus
 
 **Agent:** Claude Code (local, owner's Mac, Opus 5.5)
@@ -1101,7 +1126,37 @@ Pro simulator shows the new screen.
 **Cross-agent impact:** none; the project file is untouched.
 **Signed-by:** Claude Code
 
-### 2026-09-27T07:14:00-04:00: Claude Code — Tamago back after the Mac restart; live dashboard; replies always have words (D-122)
+---
+
+### 2026-09-27T07:14:24-04:00: Codex: widget rendering fix and release integration
+
+- Agent: Codex (local); branch: `codex/widget-rendering-fix`.
+- Starting SHA: `d741044273f60621dc96ce96296389c110f17826`; merged `cbea65dad916c32ae60466e509503edc0b5f28c6`.
+- Ending SHA: this entry is part of the integration commit (not known before commit).
+- Files changed by this task: `Apple/AppleTamago.xcodeproj/project.pbxproj`, `Apple/Complication/TamagoComplication.swift`,
+  complication Octopus asset catalog, `Apple/PhoneWidget/{TamagoPhoneWidgets,CreatureWidgetView}.swift`,
+  `docs/{WIDGETS,AGENT_WORKLOG,HANDOFF_LOG,DEVICE_TEST_LOG}.md`.
+- Work: added/embedded native iPhone WidgetKit target; all seven iPhone families including iOS 27 portrait XL;
+  inline octopus labels on both platforms; exact existing transparent cutout reused on Watch; removed opaque
+  circular foreground background; retained documented `.desaturated` rendering. Version 0.1.2 across targets.
+- Apple sources: WidgetKit accented rendering/Liquid Glass guidance; WWDC26 WidgetKit foundations; local Xcode 27 SDK.
+- Commands personally run: `swift test --package-path Apple/Shared --scratch-path .build/spm` (147 passed);
+  `cd Gateway && npm test` (132 passed, 2 skipped);
+  `xcodebuild build -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'generic/platform=iOS Simulator' -derivedDataPath .build/DerivedData CODE_SIGNING_ALLOWED=NO` (succeeded);
+  `xcodebuild archive -project Apple/AppleTamago.xcodeproj -scheme TamagoPhone -destination 'generic/platform=iOS' -configuration Release -derivedDataPath .build/DerivedData -archivePath .build/release-check/Tamago-0.1.2.xcarchive CODE_SIGNING_ALLOWED=NO` (succeeded).
+- Archive inspection: phone app, phone extension, Watch app and Watch extension each have version 0.1.2 and compiled assets.
+  Cutout SHA-256 matches byte-for-byte across extensions. Xcode warnings only: no AppIntents dependency/metadata.
+- UNIT_TESTED_ONLY: shared Swift and gateway tests. UNVERIFIED: new widget appearance/taps on hardware,
+  all-family simulator rendering, StandBy/CarPlay, reduced luminance, and signed cloud distribution at this checkpoint.
+- Known limits: native Xcode/Device Hub accessibility timed out; simulator app installed/launched but not widget-render verified.
+  One first test attempt failed because the log directory did not yet exist; rerun passed. Direct simctl screenshot file save
+  was denied by the simulator service's external-volume permissions. No signing credentials or device settings changed.
+- Cross-agent impact: preserved both branches and both sides of the append-only worklog conflict. Original checkout and
+  untracked 3D work untouched. No third-party art/code added. TestFlight workflow preparation by delegated Codex agent
+  was independently inspected: Archive iOS / TamagoPhone / Owner internal-testing post-action, main trigger.
+- Signed-by: Codex
+
+### 2026-09-27T07:14:00-04:00: Claude Code — Tamago back after the Mac restart; live dashboard; replies always have words (D-123; commit b4f5624 says D-122, renumbered at the merge with main)
 
 **Agent:** Claude Code (local, owner's Mac, Opus 5.5)
 **Branch:** `claude/great-volta-ogpuw8`
@@ -1115,12 +1170,12 @@ Pro simulator shows the new screen.
 - `Gateway/src/transcriber.js`: punctuation-only transcripts are empty
 - Brain: `profile.js`, `orchestrator.js`, `routing/intent-router.js`, `routing/model-router.js`
 - Tests: `brain.test.js`, `brain-gateway.test.js`, `audio.test.js`
-- Docs: `DECISIONS.md` D-122, `DEVELOPMENT.md`
+- Docs: `DECISIONS.md` D-123, `DEVELOPMENT.md`
 **Work performed:**
 - **Diagnosis.** The owner said Tamago didn't reply after the Mac restarted: the gateway and Ollama weren't running.
 - **Restart path.** Added a one-command restart and the owner's live view: terminal lines plus a loopback dashboard.
 - **Silent replies.** The dashboard then showed the Watch's messages arriving but "Hello" / "Can you hear me?"
-  answered without words, which is invisible on the still-picture Watch. Every reply now has words (D-122).
+  answered without words, which is invisible on the still-picture Watch. Every reply now has words (D-123).
 - **Clock.** The time is answered by rule.
 - **Transcripts.** "." is treated as nothing heard.
 - **Restart bugs fixed:**
@@ -1132,11 +1187,11 @@ Pro simulator shows the new screen.
   - "Hello" → "Oh. Hi."
   - "what time is it?" → "It's 7:12. Early morning here."
   - Kokoro voice made for each.
-- Live from the owner's Watch, before the D-122 restart:
+- Live from the owner's Watch, before the D-123 restart:
   - voice arrived → heard in 0.2 s → answered in 1.4–2.6 s → Kokoro voice made → Watch fetched it.
 - Ctrl-C leaves Ollama running.
 **Things NOT verified:**
-- The owner hearing the D-122 replies on the Watch.
+- The owner hearing the D-123 replies on the Watch.
 - Starting at login (launchd, not done yet).
 **Known issues:** llama3.2:3b answers are weak ("I am functioning.", "Tentacles absorb nutrients"); a stronger
 model is planned (D-118).

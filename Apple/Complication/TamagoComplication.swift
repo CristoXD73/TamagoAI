@@ -1,14 +1,4 @@
-// TamagoComplication.swift
-//
-// VERIFICATION: compiles; rendered in the watchOS 27 simulator's face editor
-// only if noted in docs/HANDOFF_LOG.md. Not DEVICE_VERIFIED.
-//
-// The owner's "put in the widgets" (2026-09-27): Tamago on the watch face and in
-// the Smart Stack. Every family shows the approved octopus art (unchanged, on
-// black; Complication/Assets.xcassets) and a tap opens the app. No face symbol:
-// the creature has no smiley (CREATURE_SPEC). Live content (last reply, whether
-// the Mac is reachable) needs an App Group shared with the Watch app: next step
-// (D-105).
+// Static approved artwork; see docs/WIDGETS.md for rendering and verification.
 
 import SwiftUI
 import WidgetKit
@@ -46,8 +36,7 @@ struct Provider: TimelineProvider {
     }
 }
 
-/// The approved art. `.desaturated` keeps the white octopus white on tinted
-/// faces instead of flattening it into a single-colour blob.
+/// Transparent approved cutout. Keep grayscale detail in watch-face accented mode.
 private struct Octopus: View {
     var body: some View {
         Image("Octopus")
@@ -64,11 +53,9 @@ private struct ComplicationView: View {
     var body: some View {
         switch family {
         case .accessoryCircular:
-            ZStack {
-                Color.black
-                Octopus().padding(3)
-            }
-            .clipShape(Circle())
+            // An opaque foreground background is tinted white on accented faces.
+            // Keep the background only in containerBackground, where WidgetKit owns it.
+            Octopus().padding(3)
         case .accessoryCorner:
             Octopus()
                 .widgetLabel("Tamago")
@@ -87,8 +74,15 @@ private struct ComplicationView: View {
                 }
                 Spacer(minLength: 0)
             }
+        case .accessoryInline:
+            Label("Tamago", image: "Octopus")
         default:
-            Text("Tamago")
+            Octopus()
         }
     }
 }
+
+#Preview("Circular", as: .accessoryCircular) { TamagoComplication() } timeline: { Entry(date: .now) }
+#Preview("Corner", as: .accessoryCorner) { TamagoComplication() } timeline: { Entry(date: .now) }
+#Preview("Rectangular", as: .accessoryRectangular) { TamagoComplication() } timeline: { Entry(date: .now) }
+#Preview("Inline", as: .accessoryInline) { TamagoComplication() } timeline: { Entry(date: .now) }

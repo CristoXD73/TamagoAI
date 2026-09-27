@@ -27,7 +27,7 @@ function tmpDb() {
   return { path: join(dir, 'brain.sqlite'), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-// Gestures on: how Tamago behaves once the Watch can show a wordless reaction (D-122 turns this off for now).
+// Gestures on: how Tamago behaves once the Watch can show a wordless reaction (D-123 turns this off for now).
 const GESTURES = { ...TAMAGO_PROFILE, behavior: { ...TAMAGO_PROFILE.behavior, silenceIsAllowed: true, nonverbalResponseAllowed: true } };
 
 function clock(start = T0) {
@@ -223,7 +223,7 @@ test('behavior policy: greeting is watchful when new, verbal once acquainted; fa
   }
 });
 
-test('D-122: while the Watch shows a still picture, every reply has words', async () => {
+test('D-123: while the Watch shows a still picture, every reply has words', async () => {
   const db = tmpDb();
   const now = clock();
   try {

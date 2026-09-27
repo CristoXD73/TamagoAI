@@ -77,3 +77,16 @@ Mac transcription, spoken/captioned reply. Recordings were kept only for this di
 measured (audible, peak RMS ≈ 2000/32768), then deleted.
 Fixed on the Mac right after: empty transcript now says "I didn't catch that."; punctuation runs from trailing
 silence are stripped; the model is kept warm (60 min, and warmed when the Watch checks in); no bare "No" answers.
+
+
+## 2026-09-27T07:14:24-04:00 — owner reports blank white complication on watchOS 27
+
+`DEVICE_VERIFIED` (owner-reported symptom, not a passing fix): “complications works as in if i click it it brings me
+to the app but it just sshows white, not the lil octopus”. Owner also reports the same issue for iPhone widgets.
+Exact affected face/slot/appearance was not supplied. App Store Connect currently shows the owner installed
+0.1.1 (101); that is contextual evidence, not confirmation of the build running on the Watch at observation time.
+
+The 0.1.2 fix removes the opaque circular foreground background and uses the approved transparent cutout on Watch;
+iPhone widgets are now embedded and include the new portrait XL family. New physical appearance/tap results:
+`UNVERIFIED` until the owner tests the TestFlight update. No device erasure, unpairing, settings reset or updates performed.
+Signed-by: Codex

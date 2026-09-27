@@ -23,7 +23,7 @@ export const TAMAGO_PROFILE = Object.freeze({
   },
   behavior: {
     reactsBeforeSpeaking: true,
-    // D-122: off while the Watch shows the creature as a still picture. A wordless
+    // D-123: off while the Watch shows the creature as a still picture. A wordless
     // reaction was invisible there and read as "Tamago doesn't reply" (owner,
     // 2026-09-27). Turn back on once the Watch can animate a reaction.
     silenceIsAllowed: false,

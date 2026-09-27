@@ -1,7 +1,7 @@
 # Relay plan: talk to Tamago, and it runs Claude, Codex or ChatGPT on your projects
 
 **Status:** PLAN (2026-09-27, Claude Code on the owner's Mac). Nothing here is built yet. The owner answered
-section 9 on 2026-09-27; one point there still needs a yes. Phases R0–R6 run in order, and every phase ends
+section 9 on 2026-09-27. Phases R0–R6 run in order, and every phase ends
 with tests and a worklog entry.
 
 **Owner's goal (2026-09-27):**
@@ -28,7 +28,7 @@ with tests and a worklog entry.
   - They work inside a project folder on their own branch.
   - They report through the relay.
   - The relay records everything they print.
-- **The live dashboard (D-122) becomes mission control.** It shows tasks, which agent holds each one, the agent's
+- **The live dashboard (D-123) becomes mission control.** It shows tasks, which agent holds each one, the agent's
   live output, questions waiting for you, and every handoff.
 
 ## 2. A stronger brain, honestly sized for this Mac
@@ -75,7 +75,7 @@ One adapter per agent. Each one:
 |---|---|---|---|
 | **Claude Code** | `claude -p "<prompt>" --output-format stream-json --verbose --append-system-prompt-file <relay rules>` in the project dir | `claude -p --resume <session> "<answer>"` | normal permission mode with an allowed-tools list; **never** `--dangerously-skip-permissions` |
 | **Codex CLI** | `codex exec --json -C <project dir> -s workspace-write "<prompt>"` | `codex exec resume <session> "<answer>"` | `-s workspace-write`, or `read-only` for questions |
-| **"ChatGPT classic"** | decision 1 | | |
+| **"ChatGPT chat"** (decision 1) | `codex exec --json -s read-only "<baton + question>"`: answers only, never edits | `codex exec resume` | read-only sandbox |
 
 Every task:
 - runs on its own branch `tamago/<task-slug>`, in a git worktree under the project, never on `main`;
@@ -206,14 +206,9 @@ Each phase:
 
 ## 9. Owner decisions (answered 2026-09-27)
 
-1. **ChatGPT: the owner wants Tamago to use the ChatGPT app "as if it was me", typing into it.** It's the last link
-   of the chain (§6). **Needs a yes before it's built:**
-   - OpenAI's terms of use forbid automated or programmatic extraction of output from ChatGPT, so driving the app
-     or website this way could get the account flagged or suspended.
-   - The allowed route with the same subscription is Codex CLI in read-only "just answer" mode (same account, same
-     models, no extra cost).
-   - The plan uses that route unless the owner accepts the risk for the app-typing route. That route would drive
-     the ChatGPT Mac app through macOS accessibility.
+1. **ChatGPT: the safe route (owner, 2026-09-27).** "ChatGPT chat" is Codex CLI in read-only "just answer" mode:
+   same ChatGPT account and models, no extra cost, within OpenAI's terms. The app-typing route was considered and
+   declined: OpenAI's terms forbid automated extraction of output from ChatGPT.
 2. **Out of credits: transfer automatically,** watch the next agent, and end the chain at ChatGPT chat with
    everything collected (§6).
 3. **Projects:** the relay may change only folders on an allowlist. It starts with TamaWatch. Others are added

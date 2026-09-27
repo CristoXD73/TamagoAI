@@ -976,7 +976,29 @@ wait. Simulator end to end: hold → transcript 0.32 s → reply 1.4 s → Mac v
 `TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=af_heart TAMAGO_TTS_SPEED=0.9 TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts`.
 Heard on the Watch: UNVERIFIED until the owner listens.
 
-### D-122 Every reply has words while the Watch shows a still picture; the owner's live dashboard
+### D-122 iPhone widgets: the octopus in every iPhone widget family, tap opens the app
+
+- **Why:** the owner wants Tamago on the iPhone Home and Lock Screens: "encapsulate our octopus friend in there
+  and when you click it it bring you to the app". Other uses come later; for now the widgets just need to exist.
+- **Decision:**
+  - A new iOS WidgetKit extension, `TamagoPhoneWidget`, with sources in `Apple/PhoneWidget/`, embedded in
+    `TamagoPhone`.
+  - One static widget, `TamagoCreature`, in all six iPhone families: small, medium, large, accessory circular,
+    accessory rectangular, accessory inline. Extra large is iPad-only and accessory corner is Watch-only.
+  - One timeline entry and no refreshes. `widgetURL` is `tamago://widget/creature`, and a tap opens the app.
+- **Art:** the owner-approved `ref_hero_q34.jpg`, static and unchanged, with only its black background made
+  transparent (`CreatureCutout.png`, `tools/widget-art/make_cutout.py`).
+  - The cutout is needed because tinted/clear Home Screens paint opaque images solid white.
+  - It's always aspect-fitted, never stretched or cropped. Margins follow the HIG (16 pt text, 11 pt art).
+  - Sizes, rendering modes and sources are in `docs/WIDGETS.md`.
+  - No motion, so the Visual Approval Gate's prototype step doesn't apply. The art use is recorded as an
+    owner-directed runtime exception in `PROVENANCE.md`.
+- **Not done here:** the Xcode target itself. `project.pbxproj` isn't edited in the cloud (CLAUDE.md). The Mac
+  agent follows `docs/WIDGETS.md` §4. No App Group, mood or controls yet.
+- **Verification:** UNVERIFIED (not compiled, not rendered). The layout math is checked only by a Python mock
+  at HIG point sizes (`docs/widgets/layout-mock.png`).
+
+### D-123 Every reply has words while the Watch shows a still picture; the owner's live dashboard
 
 - **Evidence (owner, 2026-09-27 07:05–07:09 EDT, first session after a Mac restart):**
   - "when i talk to tamago AI after turning back on the mac it doesnt reply." Two causes:

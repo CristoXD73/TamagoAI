@@ -21,3 +21,7 @@ These images are visual ground truth: do not redesign, humanize, or restyle the 
   icon can replace these later.
 - **Runtime exception (owner, 2026-09-27, D-119):** the owner directed that `ref_hero_q34.jpg` be the creature on
   the Watch, floating gently on black. It ships unchanged as `Apple/WatchApp/Assets.xcassets/Creature.imageset/Creature.jpg`.
+- **iPhone widget exception (owner, 2026-09-27, D-122):** the owner asked for the octopus in the iPhone widgets.
+  `Apple/PhoneWidget/Assets.xcassets/CreatureCutout.imageset/CreatureCutout.png` is `ref_hero_q34.jpg`, static,
+  with only its black background made transparent and the frame trimmed (`tools/widget-art/make_cutout.py`).
+  The octopus's pixels are unchanged.

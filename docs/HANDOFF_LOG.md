@@ -1357,7 +1357,45 @@ the Swift compiles. `swift test` passes 147/147 and the TamagoWatch simulator bu
 
 ---
 
-### 2026-09-27 07:14 EDT: Claude Code (local): restart script, live dashboard, every reply has words (D-122)
+### 2026-09-27: Claude Code (cloud): iPhone widgets (D-122), review branch `claude/iphone-widgets`
+
+**Branch:** `claude/iphone-widgets`. Separate from `claude/great-volta-ogpuw8` on the owner's request, so another agent can
+review and merge it.
+**Done:**
+- `Apple/PhoneWidget/`: a WidgetKit extension source with the approved octopus in all six iPhone families (small, medium,
+  large, Lock Screen circular, rectangular, inline). A tap opens the app.
+- The sizes and rendering modes come from Apple's HIG (`docs/WIDGETS.md`). The art is a transparent cutout of the approved hero
+  image, never distorted.
+
+**Tests:** gateway `npm test` unchanged. Swift not compiled (cloud).
+**Unverified:** everything on the Apple side: compile, the look in each mode, the tap to open.
+**Next recommended task (ONE), agent on the Mac:**
+1. Review this branch and add the `TamagoPhoneWidget` target per `docs/WIDGETS.md` §4.
+2. Build `TamagoPhone`, and re-run the `TamagoWatch` tests and `swift test` to confirm nothing regressed.
+3. Check all six families in the simulator, including tinted/clear and the Lock Screen. Tap each one.
+4. Merge into `claude/great-volta-ogpuw8`.
+
+**Do not redo:** the size research, the cutout (use `tools/widget-art/make_cutout.py` if the art changes).
+
+---
+
+### 2026-09-27T07:14:24-04:00: Codex: release 0.1.2 widget corrections
+Branch: `codex/widget-rendering-fix`.
+Commits: integration of d741044 and cbea65d plus this fix (SHA pending commit).
+Files: Xcode project, Watch cutout/complication, iPhone widget layouts/configuration, widget documentation and logs.
+Upstream source reused: none; existing approved art copied without pixel changes.
+Tests: exact commands and results in matching AGENT_WORKLOG entry. Swift 147 pass; gateway 132 pass/2 skipped;
+iOS simulator build and unsigned Release archive succeeded; both extensions and asset catalogs embedded.
+Physical evidence: owner's white complication/tap-to-open report in DEVICE_TEST_LOG (prior release).
+Verification: UNIT_TESTED_ONLY for automated tests; UNVERIFIED for new widget UI on hardware.
+Known risks: no actual all-family rendered visual check because native UI automation timed out; larger art can soften
+when scaled beyond the existing 692-pixel source. Cloud signing/distribution is still pending at this checkpoint.
+Next recommended task (ONE): install 0.1.2 from TestFlight and record the seven iPhone families and four Watch families
+across default/tinted/clear and reduced luminance in DEVICE_TEST_LOG.
+Do not redo: transparent cutout generation, native widget target integration, latest-branch merge, voice engine setup.
+Signed-by: Codex
+
+### 2026-09-27 07:14 EDT: Claude Code (local): restart script, live dashboard, every reply has words (D-123)
 
 **Done:**
 - `scripts/tamago-up.sh` brings Tamago back after a Mac restart.

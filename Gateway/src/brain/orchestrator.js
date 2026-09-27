@@ -118,10 +118,10 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       }
     }
 
-    // 6b. D-122: while the Watch can't show a gesture, every reply has words.
+    // 6b. D-123: while the Watch can't show a gesture, every reply has words.
     if (intent.speech === null && profile.behavior?.nonverbalResponseAllowed === false) {
       intent = { ...intent, speech: wordsForSilence(cls, text, relationship) };
-      step('speak_instead', { reason: 'nonverbal replies are invisible on the Watch (D-122)' });
+      step('speak_instead', { reason: 'nonverbal replies are invisible on the Watch (D-123)' });
     }
 
     // 7. speech composer: Watch constraints regardless of which model spoke
@@ -201,7 +201,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       : { speech: 'Got it.', emotion: 'content', sound: 'soft_ack', haptic: 'click', behavior: 'settle', thought: `Learned: ${candidates[0]?.text}` });
   }
 
-  // Short in-character words for the moments Tamago would otherwise only gesture (D-122).
+  // Short in-character words for the moments Tamago would otherwise only gesture (D-123).
   function wordsForSilence(cls, text, relationship) {
     const warm = relationship.stage === 'familiar' || relationship.stage === 'bonded';
     if (/\b(hear|hearing) me\b|\byou there\b|\bare you (awake|listening|here)\b/i.test(text)) return 'I hear you.';

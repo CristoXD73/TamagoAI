@@ -81,7 +81,7 @@ If CoreSimulator is unavailable in a restricted session, report that limitation;
 do not change signing, provisioning, targets or deployment settings. Physical
 deployment is a separate owner-led task.
 
-## After the Mac restarts: `scripts/tamago-up.sh` and the live dashboard (D-122)
+## After the Mac restarts: `scripts/tamago-up.sh` and the live dashboard (D-123)
 
 Nothing starts Tamago at login yet. After a restart, run from the repository root:
 

@@ -9,7 +9,7 @@ import { validateResponse } from '../src/protocol.js';
 import { loadConfig } from '../src/config.js';
 import { createBrainProvider, brainOptionsFromEnv } from '../src/brain/index.js';
 
-test('gateway with the brain provider speaks Protocol V1, always in words (D-122), and remembers', async () => {
+test('gateway with the brain provider speaks Protocol V1, always in words (D-123), and remembers', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tamago-brain-gw-'));
   const provider = createBrainProvider(brainOptionsFromEnv({ TAMAGO_BRAIN_DB: join(dir, 'brain.sqlite') }));
   await provider.ready();

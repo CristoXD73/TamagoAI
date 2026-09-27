@@ -13,6 +13,11 @@
 		7E4DEFA0D0866F2AEA4C593E /* TamagoShared in Frameworks */ = {isa = PBXBuildFile; productRef = 40772E5EFFB58613CA8383F3 /* TamagoShared */; };
 		8A8692300A9B275BB20A8D94 /* TamagoComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4AD192928F69072810ACC87F /* TamagoComplication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8DB413D61E0D6BD0290EC188 /* TamagoShared in Frameworks */ = {isa = PBXBuildFile; productRef = C6F54CD3B3536366FC24E0ED /* TamagoShared */; };
+		7059FE2AE907E806B0779A27 /* Embed Widget */ = {
+			isa = PBXBuildFile;
+			fileRef = EAD642F5A22A677144FBE5B1;
+			settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); };
+		};
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,6 +34,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 6A3E86F153968EFFFE4AAA15;
 			remoteInfo = TamagoWatch;
+		};
+		23036D19C6B1E8DFF2632C84 /* Widget Proxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595;
+			proxyType = 1;
+			remoteGlobalIDString = 72B87B8A999D73F8D128F2A4;
+			remoteInfo = TamagoPhoneWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -55,6 +67,15 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DAC1B71DBD1AC7DB57572903 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (7059FE2AE907E806B0779A27, );
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -63,6 +84,13 @@
 		4C5FCE7E6A9BC80182FC253E /* Tamago.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tamago.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E99D4633A28B788BB2EEF6C /* Tamago.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tamago.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD5FEB36355BB38F98691943 /* TamagoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TamagoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EAD642F5A22A677144FBE5B1 /* Product */ = {
+			isa = PBXFileReference;
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			path = TamagoPhoneWidget.appex;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -88,6 +116,11 @@
 				README.md,
 			);
 			target = D7A8BFB185F0C37178C16F78 /* TamagoComplication */;
+		};
+		CE94BD33CB12AA99DF9D0640 /* PhoneWidget Exceptions */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (Info.plist, );
+			target = 72B87B8A999D73F8D128F2A4;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -119,6 +152,12 @@
 		D6A389BCEE209D4F7F527026 /* Shared/Tests/TamagoSharedTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Shared/Tests/TamagoSharedTests;
+			sourceTree = "<group>";
+		};
+		137E1AA7C6993A9EF01ECE55 /* PhoneWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (CE94BD33CB12AA99DF9D0640, );
+			path = PhoneWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -156,6 +195,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		2914A157F04C0F3A46881B0C /* Widget Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -165,6 +210,7 @@
 				3115A829A6D9DE702F550E32 /* WatchApp */,
 				C759EBCEFB644A19B2E954E2 /* Complication */,
 				9A9F48B0084C75AE4EE5799B /* iPhoneApp */,
+				137E1AA7C6993A9EF01ECE55 /* PhoneWidget */,
 				D6A389BCEE209D4F7F527026 /* Shared/Tests/TamagoSharedTests */,
 				5386A2EAF0036C0154CF9012 /* Config */,
 				86024CAD1E83101D97359D73 /* Products */,
@@ -186,6 +232,7 @@
 				4C5FCE7E6A9BC80182FC253E /* Tamago.app */,
 				4AD192928F69072810ACC87F /* TamagoComplication.appex */,
 				BD5FEB36355BB38F98691943 /* TamagoTests.xctest */,
+				EAD642F5A22A677144FBE5B1 /* TamagoPhoneWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -226,11 +273,13 @@
 				9EDF4C475B0B7D50710B2A7F /* Frameworks */,
 				5313E99CFFCFB3C1289CC421 /* Resources */,
 				7B2461AEC77E56C8B1A39C51 /* Embed Watch Content */,
+				DAC1B71DBD1AC7DB57572903 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				E7810C43C3620B381C3F0C27 /* PBXTargetDependency */,
+				506244F260F135E8416A904C /* Widget Dependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				9A9F48B0084C75AE4EE5799B /* iPhoneApp */,
@@ -289,6 +338,19 @@
 			productReference = 4AD192928F69072810ACC87F /* TamagoComplication.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		72B87B8A999D73F8D128F2A4 /* Target */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 87180AFAA07766045C3066D1;
+			buildPhases = (0222A4BDC0F093DF5058BE06, 2914A157F04C0F3A46881B0C, 88DBB24826D50DFC80A5981A, );
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = (137E1AA7C6993A9EF01ECE55, );
+			name = TamagoPhoneWidget;
+			packageProductDependencies = ();
+			productName = TamagoPhoneWidget;
+			productReference = EAD642F5A22A677144FBE5B1;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -334,6 +396,7 @@
 				D7A8BFB185F0C37178C16F78 /* TamagoComplication */,
 				B0FA378F42FDC5AAF1CB8CC7 /* TamagoPhone */,
 				C706FA839F4C1F2316B35783 /* TamagoTests */,
+				72B87B8A999D73F8D128F2A4 /* TamagoPhoneWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -367,6 +430,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		88DBB24826D50DFC80A5981A /* Widget Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -398,6 +467,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0222A4BDC0F093DF5058BE06 /* Widget Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -410,6 +485,11 @@
 			isa = PBXTargetDependency;
 			target = 6A3E86F153968EFFFE4AAA15 /* TamagoWatch */;
 			targetProxy = B0F60C16C46F773BA2FD4624 /* PBXContainerItemProxy */;
+		};
+		506244F260F135E8416A904C /* Widget Dependency */ = {
+			isa = PBXTargetDependency;
+			target = 72B87B8A999D73F8D128F2A4;
+			targetProxy = 23036D19C6B1E8DFF2632C84;
 		};
 /* End PBXTargetDependency section */
 
@@ -492,7 +572,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX)";
 				PRODUCT_NAME = Tamago;
 				SDKROOT = iphoneos;
@@ -517,7 +597,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -537,7 +617,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -564,7 +644,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp.widget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -593,7 +673,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp";
 				PRODUCT_NAME = Tamago;
 				SDKROOT = watchos;
@@ -623,7 +703,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX)";
 				PRODUCT_NAME = Tamago;
 				SDKROOT = iphoneos;
@@ -641,7 +721,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -670,7 +750,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).watchkitapp";
 				PRODUCT_NAME = Tamago;
 				SDKROOT = watchos;
@@ -681,6 +761,54 @@
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		D248A98794AC78DE3A8883AF /* Widget Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PhoneWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Tamago;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks", );
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F665AF31862D0A9BF15F3B47 /* Widget Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PhoneWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Tamago;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks", );
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TAMAGO_BUNDLE_PREFIX).widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -729,6 +857,12 @@
 				C35487E0083F7BC5E035C410 /* Debug */,
 				7EDF190F06EDA1100A36657D /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		87180AFAA07766045C3066D1 /* Configurations */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (D248A98794AC78DE3A8883AF, F665AF31862D0A9BF15F3B47, );
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
