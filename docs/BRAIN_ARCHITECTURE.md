@@ -1,8 +1,8 @@
 # Tamago Brain — Mac-side intelligence architecture
 
-**Status (2026-09-27): Milestone 1 built (Brain A–D).** Everything here is `UNIT_TESTED_ONLY` in the cloud,
-against the deterministic reasoner and a **stubbed** Ollama. Real-model behavior is
-`UNVERIFIED_LOCAL_PROVIDER` until Brain F runs on the owner's Mac. Decision record: D-117.
+**Status (2026-09-27): Milestone 1 built (Brain A–D), Brain F done.** The logic is `UNIT_TESTED_ONLY` (108
+gateway tests). The Ollama reasoner is **verified on the owner's Mac with `llama3.2:3b`** (Ollama 0.34.4,
+2026-09-27): results, defects found and fixed in [`BRAIN_EVAL.md`](BRAIN_EVAL.md). Decisions: D-117, D-118.
 
 > **The LLM is not Tamago. The LLM is one reasoning component inside Tamago.**
 > Personality, memory, familiarity, routing and the Watch contract are deterministic code and data.
@@ -41,7 +41,7 @@ client already handled.
 | `routing/intent-router.js` | Deterministic classification: gratitude, affirmation, greeting, forget, tool_request, recall, question, statement. It also detects complexity, "don't remember" requests and pronouns, and extracts keywords. |
 | `routing/model-router.js` | `rule` (no model) · `fast` · `smart` (complex *why/how* questions). |
 | `context-builder.js` | A budgeted context of ≤ 1800 chars: memories, this conversation, relationship, now, route. When over budget it drops the oldest turns first, then the weakest memories. |
-| `reasoners/ollama.js` | Ollama `/api/chat` with **structured outputs** (`format` = the intent schema). One repair attempt on invalid JSON, then a structured `provider_error`, never raw model text. Fast/smart model routing, and a health check. `UNVERIFIED_LOCAL_PROVIDER`. |
+| `reasoners/ollama.js` | Ollama `/api/chat` with **structured outputs** (`format` = the intent schema). One repair attempt on invalid JSON, then a structured `provider_error`, never raw model text. Fast/smart model routing, and a health check. Verified with `llama3.2:3b` on the owner's Mac ([`BRAIN_EVAL.md`](BRAIN_EVAL.md)); other models unverified. |
 | `reasoners/deterministic.js` | **Offline fallback and test double. Not intelligence.** It answers only from structured memories. Otherwise it says it doesn't know or reacts nonverbally. It's used automatically when Ollama is unreachable. |
 | `memory/extractor.js` | Rule-based fact candidates from the owner's own words ("my X runs on Y", preferences, names, "remember that…"). |
 | `memory/gate.js` | **The write gate.** It rejects: owner said "don't remember", secret-like content (passwords, keys, card numbers, long opaque strings), low confidence (rule < 0.7, model < 0.8), low importance per type (episodic needs 0.75). |
@@ -98,15 +98,15 @@ filler becomes silence.
 
 ```sh
 cd Gateway
-npm test                                            # 101 tests, no model or network needed
+npm test                                            # 108 tests, no model or network needed
 npm run brain -- chat                               # talk to the brain in the terminal
 npm run brain -- inspect                            # why did it answer that? (full decision trace)
 npm run brain -- memories | status | forget <id> | reset --yes
 
 # behind the Watch-facing gateway
 TAMAGO_PROVIDER=brain npm start                                 # deterministic reasoner (no model)
-TAMAGO_PROVIDER=brain OLLAMA_MODEL=llama3.2 npm start           # Ollama (fast = smart = llama3.2)
-TAMAGO_PROVIDER=brain TAMAGO_FAST_MODEL=llama3.2:3b TAMAGO_SMART_MODEL=qwen2.5:7b npm start
+TAMAGO_PROVIDER=brain TAMAGO_REASONER=ollama npm start          # Ollama, D-118 default llama3.2:3b (fast = smart)
+TAMAGO_PROVIDER=brain TAMAGO_FAST_MODEL=llama3.2:3b TAMAGO_SMART_MODEL=<bigger> npm start
 ```
 
 Verified transcript (deterministic reasoner, a process restart between the first line and the rest):
@@ -134,16 +134,19 @@ envelope the Watch received.
 | **C** Memory | ✅ built | SQLite + FTS5, gate, dedupe/supersede, forget |
 | **D** Familiarity | ✅ built | deterministic, day-based, never decreasing |
 | **E** Tools | ❌ not started | Tamago answers honestly: "I can't do that yet." / "I can't check that yet." A model-requested `tool` is recorded, never executed. Next: registry + risk levels (0 read-only … 3 prohibited) + policy engine + confirmation + mock tools, then `jellyfin.status`. |
-| **F** Real Ollama validation | ❌ needs the owner's Mac | Run §9 there. Until then the Ollama reasoner is `UNVERIFIED_LOCAL_PROVIDER`. |
+| **F** Real Ollama validation | ✅ done (`llama3.2:3b`) | [`BRAIN_EVAL.md`](BRAIN_EVAL.md): 34 model turns, all valid JSON first try, ~1 s warm, 2.3 GB; 9 defects fixed. Re-run `scripts/brain-eval.js` for the next model. |
 | LLM consolidation | ❌ | Session summaries → episodic memories, when real transcripts show it's needed |
 | Embeddings | ❌ | Only if FTS retrieval proves insufficient |
 | Protocol V2 | ❌ intentionally | Only when the Watch needs a new semantic capability (e.g. carrying `behavior`/`sound`/familiarity for animation) |
 
-## 9. Brain F — validation plan on the owner's Mac (16 GB)
+## 9. Brain F — validation on the owner's Mac (16 GB)
+
+**Done 2026-09-27 with `llama3.2:3b`: see [`BRAIN_EVAL.md`](BRAIN_EVAL.md).** The plan it followed, kept for the next model:
 
 1. `ollama pull` 2–3 candidates (e.g. a ~3B fast model and a 7–8B smart model).
-2. `TAMAGO_REASONER=ollama TAMAGO_FAST_MODEL=… npm run brain -- chat`, then run the script in `test/brain.test.js`
-   and ~20 everyday utterances.
+2. `TAMAGO_REASONER=ollama TAMAGO_FAST_MODEL=… TAMAGO_BRAIN_DB=/Volumes/Storage/AI/tamago-eval/<model>.sqlite
+   node scripts/brain-eval.js --out <file>.json` (the milestone plus 24 everyday utterances; the database is reset
+   first), or talk to it with `npm run brain -- chat`.
 3. Record for each model: first-token and total latency (the `inspect` trace has `totalMs`), JSON validity
    rate (the `attempts` field), assistant-isms caught by the composer, invented facts, and RAM.
 4. Pick fast/smart defaults, record them in DECISIONS, and flip `UNVERIFIED_LOCAL_PROVIDER` only with that evidence.

@@ -109,7 +109,8 @@ engine drives its autonomous idle life. Neither touches the network. They emit
 effects that a thin platform layer executes: an HTTP request, a haptic, speech
 or a sound. The Mac side is a dependency-free Node gateway with pairing, request
 IDs, timeouts, duplicate protection and a swappable AI provider: a deterministic
-mock, or Ollama for local models (not yet run against a real engine).
+mock, or the Tamago Brain: memory, familiarity and routing around a local model through Ollama
+(verified with `llama3.2:3b` on the owner's Mac, [`docs/BRAIN_EVAL.md`](docs/BRAIN_EVAL.md)).
 
 ### Architecture
 
@@ -142,8 +143,8 @@ Building the Watch app, pairing a simulator and driving the full loop are in
 
 | Suite | Count | Where |
 |---|---|---|
-| Swift (`Apple/Shared`) | 137 | host (`swift test`) and the watchOS 27 simulator (`xcodebuild test`) |
-| Gateway (`Gateway/test`) | 79 | Node test runner |
+| Swift (`Apple/Shared`) | 138 | host (`swift test`) and the watchOS 27 simulator (`xcodebuild test`) |
+| Gateway (`Gateway/test`) | 108 | Node test runner |
 
 `UNIT_TESTED_ONLY` means the tests passed, not that the feature was seen
 working. Simulator and device evidence is recorded separately in

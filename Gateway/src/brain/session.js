@@ -21,6 +21,21 @@ export function recentTurns(db, sessionId, limit = 6) {
     .all(sessionId, limit).reverse();
 }
 
+/**
+ * "Forget what I told you about X" must also leave the conversation log: every
+ * owner turn mentioning all the keywords, and Tamago's reply to it, become
+ * "(forgotten)", so no later prompt can recover what the memory store let go.
+ */
+export function forgetTurns(db, keywords) {
+  if (!keywords.length) return 0;
+  const where = keywords.map(() => 'lower(text) LIKE ?').join(' AND ');
+  const owners = db.prepare(`SELECT session_id, at FROM messages WHERE role = 'owner' AND ${where}`)
+    .all(...keywords.map((k) => `%${k.toLowerCase().replace(/[%_]/g, '')}%`));
+  const scrub = db.prepare("UPDATE messages SET text = '(forgotten)' WHERE session_id = ? AND at = ?");
+  for (const o of owners) scrub.run(o.session_id, o.at);
+  return owners.length;
+}
+
 export function appendTurn(db, sessionId, now, ownerText, tamagoText, meta) {
   const ins = db.prepare('INSERT INTO messages (session_id, at, role, text, meta) VALUES (?, ?, ?, ?, ?)');
   ins.run(sessionId, now, 'owner', ownerText, null);

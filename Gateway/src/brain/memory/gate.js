@@ -7,6 +7,11 @@ const PRIVATE = [
   /\b[A-Za-z0-9_\-]{32,}\b/,               // long opaque strings (keys, tokens)
 ];
 
+/** True when text looks like a secret. Such text is never stored anywhere, not even as a conversation turn. */
+export function looksPrivate(text) {
+  return PRIVATE.some((re) => re.test(text));
+}
+
 const MIN_CONFIDENCE = { rule: 0.7, llm: 0.8 };
 const MIN_IMPORTANCE = { preference: 0.5, semantic: 0.55, procedural: 0.6, episodic: 0.75 };
 
@@ -16,7 +21,7 @@ const MIN_IMPORTANCE = { preference: 0.5, semantic: 0.55, procedural: 0.6, episo
  */
 export function gateCandidate(c, { noStore = false } = {}) {
   if (noStore) return { decision: 'discard', reason: 'owner asked not to remember' };
-  if (PRIVATE.some((re) => re.test(c.text) || (c.value && re.test(c.value)))) {
+  if (looksPrivate(c.text) || (c.value && looksPrivate(c.value))) {
     return { decision: 'discard', reason: 'private/secret-like content' };
   }
   const minC = MIN_CONFIDENCE[c.source] ?? 0.8;

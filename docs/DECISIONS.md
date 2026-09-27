@@ -852,3 +852,26 @@ off-LAN exposure).
   and a stubbed Ollama). The real Ollama reasoner stays `UNVERIFIED_LOCAL_PROVIDER` until Brain F runs on the owner's Mac.
 - **Not built:** tools (Brain E), LLM consolidation, embeddings.
 
+
+### D-118 Brain F: `llama3.2:3b` as the interim default; owner facts come from memory, never a model's guess
+
+- **Decision (owner direction + evidence, 2026-09-27):** with `TAMAGO_REASONER=ollama` and no model named,
+  the brain uses **`llama3.2:3b` for both fast and smart** (`DEFAULT_MODELS` in `Gateway/src/brain/index.js`).
+  The owner chose it "just for testing"; a stronger model will replace it. Nothing set at all still means the
+  deterministic reasoner.
+- **Evidence:** `docs/BRAIN_EVAL.md`: 34 real model turns on the owner's Mac (M6, 16 GB, Ollama 0.34.4), all
+  valid JSON on the first try (the repair path never ran), ~1 s warm, 1.5 s cold load, 2.3 GB resident.
+- **What the evidence changed in the design (bounded fixes, not a rewrite):**
+  - Simple "what/where/who is my…" questions are answered **from memory only**: no matching memory → "I don't
+    know that yet." by rule; a match → the model sees the memories without older conversation lines. A 3B model
+    otherwise guessed ("Blue") or copied a stale answer ("Teal" after the owner changed it).
+  - **Live information** (weather, news, "is it running?") is a deterministic `live_info` kind → "I can't check
+    that yet." until tools exist (Brain E). The model invented "Rain" and "No".
+  - **Secret-looking and off-the-record text is never persisted verbatim**: conversation turns and traces store a
+    placeholder, and a secret never reaches a model. Before, the gate refused the *memory* but the turn log kept
+    the words for 7 days and fed them to later prompts.
+  - **Forget** also blanks the matching conversation turns.
+- **Alternatives rejected:** a bigger prompt alone (the 3B model ignored "never invent owner facts"); pulling
+  7–8B models now (owner's call; the eval script makes the comparison a one-command job later).
+- **Verification:** real-model behavior verified with `llama3.2:3b` only; logic `UNIT_TESTED_ONLY` (108 gateway
+  tests). The legacy `TAMAGO_PROVIDER=ollama` provider is still `UNVERIFIED_LOCAL_PROVIDER`.

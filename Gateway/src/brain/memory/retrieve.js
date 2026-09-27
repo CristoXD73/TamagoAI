@@ -14,6 +14,7 @@ export function retrieveMemories(db, { keywords = [], limit = 5, now = Date.now(
     for (const r of rows) {
       const recency = Math.exp(-(now - r.updated_at) / (30 * DAY));
       r.score = -r.rank * 10 + r.importance + 0.1 * Math.min(r.strength, 5) + 0.3 * recency;
+      r.matched = true;
       picked.set(r.id, r);
     }
   }
@@ -25,7 +26,14 @@ export function retrieveMemories(db, { keywords = [], limit = 5, now = Date.now(
   const out = [...picked.values()].sort((a, b) => b.score - a.score).slice(0, limit);
   const touch = db.prepare('UPDATE memories SET last_used_at = ? WHERE id = ?');
   for (const r of out) touch.run(now, r.id);
-  return out.map(({ id, type, text, subject, relation, value, score }) => ({ id, type, text, subject, relation, value, score }));
+  return out.map(({ id, type, text, subject, relation, value, score, matched }) => ({ id, type, text, subject, relation, value, score, matched: !!matched }));
+}
+
+/** The strongest facts Tamago holds, for "what do you know about me?" (preferences excluded). */
+export function topMemories(db, { limit = 3 } = {}) {
+  return db.prepare(`SELECT id, type, text, subject, relation, value, importance AS score FROM memories
+      WHERE superseded_by IS NULL AND type != 'preference' ORDER BY importance DESC, strength DESC, updated_at DESC LIMIT ?`)
+    .all(limit).map((m) => ({ ...m, matched: true }));
 }
 
 export function forgetMatching(db, keywords) {

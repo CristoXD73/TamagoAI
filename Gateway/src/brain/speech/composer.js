@@ -37,6 +37,11 @@ export function composeSpeech(raw, profile = TAMAGO_PROFILE) {
   for (const re of ASSISTANTISMS) s = s.replace(re, ' ');
   s = s.replace(/\s+/g, ' ').trim();
   if (s !== before.trim()) changed.push('cleaned');
+  // The model reads "Owner's X" in its context; Tamago speaks to the owner as "you".
+  // Only the possessive is rewritten: "the owner likes" -> "you likes" would be worse than the prompt rule alone.
+  const addressed = s.replace(/\b(the )?owner's\b/gi, (m) => (m[0] === m[0].toUpperCase() ? 'Your' : 'your'));
+  if (addressed !== s) changed.push('addressed');
+  s = addressed;
 
   const text = truncate(s, profile.communication.maxTextChars);
   let speech = sentences(s).slice(0, 2).join(' ');

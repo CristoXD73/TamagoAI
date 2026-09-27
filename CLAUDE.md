@@ -26,7 +26,7 @@ adds Claude-specific notes.
 | Path | What | Verified how |
 |---|---|---|
 | `Gateway/` | Node ≥22 Mac gateway, zero dependencies. `npm test`, `npm start`. | `UNIT_TESTED_ONLY` (CI + cloud) |
-| `Gateway/src/brain/` | **Tamago Brain** (orchestrator, memory, familiarity, routing; `TAMAGO_PROVIDER=brain`). Design: `docs/BRAIN_ARCHITECTURE.md`. | `UNIT_TESTED_ONLY`; Ollama `UNVERIFIED_LOCAL_PROVIDER` |
+| `Gateway/src/brain/` | **Tamago Brain** (orchestrator, memory, familiarity, routing; `TAMAGO_PROVIDER=brain`). Design: `docs/BRAIN_ARCHITECTURE.md`. | `UNIT_TESTED_ONLY`; Ollama reasoner verified with `llama3.2:3b` on the owner's Mac (`docs/BRAIN_EVAL.md`) |
 | `Tests/Fixtures/protocol-v1/` | JSON fixtures shared by gateway and Swift tests. Gateway ones are generated from the live mock (`npm run fixtures`). | drift-checked by gateway tests |
 | `Apple/Shared/` | Local Swift package `TamagoShared`: protocol models + sprite timing engine, tests in `Tests/`. | `UNIT_TESTED_ONLY` (host + watchOS simulator) |
 | `Apple/AppleTamago.xcodeproj` | Targets `TamagoWatch`, `TamagoComplication`, `TamagoPhone`, `TamagoTests` (D-101). | builds: `SIMULATOR_VERIFIED_ONLY` |

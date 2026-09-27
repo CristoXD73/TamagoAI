@@ -1,6 +1,7 @@
-// VERIFICATION: UNVERIFIED_LOCAL_PROVIDER
-// Tested only against a stubbed fetch. Not yet run against real Ollama on the
-// owner's Mac (Brain F). Uses Ollama structured outputs (`format` = JSON schema).
+// VERIFICATION: verified on the owner's Mac with llama3.2:3b (Ollama 0.34.4), 2026-09-27:
+// 34 real model turns across three 25-turn runs (+2 through the gateway), all valid JSON on the first try, ~1 s
+// warm (docs/BRAIN_EVAL.md, D-118). Other models: unverified. Unit tests use a stubbed fetch.
+// Uses Ollama structured outputs (`format` = JSON schema).
 
 import { ProviderError } from '../../providers/provider.js';
 import { INTENT_JSON_SCHEMA, validateIntent } from '../response-schema.js';

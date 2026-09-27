@@ -1,6 +1,6 @@
 // Memory persistence with de-duplication and supersession.
 
-const words = (s) => new Set(s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(' ').filter((w) => w.length > 2));
+const words = (s) => new Set(s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, ' ').split(' ').filter((w) => w.length > 2));
 function jaccard(a, b) {
   const A = words(a), B = words(b);
   if (!A.size || !B.size) return 0;

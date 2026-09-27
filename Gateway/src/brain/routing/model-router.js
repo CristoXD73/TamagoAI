@@ -10,6 +10,7 @@ export function chooseRoute(cls, { extractedFacts = 0 } = {}) {
     case 'greeting':
     case 'forget':
     case 'tool_request':        // tools arrive in Brain E; answered honestly by rule until then
+    case 'live_info':
       return 'rule';
     case 'statement':
       return extractedFacts > 0 ? 'rule' : 'fast';

@@ -659,3 +659,42 @@ upload (needs the App Store Connect app record); anything running on the Watch.
 **Cross-agent impact:** Watch icon asset layout changed; no Swift or `.pbxproj` edits.
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T00:58:09-04:00: Claude Code — Brain F: real Ollama evaluation, 9 defects fixed, D-118
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `9c9e24b`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Gateway/src/brain/` (orchestrator, memory/{gate,retrieve,store,extractor}, session,
+routing/{intent-router,model-router}, personality/profile, speech/composer, reasoners/ollama header, index
+defaults), `Gateway/test/brain.test.js` (+7 tests), new `Gateway/scripts/brain-eval.js`,
+`Gateway/.env.example`, new `docs/BRAIN_EVAL.md`, `docs/BRAIN_ARCHITECTURE.md`, `docs/DECISIONS.md` (D-118),
+`docs/ACCEPTANCE_TESTS.md` §K, `CLAUDE.md` map, `README.md` (test counts, one line), this file.
+
+**Work performed:** installed Ollama 0.34.4 with the owner's go-ahead (`brew install ollama`), served on
+127.0.0.1 only with models on `/Volumes/Storage/AI/ollama/models`, pulled `llama3.2:3b` (the owner's
+choice: one model, "just for testing"). Wrote `scripts/brain-eval.js` (25-turn script through the real
+orchestrator, database reset per run). Run 1 exposed 9 defects (see BRAIN_EVAL.md), including a **privacy
+defect**: refused secrets and off-the-record sentences were kept verbatim as conversation turns and traces
+and fed to later prompts. Fixed each with a test; runs 2 and 3 confirmed. Owner facts are now answered from
+memory only (no guesses), live information is answered honestly by rule, forget also blanks the
+conversation. Default model recorded in D-118. Labels flipped only for the brain reasoner with
+`llama3.2:3b`; the legacy `providers/ollama.js` stays UNVERIFIED_LOCAL_PROVIDER.
+
+**Tests/builds actually performed (by me):** `npm test` → 108/108 (was 101); three eval runs against the
+real model (13/13, 11/11, 10/10 valid JSON on the first try; warm median ~1 s; Ollama RSS 2.3 GB); a throwaway
+loopback gateway on :8788 driven by curl with V1 requests (incl. the nonverbal envelope); read the eval
+database directly to confirm no secret text is stored.
+
+**Things NOT verified:** any other model; long-term memory quality; the physical Watch; the legacy Ollama provider.
+
+**Known issues:** the 3B model's general knowledge is shaky (octopus hearts half right); some replies lack
+final punctuation (cosmetic). `.env.example` still says TAMAGO_TOKEN is required, which predates D-116's
+identity token (not changed here).
+
+**Cross-agent impact:** brain behavior changes (rule routes for `live_info` and unknown owner facts; the
+persisted-turn format now includes placeholders). Protocol V1 unchanged. The LAN gateway on this Mac was
+restarted with the new code (state in `/Volumes/Storage/AI/TamagoAI`, AGENTS.md §9).
+
+**Signed-by:** Claude Code

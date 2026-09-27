@@ -3,12 +3,13 @@
 // A model may add more candidates (source 'llm'); those face a stricter gate.
 
 const clean = (s) => s.replace(/[.!?,;]+$/g, '').replace(/\s+/g, ' ').trim();
+const cleanValue = (s) => clean(s).replace(/\s+(now|anymore|these days|nowadays)$/i, '');
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const normPlace = (v) => clean(v).replace(/\b(this|the|my) mac( mini)?\b/i, (m) => m.replace(/mac/i, 'Mac'));
 
 const RULES = [
   { // "my Jellyfin runs on this Mac", "my server is hosted on the NAS"
-    re: /\bmy ([\w .'-]{2,40}?) (?:runs|is running|lives|is hosted|is installed|sits|is) (on|in|at) ([\w .'-]{2,40})/i,
+    re: /\bmy ([\p{L}\p{N}_ .'-]{2,40}?) (?:runs|is running|lives|is hosted|is installed|sits|is) (on|in|at) ([\p{L}\p{N}_ .'-]{2,40})/iu,
     make: (m) => {
       const subject = clean(m[1]).toLowerCase();
       const value = normPlace(`${m[3]}`);
@@ -16,7 +17,7 @@ const RULES = [
         text: `Owner's ${cap(subject)} runs ${m[2].toLowerCase()} ${value}.`, confidence: 0.92, importance: 0.75 };
     },
   },
-  { re: /\b(?:my name is|call me) ([a-z][\w'-]{1,30})\b/i,
+  { re: /\b(?:my name is|call me) (\p{L}[\p{L}\p{N}_'-]{1,30})(?![\p{L}\p{N}])/iu,
     make: (m) => ({ type: 'semantic', subject: 'owner', relation: 'name', value: cap(clean(m[1])),
       text: `Owner's name is ${cap(clean(m[1]))}.`, confidence: 0.95, importance: 0.9 }) },
   { // "always answer me briefly", "keep answers short on the Watch", "I prefer short answers"
@@ -33,10 +34,10 @@ const RULES = [
     make: (m) => ({ type: 'semantic', subject: null, relation: null, value: null,
       text: `${cap(clean(m[1]).replace(/\bmy\b/gi, "owner's").replace(/\bi\b/g, 'owner'))}.`, confidence: 0.95, importance: 0.7 }) },
   { // generic possessive: "my favorite color is teal"
-    re: /\bmy ([\w '-]{2,40}?) (?:is|are) (?!on\b|in\b|at\b)([\w .'-]{1,60})/i,
-    make: (m) => ({ type: 'semantic', subject: clean(m[1]).toLowerCase(), relation: 'is', value: clean(m[2]),
-      text: `Owner's ${clean(m[1])} is ${clean(m[2])}.`, confidence: 0.85, importance: 0.6 }) },
-  { re: /\bi (?:have|own) (?:a|an|two|three) ([\w .'-]{2,50})/i,
+    re: /\bmy ([\p{L}\p{N}_ '-]{2,40}?) (?:is|are) (?!on\b|in\b|at\b)([\p{L}\p{N}_ .'-]{1,60})/iu,
+    make: (m) => ({ type: 'semantic', subject: clean(m[1]).toLowerCase(), relation: 'is', value: cleanValue(m[2]),
+      text: `Owner's ${clean(m[1])} is ${cleanValue(m[2])}.`, confidence: 0.85, importance: 0.6 }) },
+  { re: /\bi (?:have|own) (?:a|an|two|three) ([\p{L}\p{N}_ .'-]{2,50})/iu,
     make: (m) => ({ type: 'semantic', subject: 'owner', relation: 'has', value: clean(m[1]),
       text: `Owner has ${m[0].split(/ (?:have|own) /i)[1].replace(/[.!?]+$/, '')}.`, confidence: 0.85, importance: 0.55 }) },
 ];

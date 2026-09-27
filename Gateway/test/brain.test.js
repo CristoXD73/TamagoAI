@@ -245,6 +245,140 @@ test('tools are not faked before Brain E', async () => {
   }
 });
 
+// ---------------------------------------------------------------- Brain F: defects reproduced against llama3.2:3b
+/** A reasoner that records every prompt it's shown and answers "Hmm." */
+function capturingReasoner() {
+  const prompts = [];
+  return {
+    prompts,
+    reasoner: { name: 'capture', available: true,
+      reason: async ({ context }) => { prompts.push(context.prompt); return { intent: makeIntent({ speech: 'Hmm.' }), attempts: 1 }; } },
+  };
+}
+
+test('privacy: secrets and off-the-record words are never persisted verbatim (turns, traces, later prompts)', async () => {
+  const db = tmpDb();
+  try {
+    const cap = capturingReasoner();
+    const brain = await createBrain({ dbPath: db.path, now: clock(), reasoner: cap.reasoner });
+    const secret = await brain.handle('My wifi password is hunter2-Blue-42.');
+    assert.equal(secret.intent.speech, "I don't keep secrets like that.");
+    const loose = await brain.handle('The router password is swordfish');      // no extractable fact, still a secret
+    assert.equal(loose.trace.route, 'rule');
+    await brain.handle("I'm thinking about quitting my job, don't remember that.");
+    await brain.handle('What is an octopus?');
+    assert.equal(cap.prompts.length, 1, 'secrets and off-the-record statements are handled by rule; only the octopus reaches a model');
+    assert.doesNotMatch(cap.prompts.at(-1), /hunter2|swordfish|quitting/);
+    brain.close();
+
+    const { DatabaseSync } = await import('node:sqlite');
+    const raw = new DatabaseSync(db.path, { readOnly: true });
+    const stored = JSON.stringify([raw.prepare('SELECT text FROM messages').all(), raw.prepare('SELECT trace FROM traces').all()]);
+    raw.close();
+    assert.doesNotMatch(stored, /hunter2|swordfish|quitting/);
+    assert.match(stored, /\(private, not kept\)/);
+    assert.match(stored, /\(off the record\)/);
+  } finally {
+    db.cleanup();
+  }
+});
+
+test('forget also removes the topic from the conversation, so the model cannot recover it', async () => {
+  const db = tmpDb();
+  try {
+    const cap = capturingReasoner();
+    const brain = await createBrain({ dbPath: db.path, now: clock(), reasoner: cap.reasoner });
+    await brain.handle('My favorite color is teal.');
+    await brain.handle('What is my favorite color?');
+    const f = await brain.handle('Forget what I told you about my favorite color.');
+    assert.equal(f.intent.speech, 'Okay. Forgotten.');
+    assert.ok(f.trace.memoryOps.some((o) => o.op === 'forgotten_turns'));
+    const after = await brain.handle('What is my favorite color?');
+    assert.equal(after.intent.speech, "I don't know that yet.", 'no memory: no guess, and no model asked');
+    assert.equal(after.trace.route, 'rule');
+    await brain.handle('What is an octopus?');
+    assert.doesNotMatch(cap.prompts.at(-1), /teal/i, 'the scrubbed conversation no longer carries it');
+    brain.close();
+  } finally {
+    db.cleanup();
+  }
+});
+
+test('fact recall: answered from memory only, never from stale conversation or a guess', async () => {
+  const db = tmpDb();
+  try {
+    const cap = capturingReasoner();
+    const brain = await createBrain({ dbPath: db.path, now: clock(), reasoner: cap.reasoner });
+    assert.equal((await brain.handle('What do you know about me?')).intent.speech, 'Not much yet.');
+    assert.equal((await brain.handle("What's my dog's name?")).intent.speech, "I don't know that yet.");
+    assert.equal(cap.prompts.length, 0, 'nothing known: no model was asked to guess');
+
+    await brain.handle('My favorite color is teal.');
+    await brain.handle('What is my favorite color?');
+    await brain.handle('Actually my favorite color is orange now.');
+    await brain.handle('What is my favorite color?');
+    const prompt = cap.prompts.at(-1);
+    assert.match(prompt, /favorite color is orange/);
+    assert.doesNotMatch(prompt, /teal|THIS CONVERSATION/, 'the model sees the current memory, not the old answer');
+
+    await brain.handle('My dog is named Pixel.');
+    await brain.handle('What do you know about me?');
+    assert.match(cap.prompts.at(-1), /dog is named Pixel/);
+    brain.close();
+  } finally {
+    db.cleanup();
+  }
+});
+
+test('routing: live information is answered honestly by rule; small talk is not "complex"', async () => {
+  for (const [text, kind, route] of [
+    ["What's the weather like?", 'live_info', 'rule'], ['Is it running right now?', 'live_info', 'rule'],
+    ['is jellyfin down', 'live_info', 'rule'], ['How are you today?', 'question', 'fast'],
+    ['Are you up?', 'question', 'fast'], ['Is my Jellyfin on the NAS?', 'recall', 'fast'],
+  ]) {
+    const c = classify(text);
+    assert.equal(c.kind, kind, text);
+    assert.equal(chooseRoute(c), route, text);
+  }
+  const db = tmpDb();
+  try {
+    const brain = await createBrain({ dbPath: db.path, now: clock() });
+    const w = await brain.handle("What's the weather like?");
+    assert.equal(w.intent.speech, "I can't check that yet.");
+    assert.equal(w.trace.route, 'rule');
+    brain.close();
+  } finally {
+    db.cleanup();
+  }
+});
+
+test('memory: accented names survive, and a changed value drops the time word ("orange now")', async () => {
+  assert.equal(extractCandidates('My sister is called Lucía.')[0].text, "Owner's sister is called Lucía.");
+  assert.equal(extractCandidates('My name is José')[0].value, 'José');
+  assert.deepEqual(classify("What's my sister Lucía doing?").keywords.includes('lucía'), true);
+  const db = tmpDb();
+  try {
+    const brain = await createBrain({ dbPath: db.path, now: clock() });
+    await brain.handle('My favorite color is teal.');
+    const changed = await brain.handle('Actually my favorite color is orange now.');
+    assert.equal(changed.trace.memoryOps[0].op, 'superseded');
+    assert.equal(brain.memories()[0].value, 'orange');
+    brain.close();
+  } finally {
+    db.cleanup();
+  }
+});
+
+test('speech: Tamago says "your", not "owner\'s"; the prompt says memory beats older conversation', () => {
+  const r = composeSpeech("Owner's name is unknown.");
+  assert.equal(r.speech, 'Your name is unknown.');
+  assert.ok(r.changed.includes('addressed'));
+  const p = renderSystemPrompt();
+  assert.match(p, /as "you"/);
+  assert.match(p, /OWNER MEMORY is current/);
+  assert.match(p, /cannot see live information/);
+});
+
 test('an aborted interaction commits nothing', async () => {
   const db = tmpDb();
   try {
@@ -294,7 +428,15 @@ test('context builder stays within budget and system prompt is compact', () => {
   assert.ok(renderSystemPrompt().length < 1200);
 });
 
-// ---------------------------------------------------------------- Ollama reasoner (stubbed; UNVERIFIED_LOCAL_PROVIDER)
+test('D-118 defaults: ollama without a named model uses llama3.2:3b; nothing set stays deterministic', async () => {
+  const { brainOptionsFromEnv } = await import('../src/brain/index.js');
+  assert.deepEqual(brainOptionsFromEnv({ TAMAGO_REASONER: 'ollama', TAMAGO_BRAIN_DB: ':memory:' }).reasoner.models,
+    { fast: 'llama3.2:3b', smart: 'llama3.2:3b' });
+  assert.deepEqual(brainOptionsFromEnv({ TAMAGO_FAST_MODEL: 'a', TAMAGO_BRAIN_DB: ':memory:' }).reasoner.models, { fast: 'a', smart: 'a' });
+  assert.equal(brainOptionsFromEnv({ TAMAGO_BRAIN_DB: ':memory:' }).reasoner.name, 'deterministic');
+});
+
+// ---------------------------------------------------------------- Ollama reasoner (stubbed in unit tests; real runs: docs/BRAIN_EVAL.md)
 function ollamaStub(replies) {
   const calls = [];
   const fetchImpl = async (url, init) => {

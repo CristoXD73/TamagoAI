@@ -6,15 +6,18 @@ import { createDeterministicReasoner } from './reasoners/deterministic.js';
 import { defaultBrainPath } from './storage/database.js';
 import { defaultStateDir } from '../identity.js';
 
+/** D-118: verified on the owner's Mac (docs/BRAIN_EVAL.md). An interim test model; a stronger one comes later. */
+export const DEFAULT_MODELS = Object.freeze({ fast: 'llama3.2:3b', smart: 'llama3.2:3b' });
+
 export function brainOptionsFromEnv(env = process.env) {
-  const fastModel = env.TAMAGO_FAST_MODEL ?? env.OLLAMA_MODEL;
-  const kind = env.TAMAGO_REASONER ?? (fastModel ? 'ollama' : 'deterministic');
+  const kind = env.TAMAGO_REASONER ?? (env.TAMAGO_FAST_MODEL ?? env.OLLAMA_MODEL ? 'ollama' : 'deterministic');
+  const fastModel = env.TAMAGO_FAST_MODEL ?? env.OLLAMA_MODEL ?? DEFAULT_MODELS.fast;
   let reasoner;
   if (kind === 'ollama') {
     reasoner = createOllamaReasoner({
       baseUrl: env.OLLAMA_URL ?? 'http://127.0.0.1:11434',
       fastModel,
-      smartModel: env.TAMAGO_SMART_MODEL ?? fastModel,
+      smartModel: env.TAMAGO_SMART_MODEL ?? (env.TAMAGO_FAST_MODEL ?? env.OLLAMA_MODEL ? fastModel : DEFAULT_MODELS.smart),
     });
   } else if (kind === 'deterministic') {
     reasoner = createDeterministicReasoner();

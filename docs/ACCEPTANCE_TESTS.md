@@ -107,7 +107,10 @@ SIMULATOR_VERIFIED_ONLY. See HANDOFF_LOG for commands, defects and remaining gap
 | Forget by voice and CLI | UNIT_TESTED_ONLY |
 | Familiarity by days, never decreasing | UNIT_TESTED_ONLY |
 | Aborted interaction commits nothing | UNIT_TESTED_ONLY |
-| Ollama structured outputs, repair, fallback | UNIT_TESTED_ONLY (stubbed) · real: UNVERIFIED_LOCAL_PROVIDER |
-| Latency/quality of real local models on the owner's Mac | UNVERIFIED (Brain F) |
+| Ollama structured outputs, repair, fallback | UNIT_TESTED_ONLY (stubbed) · real: verified with `llama3.2:3b` on the owner's Mac, 2026-09-27 (BRAIN_EVAL.md; repair never needed) |
+| Latency/quality of real local models on the owner's Mac | `llama3.2:3b`: ~1 s warm, 2.3 GB, no invented owner facts after fixes (BRAIN_EVAL.md). Other models UNVERIFIED |
+| Secrets / off-the-record never persisted verbatim (turns, traces, prompts) | UNIT_TESTED_ONLY + checked in the eval database |
+| Personal facts answered from memory only; no guess when unknown | UNIT_TESTED_ONLY + real model (BRAIN_EVAL.md run 3) |
+| Live information (weather, "is it running?") answered honestly by rule | UNIT_TESTED_ONLY + real model |
 | Nonverbal envelope on the physical Watch (no speech, haptic plays) | UNVERIFIED |
 

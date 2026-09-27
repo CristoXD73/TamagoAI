@@ -12,12 +12,12 @@ import { chooseRoute } from './routing/model-router.js';
 import { deterministicResponse } from './personality/behavior-policy.js';
 import { TAMAGO_PROFILE } from './personality/profile.js';
 import { extractCandidates } from './memory/extractor.js';
-import { gateCandidate } from './memory/gate.js';
+import { gateCandidate, looksPrivate } from './memory/gate.js';
 import { upsertMemory, listMemories, deleteMemory } from './memory/store.js';
-import { retrieveMemories, forgetMatching } from './memory/retrieve.js';
+import { retrieveMemories, forgetMatching, topMemories } from './memory/retrieve.js';
 import { getRelationship, recordInteraction } from './relationship/model.js';
 import { worldSnapshot } from './world/state.js';
-import { currentSession, recentTurns, appendTurn } from './session.js';
+import { currentSession, recentTurns, appendTurn, forgetTurns } from './session.js';
 import { runMaintenance } from './maintenance.js';
 import { buildContext } from './context-builder.js';
 import { composeSpeech } from './speech/composer.js';
@@ -39,12 +39,16 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
   async function handle(input, { signal, requestId = randomUUID(), client } = {}) {
     const started = now();
     const text = String(input).trim();
-    const trace = { requestId, at: new Date(started).toISOString(), input: text, client: client ?? null, steps: [] };
     const step = (name, data) => trace.steps.push({ name, ms: now() - started, ...data });
 
     // 1. understand the utterance (no model)
     const cls = classify(text);
-    step('classify', { kind: cls.kind, complexity: cls.complexity, noStore: cls.noStore, keywords: cls.keywords });
+    // Secret-looking or off-the-record words are never persisted verbatim: not as a
+    // memory, not as a conversation turn, not in the trace (so no later prompt sees them).
+    const privateText = looksPrivate(text);
+    const redacted = privateText ? '(private, not kept)' : cls.noStore ? '(off the record)' : null;
+    const trace = { requestId, at: new Date(started).toISOString(), input: redacted ?? text, client: client ?? null, steps: [] };
+    step('classify', { kind: cls.kind, complexity: cls.complexity, noStore: cls.noStore, keywords: redacted ? [] : cls.keywords });
 
     // 2. session (closing an idle one triggers cheap maintenance)
     const { session, started: newSession, closed } = currentSession(db, started);
@@ -59,8 +63,14 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     // (the last owner turn that had a topic; "Thanks." or "ok" carry none)
     const topicTurn = [...turns].reverse().find((t) => t.role === 'owner' && keywordsOf(t.text).some((k) => !/^(thanks|thank|buddy|cool|nice)$/.test(k)));
     const focusKeywords = (cls.usesPronoun || cls.keywords.length === 0) && topicTurn ? keywordsOf(topicTurn.text) : [];
-    const memories = cls.kind === 'forget' ? [] : retrieveMemories(db, { keywords: [...cls.keywords, ...focusKeywords], now: started });
-    step('retrieve', { focusKeywords, memories: memories.map((m) => ({ id: m.id, text: m.text, score: +m.score.toFixed(2) })) });
+    // "What/where/who is my…": the owner's facts come from memory, never from a model's guess
+    // or from older conversation lines (a small model copies a stale answer from those).
+    const aboutMe = cls.isQuestion && /\bwhat do you (know|remember)\b|\b(know|remember) about me\b/i.test(text);
+    const factRecall = aboutMe || (cls.kind === 'recall' && cls.complexity === 'simple' && /^(what|what's|whats|where|where's|who|who's|which|when)\b/i.test(text));
+    const memories = cls.kind === 'forget' ? []
+      : aboutMe ? topMemories(db)
+        : retrieveMemories(db, { keywords: [...cls.keywords, ...focusKeywords], now: started });
+    step('retrieve', { focusKeywords, factRecall, memories: memories.map((m) => ({ id: m.id, text: m.text, score: +m.score.toFixed(2), matched: m.matched })) });
 
     // 5. who and when
     const relationship = getRelationship(db, started);
@@ -72,17 +82,22 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     //    so Tamago never says "Got it" about something it refused to keep)
     const ruleGated = candidates.map((c) => ({ c, g: gateCandidate(c, { noStore: cls.noStore }) }));
     const accepted = ruleGated.filter(({ g }) => g.decision === 'accept').length;
-    const refusedPrivate = ruleGated.some(({ g }) => g.reason === 'private/secret-like content');
-    let route = chooseRoute(cls, { extractedFacts: accepted || (refusedPrivate || cls.noStore ? candidates.length : 0) });
+    const refusedPrivate = privateText || ruleGated.some(({ g }) => g.reason === 'private/secret-like content');
+    // A secret never reaches a model, whatever kind of utterance carried it.
+    const unknownFact = factRecall && !memories.some((m) => m.matched);
+    let route = refusedPrivate || unknownFact ? 'rule' : chooseRoute(cls, { extractedFacts: accepted || (cls.noStore ? candidates.length : 0) });
     let intent;
     let reasonerUsed = 'rule';
     const memoryOps = [];
 
     if (route === 'rule') {
-      intent = ruleIntent(cls, { relationship, world, candidates, text, memoryOps, refusedPrivate });
+      intent = unknownFact && !refusedPrivate
+        ? makeIntent({ speech: aboutMe ? "Not much yet." : "I don't know that yet.", emotion: 'uncertain', sound: 'uncertain_hum',
+          haptic: 'none', behavior: 'look_away', thought: 'No memory holds that. Not guessing.' })
+        : ruleIntent(cls, { relationship, world, candidates, text, memoryOps, refusedPrivate });
     } else {
-      const context = buildContext({ text, cls, route, memories, turns, relationship, world, profile });
-      step('context', { ...context.stats, prompt: context.prompt });
+      const context = buildContext({ text, cls, route, memories, turns: factRecall ? [] : turns, relationship, world, profile });
+      step('context', { ...context.stats, prompt: redacted ? context.prompt.replace(/OWNER SAYS: [\s\S]*$/, `OWNER SAYS: ${redacted}`) : context.prompt });
       let active = reasoner.available === false ? fallback : reasoner;
       try {
         const r = await active.reason({ context, route, text, cls, memories, focusKeywords }, { signal });
@@ -113,7 +128,9 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     // 8. memory write gate (rules + any model proposals)
     const gated = [...ruleGated, ...intent.memoryCandidates.map((c) => ({ ...c, key: null, source: 'llm' }))
       .map((c) => ({ c, g: gateCandidate(c, { noStore: cls.noStore }) }))];
-    step('memory_gate', { decisions: gated.map(({ c, g }) => ({ text: c.text, source: c.source, ...g })) });
+    step('memory_gate', { decisions: gated.map(({ c, g }) => ({
+      text: redacted || g.reason === 'private/secret-like content' ? '[redacted]' : c.text, source: c.source, ...g,
+    })) });
 
     if (signal?.aborted) throw signal.reason ?? new Error('aborted'); // never commit a stale interaction
 
@@ -123,7 +140,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       for (const { c, g } of gated) {
         if (g.decision === 'accept') memoryOps.push({ op: upsertMemory(db, c, started).action, text: c.text });
       }
-      appendTurn(db, session.id, started, text, said, { emotion: intent.emotion, behavior: intent.behavior, route });
+      appendTurn(db, session.id, started, redacted ?? text, said, { emotion: intent.emotion, behavior: intent.behavior, route });
       recordInteraction(db, cls.kind, started);
     });
     step('commit', { memoryOps });
@@ -141,11 +158,17 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     const policy = deterministicResponse(cls, { relationship, world });
     if (policy) return policy;
     if (cls.kind === 'forget') {
-      const removed = transaction(db, () => forgetMatching(db, cls.keywords.filter((k) => !/^(forget|erase|delete|remove|told|about|that)$/.test(k))));
+      const topic = cls.keywords.filter((k) => !/^(forget|erase|delete|remove|told|about|that)$/.test(k));
+      const { removed, turns } = transaction(db, () => ({ removed: forgetMatching(db, topic), turns: forgetTurns(db, topic) }));
       for (const r of removed) memoryOps.push({ op: 'forgotten', text: r.text });
-      return makeIntent(removed.length
+      if (turns) memoryOps.push({ op: 'forgotten_turns', text: `${turns} conversation turns` });
+      return makeIntent(removed.length || turns
         ? { speech: 'Okay. Forgotten.', emotion: 'content', haptic: 'click', behavior: 'slow_blink', thought: `Forgot ${removed.length} memories.` }
         : { speech: "I didn't have that.", emotion: 'uncertain', haptic: 'none', behavior: 'look_away', thought: 'Nothing matched.' });
+    }
+    if (cls.kind === 'live_info') {
+      return makeIntent({ speech: "I can't check that yet.", emotion: 'uncertain', sound: 'uncertain_hum', haptic: 'none',
+        behavior: 'look_away', thought: 'Live information (weather, news, service status) needs tools (Brain E).' });
     }
     if (cls.kind === 'tool_request') {
       return makeIntent({ speech: "I can't do that yet.", emotion: 'uncertain', sound: 'uncertain_hum', haptic: 'none',
