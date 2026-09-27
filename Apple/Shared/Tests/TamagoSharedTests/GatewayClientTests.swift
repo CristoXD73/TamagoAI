@@ -143,7 +143,21 @@ struct GatewayClientTests {
         stub.next = .success(json: #"{"protocolVersion":1,"error":{"code":"pairing_unavailable","message":"x"}}"#, httpStatus: 404)
         #expect(await makeClient(stub).pair(code: "000000") == .closed)
         stub.next = .failure(URLError(.cannotFindHost))
-        #expect(await makeClient(stub).pair(code: "000000") == .unreachable)
+        #expect(await makeClient(stub).pair(code: "000000") == .unreachable("Name not found: gateway.test"))
+        stub.next = .failure(URLError(.cannotConnectToHost))
+        #expect(await makeClient(stub).pair(code: "000000") == .unreachable("Connection refused by gateway.test"))
+        stub.next = .success(json: "{}", httpStatus: 500)
+        #expect(await makeClient(stub).pair(code: "000000") == .unreachable("Unexpected answer (HTTP 500)"))
+    }
+
+    @Test func manualAddressBecomesAGatewayURL() {
+        #expect(GatewayConfiguration.manualBaseURL(from: "192.168.0.74")?.absoluteString == "http://192.168.0.74:8787")
+        #expect(GatewayConfiguration.manualBaseURL(from: " 192.168.0.74:9000 ")?.absoluteString == "http://192.168.0.74:9000")
+        #expect(GatewayConfiguration.manualBaseURL(from: "http://studio.local:8787/v1/health")?.absoluteString == "http://studio.local:8787")
+        #expect(GatewayConfiguration.manualBaseURL(from: "HTTP://Mac.local")?.absoluteString == "http://Mac.local:8787")
+        #expect(GatewayConfiguration.manualBaseURL(from: "") == nil)
+        #expect(GatewayConfiguration.manualBaseURL(from: "my mac") == nil)
+        #expect(GatewayConfiguration.manualBaseURL(from: "ftp://192.168.0.74") == nil)
     }
 
     @Test func requestSendsBearerAuthorizationHeaderAndJSONBody() async {

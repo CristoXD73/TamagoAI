@@ -143,7 +143,7 @@ Building the Watch app, pairing a simulator and driving the full loop are in
 
 | Suite | Count | Where |
 |---|---|---|
-| Swift (`Apple/Shared`) | 138 | host (`swift test`) and the watchOS 27 simulator (`xcodebuild test`) |
+| Swift (`Apple/Shared`) | 139 | host (`swift test`) and the watchOS 27 simulator (`xcodebuild test`) |
 | Gateway (`Gateway/test`) | 108 | Node test runner |
 
 `UNIT_TESTED_ONLY` means the tests passed, not that the feature was seen

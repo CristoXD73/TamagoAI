@@ -725,3 +725,38 @@ test that runs the real fixture through `CharacterStateMachine` (reaction `happy
 unverified; no production Swift touched.
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T01:19:43-04:00: Claude Code — TestFlight live; first physical-Watch pairing attempt fails; build 3 with manual address + error detail
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `03480a4`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/Shared/GatewayTransport.swift` (`PairingOutcome.unreachable(String)`,
+`GatewayClient.describe`, `GatewayConfiguration.manualBaseURL`), `Apple/WatchApp/PairingView.swift` ("Use Mac
+address" + the real reason on failure), `Apple/WatchApp/TamagoConnection.swift` (`pair(code:address:)`),
+`Apple/WatchApp/DebugStateControlsView.swift`, `Apple/Shared/Tests/.../GatewayClientTests.swift` (+1 test,
+extended pairing test), `README.md` (Swift count), this file.
+
+**Work performed:** with the owner (renewed membership), created the App Store Connect record "TamagoAI"
+(bundle `com.cristoxd73.tamawatch.c73x926`), uploaded build 0.1.0 (2), and created the internal group "Owner"
+(automatic distribution) with the account holder as tester. The owner installed it from TestFlight on the
+iPhone; the icon shows correctly. **First physical-Watch evidence:** pairing against the LAN gateway
+(`tamagoai.local` → 192.168.0.74) failed twice with "Couldn't find your Mac on this network", with the
+iPhone's Bluetooth on and then off; the gateway log shows no `/v1/pair` request from the Watch. From the
+iPhone's Safari both `http://tamagoai.local:8787/v1/health` and `http://192.168.0.74:8787/v1/health` work, so
+the LAN and mDNS are fine for Wi-Fi clients. Build 3 adds a typed-address fallback and shows the actual
+failure reason so the next attempt identifies the failing step.
+
+**Tests/builds actually performed (by me):** `swift test` → 139/139; Release archive → ARCHIVE SUCCEEDED;
+export/upload of build 3 → Upload succeeded. Not run in the simulator UI.
+
+**Things NOT verified:** build 3 on the Watch; why the Watch can't reach the Mac (candidates: .local
+resolution on watchOS, local-network access for the app, the Watch's actual Wi-Fi path).
+
+**Known issues:** a typed IP breaks if the Mac's DHCP address changes (reserve it on the router, or re-pair).
+
+**Cross-agent impact:** `PairingOutcome.unreachable` now carries a reason string (source-breaking for any
+other caller; all in-repo callers updated).
+
+**Signed-by:** Claude Code

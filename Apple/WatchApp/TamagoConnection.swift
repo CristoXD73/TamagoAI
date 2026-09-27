@@ -137,8 +137,11 @@ final class TamagoConnection {
 
     // MARK: Pairing (D-116)
 
-    func pair(code: String) async -> PairingOutcome {
-        let url = credential == .developerOverride ? gatewayURL : GatewayConfiguration.wellKnownBaseURL
+    /// Pairs with the Mac at `address` if given (typed on the pairing screen,
+    /// for networks where `tamagoai.local` doesn't resolve from the Watch),
+    /// otherwise at the well-known name. The address is kept with the pairing.
+    func pair(code: String, address: URL? = nil) async -> PairingOutcome {
+        let url = address ?? (credential == .developerOverride ? gatewayURL : GatewayConfiguration.wellKnownBaseURL)
         let outcome = await GatewayClient(configuration: GatewayConfiguration(baseURL: url))
             .pair(code: code, deviceName: WKInterfaceDevice.current().name)
         guard case let .paired(grant) = outcome else { return outcome }

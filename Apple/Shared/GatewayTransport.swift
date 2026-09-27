@@ -35,6 +35,23 @@ public struct GatewayConfiguration: Sendable, Equatable {
     public var expectedGatewayId: String?
 
     /// D-107: gateway timeout 20 s + 5 s.
+    /// A Mac address typed on the Watch, for networks where `tamagoai.local`
+    /// can't be resolved from the Watch. Accepts `192.168.0.74`,
+    /// `192.168.0.74:9000` or a full `http://…` URL; the port defaults to 8787.
+    public static func manualBaseURL(from input: String) -> URL? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
+        guard var parts = URLComponents(string: trimmed.contains("://") ? trimmed : "http://\(trimmed)"),
+              let scheme = parts.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              let host = parts.host, !host.isEmpty else { return nil }
+        parts.scheme = scheme
+        parts.port = parts.port ?? 8787
+        parts.path = ""
+        parts.query = nil
+        parts.fragment = nil
+        return parts.url
+    }
+
     public init(baseURL: URL, authToken: String? = nil, requestTimeout: TimeInterval = 25, expectedGatewayId: String? = nil) {
         self.baseURL = baseURL
         self.authToken = authToken
@@ -61,7 +78,9 @@ public enum PairingOutcome: Equatable, Sendable {
     /// No pairing window open: expired, already used, too many wrong codes,
     /// or the gateway doesn't pair (loopback dev mode).
     case closed
-    case unreachable
+    /// With a short, human-readable reason ("Name not found: tamagoai.local"),
+    /// so a failure on a real Watch says *which* step failed.
+    case unreachable(String)
 }
 
 /// A request's response plus whether it actually came from the gateway —
@@ -176,15 +195,36 @@ public actor GatewayClient {
             data = result.0
             response = result.1
         } catch {
-            return .unreachable
+            return .unreachable(Self.describe(error, host: configuration.baseURL.host))
         }
-        switch (response as? HTTPURLResponse)?.statusCode {
+        let status = (response as? HTTPURLResponse)?.statusCode
+        switch status {
         case 200:
-            guard let grant = try? decoder.decode(TamagoPairingGrant.self, from: data) else { return .unreachable }
+            guard let grant = try? decoder.decode(TamagoPairingGrant.self, from: data) else {
+                return .unreachable("Unreadable answer from \(configuration.baseURL.host ?? "the Mac")")
+            }
             return .paired(grant)
         case 401: return .wrongCode
         case 404, 410: return .closed
-        default: return .unreachable
+        default: return .unreachable("Unexpected answer (HTTP \(status.map(String.init) ?? "none"))")
+        }
+    }
+
+    /// Short reason for a transport failure, naming the host that was tried.
+    public static func describe(_ error: Error, host: String?) -> String {
+        let target = host ?? "the Mac"
+        guard let urlError = error as? URLError else {
+            let ns = error as NSError
+            return "Network error \(ns.domain) \(ns.code)"
+        }
+        switch urlError.code {
+        case .cannotFindHost, .dnsLookupFailed: return "Name not found: \(target)"
+        case .cannotConnectToHost: return "Connection refused by \(target)"
+        case .timedOut: return "No answer from \(target)"
+        case .notConnectedToInternet: return "The Watch has no network connection"
+        case .networkConnectionLost: return "Connection to \(target) dropped"
+        case .appTransportSecurityRequiresSecureConnection: return "Blocked by App Transport Security"
+        default: return "Network error \(urlError.code.rawValue) reaching \(target)"
         }
     }
 
