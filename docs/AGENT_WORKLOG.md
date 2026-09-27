@@ -857,3 +857,21 @@ loaded llama3.2:3b with a 60-min expiry (`/api/ps`).
 **Cross-agent impact:** none beyond the gateway.
 
 **Signed-by:** Claude Code
+
+### 2026-09-27T02:36:52-04:00: Claude Code — task brief for the cloud agent: natural voice (docs/handoff/VOICE_TASK.md)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `c92ebe1`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** new `docs/handoff/VOICE_TASK.md`, this file.
+**Work performed:** at the owner's request, wrote a self-contained, step-by-step task for Claude Code (cloud):
+research local, permissively licensed neural TTS; Mac-side synthesis behind a helper (like the transcriber);
+additive PROTOCOL_V1 §16; Watch playback with AVSpeechSynthesizer fallback (Swift UNVERIFIED in the cloud); a
+setup + listening kit for the local agent. Guardrails: local only, no voice cloning, permissive licenses for code
+and weights, zero npm deps, additive protocol, never delay the text reply, Storage disk for models.
+**Tests/builds actually performed (by me):** none (docs only); `git diff --check`.
+**Things NOT verified:** n/a.
+**Known issues:** none.
+**Cross-agent impact:** assigns the voice work to the cloud agent; the local agent verifies on the Mac/Watch after.
+**Signed-by:** Claude Code
