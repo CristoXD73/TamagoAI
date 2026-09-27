@@ -130,6 +130,10 @@ TAMAGO_ALLOW_NO_AUTH=1 npm start       # loopback-only dev mode, no auth
 swift test --package-path Apple/Shared --scratch-path .build/spm
 ```
 
+On the owner's Mac, builds, AI models, databases and caches all live on the
+external `/Volumes/Storage` disk, never the internal one
+([`AGENTS.md`](AGENTS.md) §9).
+
 Building the Watch app, pairing a simulator and driving the full loop are in
 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md). Mock provider commands are in
 [`Gateway/mock/README.md`](Gateway/mock/README.md).

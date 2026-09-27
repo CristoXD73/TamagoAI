@@ -3,6 +3,12 @@
 **Read `AGENTS.md` first. Its rules are binding for Claude too.** This file only
 adds Claude-specific notes.
 
+> [!IMPORTANT]
+> **On the owner's Mac, use the external `/Volumes/Storage` disk, never the
+> internal one**, for builds, AI models, databases, caches and temp files
+> (`AGENTS.md` §9). If it isn't mounted, stop and ask. Sign and time every
+> worklog entry (`AGENTS.md` §8).
+
 ## Orientation (read in order)
 
 1. `AGENTS.md`: rules, prohibitions, verification labels
@@ -57,6 +63,8 @@ cd Apple && xcodebuild test -project AppleTamago.xcodeproj -scheme TamagoWatch \
 - Cloud sessions have **no Xcode or Swift toolchain**. Don't claim Swift compiles.
 - Don't edit `Apple/AppleTamago.xcodeproj` in the cloud. Adding Swift files to the
   synchronized folders needs no project edit.
-- Keep `-derivedDataPath` under the repo's `.build/` (external volume).
+- Keep `-derivedDataPath` under the repo's `.build/` (external volume). Ollama
+  models, brain databases and eval runs also go on `/Volumes/Storage`
+  (`AGENTS.md` §9 has the paths and env vars).
 - Premium Xcode time is scarce. Spend it on Apple-platform problems, not boilerplate.
 - Before finishing, update `docs/HANDOFF_LOG.md`.

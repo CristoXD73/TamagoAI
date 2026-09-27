@@ -80,3 +80,42 @@ Keychain stay where Apple put them. Command-line builds in this repo pass
 `-derivedDataPath` pointing at `/Volumes/Storage/Projects/TamaWatch/.build/`
 (git-ignored) so build products do not grow the internal SSD; the simulator
 device data itself still lives in `~/Library/Developer/CoreSimulator`.
+
+This is a binding rule for every agent: `AGENTS.md` §9 has the full path table.
+
+### Check on 2026-09-26 (Claude Code, before Brain F)
+
+| Item | Value | Source |
+|---|---|---|
+| Internal SSD (`/`) | 228 GiB, **21 GiB available (90% used)** | `df -h /` |
+| `/Volumes/Storage` | 931 GiB, **400 GiB available** | `df -h /Volumes/Storage` |
+| `~/Library/Developer/CoreSimulator` | 2.6 GiB | `du -sh` |
+| `~/Library/Developer/Xcode/DerivedData` | 524 MiB (from Xcode GUI builds, not the command line) | `du -sh` |
+| `~/.npm` | 142 MiB | `du -sh` |
+| `/Volumes/Storage/AI` | exists, empty | `ls` |
+| Ollama | **not installed** | `which ollama` |
+
+### Ollama on the Storage disk
+
+Models are gigabytes each, so they must not land in the default `~/.ollama/models`
+(internal). Point the Ollama server at the Storage disk **before the first pull**:
+
+```sh
+mkdir -p /Volumes/Storage/AI/ollama/models
+# Ollama menu-bar app: set the variable for GUI apps, then quit and reopen Ollama
+launchctl setenv OLLAMA_MODELS /Volumes/Storage/AI/ollama/models
+# or run the server by hand instead of the app
+OLLAMA_MODELS=/Volumes/Storage/AI/ollama/models ollama serve
+```
+
+`launchctl setenv` lasts until logout or restart; set it again after a reboot
+(or use the Ollama app's own model-location setting if your version has one).
+Check with `ollama list` after a pull that `/Volumes/Storage/AI/ollama/models` grew
+and `~/.ollama/models` did not.
+
+Gateway state and brain databases on this Mac:
+
+```sh
+export TAMAGO_STATE_DIR=/Volumes/Storage/AI/TamagoAI       # identity + brain.sqlite
+TAMAGO_BRAIN_DB=/Volumes/Storage/AI/tamago-eval/<model>.sqlite npm run brain -- chat   # eval runs
+```

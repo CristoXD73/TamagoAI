@@ -554,3 +554,35 @@ documents empty `text`/`speechText` as a nonverbal reaction, which the current W
 No Apple sources were touched.
 
 **Signed-by:** Claude Code (cloud)
+
+### 2026-09-26T22:22:34-04:00: Claude Code — Storage-disk rule made binding and visible; Brain F blocked
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `9d6148c`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `AGENTS.md` (top callout + new §9 Storage), `CLAUDE.md` (top callout, reminder line),
+`README.md` (one line in Development), `docs/LOCAL_ENVIRONMENT.md` (disk check, Ollama-on-Storage setup),
+this file.
+
+**Work performed:** the owner asked that every agent use the external `/Volumes/Storage` disk rather than
+the internal SSD, and that the rule be visible on GitHub. It existed only in `docs/LOCAL_ENVIRONMENT.md`.
+It's now a callout at the top of `AGENTS.md` and `CLAUDE.md`, plus a full path table in `AGENTS.md` §9
+(builds, Ollama models via `OLLAMA_MODELS`, gateway state via `TAMAGO_STATE_DIR`, eval databases, temp
+files). Paths stay out of source code; code defaults remain portable.
+Brain F step 1 (environment check) stopped as instructed: Ollama is not installed.
+
+**Tests/builds actually performed (by me):** `node --version` → v26.9.0; `which ollama` → not found (no
+app, no `~/.ollama`, nothing on :11434); `df -h` → internal 21 GiB free (90% used), Storage 400 GiB free;
+`du -sh` of CoreSimulator (2.6 GiB), Xcode DerivedData (524 MiB), `~/.npm` (142 MiB);
+`cd Gateway && npm test` → 101/101 pass. Docs-only change; `git diff --check` clean.
+
+**Things NOT verified:** the `launchctl setenv OLLAMA_MODELS` instructions (Ollama isn't installed yet);
+the rendered GitHub callouts (RENDERED GITHUB PAGE NOT VERIFIED at time of writing).
+
+**Known issues:** 524 MiB of Xcode GUI DerivedData remains on the internal disk; left for the owner to
+decide (not deleted).
+
+**Cross-agent impact:** new binding rule for all agents (`AGENTS.md` §9). No code touched.
+
+**Signed-by:** Claude Code

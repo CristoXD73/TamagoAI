@@ -10,6 +10,17 @@ The Watch is the **face**; the owner's Mac mini is the **brain**. Read
 **Before modifying the README, a website, or any product presentation, read
 `docs/PRODUCT_PRESENTATION.md`.** It's mandatory, not optional background.
 
+> [!IMPORTANT]
+> **Use the external `Storage` disk, not the Mac's internal disk.** On the
+> owner's Mac, everything this project downloads, builds, caches or generates
+> goes under **`/Volumes/Storage`**: the repo itself, build products, AI models,
+> databases, evaluation data, captures and temp files. The internal SSD is small
+> and nearly full. If `/Volumes/Storage` isn't mounted, **stop and tell the
+> owner**. Never fall back to the internal disk. Full rule and paths: §9.
+>
+> **Sign and time every change.** Each worklog entry carries your agent name, a
+> machine-derived ISO-8601 timestamp (`date -Iseconds`) and `Signed-by:` (§8).
+
 ## 1. Stay in your lane
 
 - **Do not try to finish the whole product.** Do your assigned stage only
@@ -151,4 +162,37 @@ Each entry must identify:
 own.** If you rely on a build, test run, or on-device observation you did not
 personally perform, attribute it to whoever performed it (or mark it
 unverified by you) instead of restating it as your own result.
+
+## 9. Storage: the external `Storage` disk comes first
+
+Applies to every agent working on the owner's Mac (cloud sessions have their
+own disks). The owner's internal SSD is small and nearly full; the external
+volume **`/Volumes/Storage`** is where this project lives and grows.
+
+**Rule:** anything this project downloads, builds, caches or generates goes on
+`/Volumes/Storage`. Check `df -h /Volumes/Storage /` before any large download
+or build. If `/Volumes/Storage` isn't mounted, stop and tell the owner. Never
+quietly use the internal disk instead.
+
+| What | Where (on the owner's Mac) | How |
+|---|---|---|
+| Repository | `/Volumes/Storage/Projects/TamaWatch` | already there |
+| Xcode build products | `/Volumes/Storage/Projects/TamaWatch/.build/DerivedData` (git-ignored) | always pass `-derivedDataPath` |
+| SwiftPM build products | `/Volumes/Storage/Projects/TamaWatch/.build/spm` | `--scratch-path` |
+| Ollama models | `/Volumes/Storage/AI/ollama/models` | `OLLAMA_MODELS` env var for the Ollama server (see `docs/LOCAL_ENVIRONMENT.md`) |
+| Gateway state (identity, `brain.sqlite`) | `/Volumes/Storage/AI/TamagoAI` | `TAMAGO_STATE_DIR=/Volumes/Storage/AI/TamagoAI` |
+| Evaluation and throwaway databases | `/Volumes/Storage/AI/tamago-eval/` | `TAMAGO_BRAIN_DB=…` (not `/tmp`, which is internal) |
+| Large temp files, captures, exports | `/Volumes/Storage/DevCaches/TamaWatch/tmp` | not `/tmp` |
+| 3D / Blender work | inside the repo or elsewhere on `/Volumes/Storage` | — |
+
+**Stays where Apple or Homebrew put it** (don't move or symlink these):
+Xcode.app, SDKs, simulator runtimes and `~/Library/Developer/CoreSimulator`
+device data, the Keychain and signing material, and small tool binaries such as
+`ollama` or `node` themselves. Keep simulator count low; delete test
+simulators you created once you're done with them.
+
+These paths are the owner's local setup, not app code: don't hardcode them in
+source. Defaults in code stay portable (for example
+`~/Library/Application Support/TamagoAI`); the owner's Mac overrides them with
+the environment variables above.
 
