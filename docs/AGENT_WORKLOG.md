@@ -1054,3 +1054,28 @@ lengths; simulator run against a loopback test gateway with TTS: transcribe 319 
 **Known issues:** synthesis competes with Ollama for CPU.
 **Cross-agent impact:** confirms the cloud agent's setup kit and gateway path work on the real Mac.
 **Signed-by:** Claude Code
+
+### 2026-09-27T05:23:21-04:00: Claude Code — Watch complications / Smart Stack widget with the octopus
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `0429e59`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/Complication/TamagoComplication.swift` (rewritten), new `Apple/Complication/Assets.xcassets`
+(Octopus @2x/@3x from the approved art, scaled on black), `Apple/Complication/README.md`,
+`Apple/Config/Tamago.xcconfig` (app icon name per target via `TAMAGO_APPICON_$(TARGET_NAME)`), this file.
+**Work performed:** the owner asked for widgets. The placeholder complication showed an SF "face.smiling" symbol
+(the creature has no face) and the word "idle". Now: circular (octopus on black), corner (octopus + curved
+"Tamago"), rectangular / Smart Stack (octopus + "Tamago" + "Hold to talk"), inline ("Tamago"); tap opens the app;
+`.desaturated` accented rendering keeps the octopus white on tinted faces. Also shipped TestFlight 0.1.1 (100)
+with the owner's voice (previous entry) before this.
+**Tests/builds actually performed (by me):** TamagoWatch simulator build → succeeded (after fixing: global AppIcon
+name hitting the complication's new catalog; `widgetAccentedRenderingMode` must precede `scaledToFit`);
+`assetutil`: the complication's catalog holds "Octopus", the Watch app still has its AppIcon set. Saw the octopus app
+icon in the simulator's app grid.
+**Things NOT verified:** the complications rendered on a watch face (the simulator's face editor didn't respond
+to automated long-press); on the owner's Watch.
+**Known issues:** Xcode was suspended again by the owner's Game Mode tool and blocked `xcodebuild`; resumed only
+Xcode and its build service.
+**Cross-agent impact:** complication target now has an asset catalog; app-icon setting is per target.
+**Signed-by:** Claude Code
