@@ -97,7 +97,8 @@ else
   # mistaken for an option (e.g. a reply beginning "--output-filename=…").
   text="${text#"${text%%[![:space:]-]*}"}"
   [[ -n "$text" ]] || die "nothing to say"
-  "$bin" "${args[@]}" --output-filename="$raw" "$text" >/dev/null 2>"$work/err" || { cat "$work/err" >&2; die "synthesis failed"; }
+  # sherpa-onnx defaults to 1 thread; 4 cut Kokoro's generation to ~0.5 s for a sentence on the owner's M6.
+  "$bin" "${args[@]}" --num-threads="${TAMAGO_TTS_THREADS:-4}" --output-filename="$raw" "$text" >/dev/null 2>"$work/err" || { cat "$work/err" >&2; die "synthesis failed"; }
 fi
 
 [[ -s "$raw" ]] || die "engine produced no audio"

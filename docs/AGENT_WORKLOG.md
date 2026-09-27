@@ -1033,3 +1033,24 @@ fake helper (72 clips, page rendered and screenshotted in headless Chromium). `n
 sizes are unverified.
 **Cross-agent impact:** none beyond the new npm script.
 **Signed-by:** Claude Code (cloud)
+
+### 2026-09-27T03:17:07-04:00: Claude Code — natural voice installed and verified locally; owner chose Kokoro af_heart 0.9×
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `addf7c7`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Gateway/tools/tts/tamago-tts` (`--num-threads`, default 4 via `TAMAGO_TTS_THREADS`),
+`docs/DECISIONS.md` (D-121 addendum), this file.
+**Work performed:** with the owner's approval (sources and sizes shown first), ran the cloud agent's
+`tools/tts/setup.sh --kitten`: sherpa-onnx 1.13.8 (42 MB), Kokoro-82M v1.0 (334 MB), KittenTTS nano (26 MB) →
+`/Volumes/Storage/AI/tts`, SHA-256 recorded; all URLs worked first time. Generated the 96-clip listening page;
+the owner picked af_heart at 0.9×. Found the helper ran sherpa-onnx single-threaded; 4 threads halves latency.
+Real gateway restarted with voice in + out.
+**Tests/builds actually performed (by me):** setup self-test (both engines OK); timing 1 vs 4 threads on three
+lengths; simulator run against a loopback test gateway with TTS: transcribe 319 ms, reply 1404 ms, synth 1146 ms
+(7573 B), Watch log "reply audio started … finished (ok: true)".
+**Things NOT verified:** hearing it on the owner's Watch (TestFlight build next).
+**Known issues:** synthesis competes with Ollama for CPU.
+**Cross-agent impact:** confirms the cloud agent's setup kit and gateway path work on the real Mac.
+**Signed-by:** Claude Code

@@ -966,3 +966,12 @@ off-LAN exposure).
   - Real engine: UNVERIFIED (no downloads possible in the cloud sandbox).
   - Watch Swift: UNVERIFIED (not compiled).
   - Nothing is DEVICE_VERIFIED until the owner hears it on the Watch.
+
+**D-121 addendum (owner, 2026-09-27): the voice is Kokoro `af_heart` at 0.9×.** Chosen by ear from the
+listening page (8 voices × 2 speeds). Measured on the owner's Mac after setup (sherpa-onnx 1.13.8, checksums in
+`/Volumes/Storage/AI/tts/checksums.sha256`): the helper now runs sherpa-onnx with 4 threads (it defaulted to 1),
+cutting a sentence from ~2.1 s to ~1.0 s (0.65 s for "Pixel.", 1.4 s for 86 characters), inside the Watch's 2.5 s
+wait. Simulator end to end: hold → transcript 0.32 s → reply 1.4 s → Mac voice synthesized 1.15 s and played
+("reply audio finished ok"). Gateway start line:
+`TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=af_heart TAMAGO_TTS_SPEED=0.9 TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts`.
+Heard on the Watch: UNVERIFIED until the owner listens.
