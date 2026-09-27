@@ -1034,3 +1034,30 @@ Heard on the Watch: UNVERIFIED until the owner listens.
   - It starts Ollama in its own session, so Ctrl-C or closing the window leaves it running.
   - It runs the gateway with the owner's settings: brain + llama3.2:3b, Apple transcription, Kokoro af_heart 0.9×.
   - Running it at login (launchd) is the next step, once the owner is happy with the live view.
+
+### D-124 The mascot is the front idle loop; no clock over Tamago (a charm, not a Watch app)
+
+- **Owner, 2026-09-27:**
+  - "heres an idle animation its a 2d image animation, make sure to change our mascot for this".
+  - "remove the clock from the main view when we are on tamago ai remember we are working towards a charm not a
+    watch ai".
+- **Decision: the idle loop replaces the floating still (D-119, gate #11) on the Watch and in the iPhone app.**
+  It's Codex's front-facing idle loop (`docs/prototypes/idle-front-v1`, Visual Approval Gate #12, approved by
+  owner direction).
+  - **Watch:**
+    - A silent looping video, played by `VideoPlayer` with hit-testing off, so hold-to-talk still works.
+    - The Watch's video hardware decodes it.
+    - watchOS has no `AVPlayerLooper`, so an `AVQueuePlayer` keeps two clips queued (no seek, no seam).
+    - It pauses to the first frame when nobody can see it (other page, Always-On) and holds still with Reduce Motion.
+  - **iPhone:** the same loop with `AVPlayerLooper`, muted, with no audio track so it never interrupts music.
+- **The clock:** watchOS has no supported switch to hide the time in an app.
+  - Scene-level `persistentSystemOverlays(.hidden)` affects the Home indicator and similar overlays, not the Watch
+    clock (Apple docs). In the simulator it and `.toolbar(.hidden, for: .navigationBar)` left the time on screen.
+  - **What works:** watchOS hides the time while a video is on screen. Playing the mascot as a video therefore
+    removes the clock and saves battery, compared with 150 decoded frames.
+  - **Limit:** the clock comes back whenever the video is paused: Always-On, Reduce Motion, other pages.
+  - The two modifiers stay in place; they're harmless and will help if Apple honours them later.
+- **Product direction recorded:** Tamago is working towards a **charm** (MASTER_BRIEF: "strapless like a pocket
+  charm"), not a Watch utility. Watch chrome is kept to a minimum.
+- Verified in the watchOS simulator (SE 3 40 mm): the loop plays, no clock, and a hold reaches the app. Also in the
+  iOS simulator (iPhone 18 Pro). Not yet on the owner's devices.

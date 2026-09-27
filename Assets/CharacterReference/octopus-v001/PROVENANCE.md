@@ -25,3 +25,11 @@ These images are visual ground truth: do not redesign, humanize, or restyle the 
   `Apple/PhoneWidget/Assets.xcassets/CreatureCutout.imageset/CreatureCutout.png` is `ref_hero_q34.jpg`, static,
   with only its black background made transparent and the frame trimmed (`tools/widget-art/make_cutout.py`).
   The octopus's pixels are unchanged.
+
+- **Idle loop (owner, 2026-09-27, D-124):** the owner chose Codex's front-facing idle animation as the mascot.
+  - **Its source:** a front-facing cutout that Codex made from the owner's four-view reference with the built-in
+    image generator. Prompt, renderer and source are in `docs/prototypes/idle-front-v1/`; the 190 MB ProRes master
+    stays outside the repo.
+  - **What ships:** `Apple/WatchApp/IdleLoop.mp4` (300×400) and `Apple/iPhoneApp/IdleLoop.mp4` (600×800), both
+    H.264 on black with no audio, plus the first frame `Apple/WatchApp/idle-000.jpg`.
+  - **Known limit:** faint alpha noise in some sucker gaps, inherited from the generated cutout (PROTOTYPE.md).

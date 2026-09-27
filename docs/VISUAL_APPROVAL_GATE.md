@@ -58,6 +58,7 @@ is compared side by side with the approved prototype, and the owner signs off.
 | 09 | Touch Reaction | storyboard `sb09` | PROTOTYPE_READY_FOR_REVIEW | |
 | 10 | Glass Moment | storyboard `sb10` | PROTOTYPE_READY_FOR_REVIEW | |
 | 11 | Hero float (approved art, ±2.5 pt bob, ~4.8 s) | none needed: owner's explicit instruction, 2026-09-27 | **APPROVED (owner direction)** | "use a high quality picture of my octopus suspended in that black and give it a light floating up and down animation where it barely moves" (D-119). Replaces the procedural creature on screen for now. |
+| 12 | Front idle loop (Codex 2D cutout animation, 10 s: float, breathing, sway, arm waves) | `docs/prototypes/idle-front-v1/` | **APPROVED (owner direction)** | "heres an idle animation its a 2d image animation, make sure to change our mascot for this" (2026-09-27, D-124). Replaces #11 on the Watch and the iPhone app. |
 
 Existing Stage A character behavior (D-114) predates this gate. It stays as is and isn't expanded until the
 replacement animations are approved. Engineering-only fixes to it remain allowed.

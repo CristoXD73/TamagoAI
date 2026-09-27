@@ -1410,3 +1410,19 @@ Signed-by: Codex
 with launchd user agents. Wait for `/Volumes/Storage` to mount first; the logs go on Storage. The dashboard stays at
 127.0.0.1:8788.
 **Do not redo:** the monitor privacy split (words only on screen and in memory; `logger` stays metadata-only).
+
+---
+
+### 2026-09-27 09:16 EDT: Claude Code (local): new mascot loop, no clock (D-124); relay plan decisions recorded
+
+**Done:**
+- The Watch and iPhone show Codex's front idle loop as Tamago.
+- The Watch clock is hidden by playing the loop as video.
+- Merged `main`.
+- The relay plan (docs/RELAY_PLAN.md) has every owner decision: the safe ChatGPT route (Codex answer mode), the
+  automatic transfer chain, and inbox + push now.
+
+**Unverified:** on-device look, clock and battery.
+**Next recommended task (ONE):** ship this to TestFlight (merge to `main` → Xcode Cloud), then relay phase R0
+(docs/RELAY_PLAN.md §7).
+**Do not redo:** clock hiding via `persistentSystemOverlays` / toolbar alone (tested: the clock stays).

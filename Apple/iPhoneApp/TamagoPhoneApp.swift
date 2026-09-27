@@ -2,8 +2,8 @@ import SwiftUI
 import TamagoShared
 
 /// The iPhone side is a doorway, not a second Tamago: the creature lives on the
-/// Watch and thinks on the Mac (D-108 keeps the relay for later). The approved
-/// art (unchanged) on black, and one line on how to meet it.
+/// Watch and thinks on the Mac (D-108 keeps the relay for later). Tamago's idle
+/// loop (D-124) on black, and one line on how to meet it.
 @main
 struct TamagoPhoneApp: App {
     var body: some Scene {
@@ -11,9 +11,8 @@ struct TamagoPhoneApp: App {
             ZStack {
                 Color.black.ignoresSafeArea()
                 VStack(spacing: 20) {
-                    Image("Octopus")
-                        .resizable()
-                        .scaledToFit()
+                    IdleLoopPlayer()
+                        .aspectRatio(3.0 / 4.0, contentMode: .fit)
                         .frame(maxHeight: 360)
                         .accessibilityLabel("Tamago, a small white octopus")
                     Text("TamagoAI")

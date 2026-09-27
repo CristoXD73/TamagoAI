@@ -1199,3 +1199,41 @@ model is planned (D-118).
 - Silence is off by default, so brain tests that exercise wordless replies pass `profile: GESTURES`.
 - The JSON log moves to a file only in monitor mode.
 **Signed-by:** Claude Code
+
+### 2026-09-27T09:16:00-04:00: Claude Code — new mascot (front idle loop) on Watch and iPhone; no clock over Tamago (D-124); merged main
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `14efbbd`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- **Watch:** `Apple/WatchApp/FloatingCreature.swift` (video loop), new `Apple/WatchApp/IdleLoop.mp4` and
+  `Apple/WatchApp/idle-000.jpg`; `Apple/WatchApp/TamagoWatchApp.swift` (clock modifiers).
+- **iPhone:** new `Apple/iPhoneApp/IdleLoopPlayer.swift` and `Apple/iPhoneApp/IdleLoop.mp4`;
+  `Apple/iPhoneApp/TamagoPhoneApp.swift`.
+- **Docs:** `docs/prototypes/idle-front-v1/` (Codex's prototype: notes, renderer, source, poster, preview; not the
+  190 MB master); `docs/DECISIONS.md` D-124; `docs/VISUAL_APPROVAL_GATE.md` #12; `PROVENANCE.md`;
+  `docs/RELAY_PLAN.md` (safe ChatGPT route).
+**Work performed:**
+- **Merge.** Merged `origin/main` (Codex's iPhone widget work, PR #1). Both branches had used D-122; mine is now D-123.
+- **New mascot.** The owner asked for Codex's idle animation as the mascot and no clock over Tamago ("a charm, not a
+  Watch AI").
+- **Clock.** The only working way to hide the Watch clock is a video on screen, so the Watch plays the loop as
+  video. It's hardware-decoded and 265 KB.
+- **Earlier try.** A 150-frame JPEG player also worked, but kept the clock and cost 2.9 MB; it was replaced.
+**Tests/builds actually performed (by me):**
+- TamagoWatch simulator build (SE 3 40 mm): the loop animates (consecutive screenshots differ), no clock shows,
+  and a hold still reaches the app (the pairing sheet opened, as expected when unpaired).
+- TamagoPhone simulator build (iPhone 18 Pro): the loop shows on black.
+- Gateway `npm test` after the merge: 140 pass.
+**Things NOT verified:**
+- The owner's Watch and iPhone.
+- Battery use of the looping video on the Watch.
+- That the clock stays hidden on hardware as it does in the simulator.
+**Known issues:**
+- The clock returns while the video is paused (Always-On, Reduce Motion).
+- The widgets, complications and app icon still use the earlier hero art.
+**Cross-agent impact:**
+- Codex's prototype files were copied into this repo, except the masters.
+- TestFlight builds come from `main` through Xcode Cloud; this branch needs merging to `main` to ship that way.
+**Signed-by:** Claude Code

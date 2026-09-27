@@ -18,6 +18,9 @@ struct TamagoWatchApp: App {
         WindowGroup {
             RootView(controller: controller, creatureController: creatureController, connection: connection)
         }
+        // Owner, 2026-09-27: "remove the clock from the main view … we are working
+        // towards a charm, not a watch AI." Hides the system time over the app.
+        .persistentSystemOverlays(.hidden)
     }
 }
 
@@ -39,6 +42,8 @@ private struct RootView: View {
             CharacterScreen(controller: controller, creatureController: creatureController,
                             isVisible: selectedPage == 0, caption: connection.caption,
                             onHoldStart: holdStarted, onHoldEnd: { connection.endHold() })
+                // The clock sits in the navigation bar area: hide it on Tamago's own page.
+                .toolbar(.hidden, for: .navigationBar)
                 .tag(0)
             #if DEBUG
             NavigationStack {
