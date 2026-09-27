@@ -26,7 +26,10 @@ struct FloatingCreature: View {
     /// Tamago's answer, shown small under the creature while it speaks, so it
     /// isn't lost when the Watch is muted (D-119). Plain text, no bubble.
     var caption: String?
+    /// Waiting for the answer: show the owner's chosen waiting sign (D-126).
+    var isWaiting = false
 
+    @AppStorage(WaitingSignStyle.storageKey) private var waitingSign = WaitingSignStyle.dots.rawValue
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var loop = IdleLoop()
@@ -46,6 +49,10 @@ struct FloatingCreature: View {
             .opacity(isLuminanceReduced ? 0.55 : 1)
             .accessibilityElement()
             .accessibilityLabel("Tamago, a small white octopus")
+            if isWaiting && !isLuminanceReduced {
+                WaitingSign(style: WaitingSignStyle(rawValue: waitingSign) ?? .dots)
+                    .transition(.opacity)
+            }
             if let caption {
                 Text(caption)
                     .font(.footnote)
@@ -58,6 +65,7 @@ struct FloatingCreature: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: caption)
+        .animation(.easeInOut(duration: 0.4), value: isWaiting)
         .onChange(of: isMoving, initial: true) { _, moving in loop.setPlaying(moving) }
     }
 }

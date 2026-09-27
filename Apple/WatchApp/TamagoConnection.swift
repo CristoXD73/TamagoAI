@@ -57,6 +57,8 @@ final class TamagoConnection {
     @ObservationIgnored private var speechWatchdog: Task<Void, Never>?
     /// D-121: the Mac-synthesized voice. SpeechOutput stays the fallback.
     @ObservationIgnored private let replyAudio = AudioReplyPlayer()
+    /// D-126: "Right…", "One sec." as soon as the hold is released.
+    @ObservationIgnored private let thinkingSound = ThinkingSound()
     /// `speechAudio` of the response about to be applied, keyed by request ID,
     /// so `.speak` can find it without CharacterStateMachine knowing about it.
     @ObservationIgnored private var pendingSpeechAudio: (requestId: String, audio: TamagoSpeechAudio)?
@@ -188,6 +190,7 @@ final class TamagoConnection {
         // The reducer only knows transcripts; the text is a placeholder, the
         // request goes out as audio (see `.sendRequest`) and the Mac transcribes.
         controller?.apply(.transcript(text: "(voice)", requestId: id))
+        if ThinkingSound.isEnabled { thinkingSound.play() }
     }
 
     // MARK: Pairing (D-116)
@@ -296,8 +299,11 @@ final class TamagoConnection {
                     // D-121: try the Mac's voice within the fetch budget; any
                     // failure falls back to the built-in voice below.
                     armSpeechWatchdog(seconds: Self.speechFetchBudget + estimatedSeconds, requestId: requestId)
+                    thinkingSound.handOffSession()
                     speechFetch = Task { [weak self, client] in
                         let data = await client.speechAudio(path: audio.path, timeout: Self.speechFetchBudget)
+                        // Never talk over the thinking sound (D-126); it's at most ~1.7 s.
+                        await self?.thinkingSound.waitUntilDone()
                         guard let self, !Task.isCancelled,
                               self.controller?.state.activeRequestID == requestId else { return }
                         if let data, let duration = await self.replyAudio.play(data) {
@@ -313,8 +319,13 @@ final class TamagoConnection {
                         }
                     }
                 } else {
-                    speech.speak(text)
-                    armSpeechWatchdog(seconds: estimatedSeconds, requestId: requestId)
+                    thinkingSound.handOffSession()
+                    armSpeechWatchdog(seconds: estimatedSeconds + 2.0, requestId: requestId)
+                    speechFetch = Task { [weak self] in
+                        await self?.thinkingSound.waitUntilDone()   // D-126
+                        guard let self, !Task.isCancelled else { return }
+                        self.speech.speak(text)
+                    }
                 }
 
             case .stopSpeech:
@@ -322,6 +333,7 @@ final class TamagoConnection {
                 speechFetch?.cancel()
                 speechFetch = nil
                 replyAudio.stop()
+                thinkingSound.stop()
                 speech.stop()
 
             case .updateComplicationSnapshot:

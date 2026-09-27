@@ -45,12 +45,15 @@ private struct RootView: View {
                 // The clock sits in the navigation bar area: hide it on Tamago's own page.
                 .toolbar(.hidden, for: .navigationBar)
                 .tag(0)
+            // D-126: the waiting sign and thinking sounds, one swipe away.
+            NavigationStack { SettingsPage() }
+                .tag(1)
             #if DEBUG
             NavigationStack {
                 DebugStateControlsView(controller: controller, creatureController: creatureController,
                                        connection: connection, onTalk: talk)
             }
-            .tag(1)
+            .tag(2)
             #endif
         }
         .sheet(isPresented: $showPairing) {
@@ -125,6 +128,9 @@ private struct CharacterScreen: View {
     var onHoldStart: () -> Void
     var onHoldEnd: () -> Void
 
+    /// From the release of the hold until the answer starts (D-126).
+    private static let waitingStates: Set<TamagoCharacterState> = [.acknowledging, .thinking, .toolRunning]
+
     var body: some View {
         // D-114: "pure black background... a tiny dark habitat," full-bleed
         // with no chrome. The state-name label is a debug aid, not production UI.
@@ -138,7 +144,8 @@ private struct CharacterScreen: View {
         ZStack(alignment: .top) {
             // D-119 (owner direction): the approved art, gently floating. The
             // procedural CharacterView (D-114) stays in the repo but off screen.
-            FloatingCreature(isVisible: isVisible, caption: caption)
+            FloatingCreature(isVisible: isVisible, caption: caption,
+                             isWaiting: Self.waitingStates.contains(controller.state.visual))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #if DEBUG
                 .background(GeometryReader { geo in

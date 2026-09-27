@@ -1426,3 +1426,17 @@ with launchd user agents. Wait for `/Volumes/Storage` to mount first; the logs g
 **Next recommended task (ONE):** ship this to TestFlight (merge to `main` → Xcode Cloud), then relay phase R0
 (docs/RELAY_PLAN.md §7).
 **Do not redo:** clock hiding via `persistentSystemOverlays` / toolbar alone (tested: the clock stays).
+
+---
+
+### 2026-09-27 09:50 EDT: Claude Code (local): stronger brain (D-125), AI order, waiting moment (D-126)
+
+**Done:**
+- The brain is Gemma 4 12B, or Qwen 3.5 9B while Xcode or a simulator runs.
+- Relay plan §6b sets who goes first.
+- The Watch plays one of the owner's 6 thinking sounds on release and shows dots or ripples (Settings page) until
+  the answer.
+
+**Unverified:** on-device sound order; the owner's Watch.
+**Next recommended task (ONE):** ship to TestFlight (merge to `main`), then relay R2 (docs/RELAY_PLAN.md §7).
+**Do not redo:** model selection (BRAIN_EVAL.md R1); the owner's sound and sign picks.

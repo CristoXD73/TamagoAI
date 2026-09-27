@@ -1237,3 +1237,41 @@ model is planned (D-118).
 - Codex's prototype files were copied into this repo, except the masters.
 - TestFlight builds come from `main` through Xcode Cloud; this branch needs merging to `main` to ship that way.
 **Signed-by:** Claude Code
+
+### 2026-09-27T09:50:00-04:00: Claude Code — R1 stronger brain (D-125); AI order; the waiting moment on the Watch (D-126)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `f7c5f97`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- **Gateway:** `Gateway/scripts/relay-intent-eval.js`; `Gateway/src/brain/reasoners/ollama.js` (`think: false`);
+  `Gateway/src/brain/speech/composer.js` (capitals); tests.
+- **Scripts:** `scripts/tamago-up.sh` (model pick).
+- **Watch:** new `ThinkingSound.swift`, `WaitingSign.swift` and `SettingsPage.swift`, plus six `thinking-XX.m4a`;
+  `TamagoWatchApp.swift`, `FloatingCreature.swift`, `TamagoConnection.swift`.
+- **Docs:** `docs/BRAIN_EVAL.md` R1, `docs/RELAY_PLAN.md` §6b, `DECISIONS.md` D-125/D-126, Visual Approval Gate #13.
+**Work performed:**
+- **Models.** Downloaded three candidates to Storage (20 GB) and measured them. Chose Gemma 4 12B, or Qwen 3.5 9B
+  when Xcode or a simulator runs (owner: "xcode wont always be running").
+- **AI order.** Wrote who goes first. ChatGPT chat shares Codex's allowance, so Tamago's own brain is the last stop.
+- **Thinking sounds.** Made 20 Kokoro clips and a private preview page with 4 waiting-sign options. The owner kept
+  6 sounds and signs B + D, selectable. Built them into the Watch app.
+**Tests/builds actually performed (by me):**
+- Gateway `npm test`: 140 pass.
+- Model evals: numbers in BRAIN_EVAL.md.
+- TamagoWatch simulator build.
+- In the simulator, paired with the live gateway:
+  - screenshots show dots and ripples in the thinking state;
+  - the settings page shows the picker and the toggle;
+  - a full hold (debug audio file "What time is it?") → answered by Gemma in 5.2 s → Mac voice fetched and played;
+  - no audio-session errors logged.
+**Things NOT verified:**
+- The thinking sound heard in order before the reply (the simulator has no sound here).
+- Anything on the owner's Watch.
+**Known issues:**
+- The transcriber doubled words on a synthetic `say` clip ("What time? time? is it?'s"), so the time rule missed
+  and the model answered, correctly.
+- The settings page shows the system clock; that's fine for settings.
+**Cross-agent impact:** the Watch TabView now has Settings at tag 1 and Debug at tag 2.
+**Signed-by:** Claude Code
