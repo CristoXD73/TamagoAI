@@ -1299,3 +1299,23 @@ route is TestFlight; the owner renewed the developer membership on 2026-09-27.
 `com.cristoxd73.tamawatch.c73x926`, upload `.build/Archives/Tamago-0.1.0-2.xcarchive`, add the owner's Gmail
 Apple ID as an internal tester, install on the iPhone/Watch, pair, hold to talk; record in `docs/DEVICE_TEST_LOG.md`.
 **Do not redo:** the Brain F fixes; the icon set; Watch-side Bonjour (TN3135).
+
+---
+
+### 2026-09-27 02:10 EDT: Claude Code (local): first real-Watch loop, voice + caption, hold-to-talk (TestFlight builds 3–6)
+
+**Branch:** `claude/great-volta-ogpuw8` · **Commits:** `3ff17b4` (pair by address), `07100ce` (D-119 voice + caption +
+floating art), `8f79761` (D-120 hold-to-talk).
+**Done:** first physical round trip Watch → Mac → Watch (owner's SE 3, paired by typed IP; `tamagoai.local` doesn't
+resolve from the Watch). Answers spoken + captioned; creature = approved art, gently floating (owner-approved).
+Hold-to-talk: Watch records, Mac transcribes on-device (Apple SpeechAnalyzer helper), brain answers.
+**Tests:** gateway 113/113 (incl. real transcription), Swift 140/140 host; simulator hold-to-talk with a recorded
+file; TestFlight builds 2–5 Complete, 6 processing.
+**Running on the owner's Mac:** LAN gateway (brain + llama3.2:3b, voice input on), state in
+`/Volumes/Storage/AI/TamagoAI`; Ollama on loopback with models on Storage.
+**Unverified:** Watch microphone capture and permission prompt; audibility of speech on the Watch speaker; the
+hold gesture's feel on hardware; why `.local` fails on the Watch.
+**Owner to-do:** install build 6 from TestFlight; hold the octopus, allow the microphone once, hold again and
+speak, release; report whether you hear the answer. Reserve 192.168.0.74 for the Mac in the router (DHCP reservation).
+**Next recommended task (ONE):** verify build 6 on the Watch with the owner and record it in DEVICE_TEST_LOG.md.
+**Do not redo:** the transcriber helper, `/v1/audio`, voice + caption decision (D-119/D-120).
