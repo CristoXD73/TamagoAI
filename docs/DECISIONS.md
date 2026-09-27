@@ -975,3 +975,40 @@ wait. Simulator end to end: hold → transcript 0.32 s → reply 1.4 s → Mac v
 ("reply audio finished ok"). Gateway start line:
 `TAMAGO_TTS=kokoro TAMAGO_TTS_VOICE=af_heart TAMAGO_TTS_SPEED=0.9 TAMAGO_TTS_MODEL_DIR=/Volumes/Storage/AI/tts`.
 Heard on the Watch: UNVERIFIED until the owner listens.
+
+### D-122 Every reply has words while the Watch shows a still picture; the owner's live dashboard
+
+- **Evidence (owner, 2026-09-27 07:05–07:09 EDT, first session after a Mac restart):**
+  - "when i talk to tamago AI after turning back on the mac it doesnt reply." Two causes:
+    - Nothing restarted with the Mac: neither the gateway nor Ollama was running.
+    - Once they were, the dashboard showed "Hello" and "Can you, hear me?" answered with **no words**.
+  - The brain's rules and the 3B model both chose wordless reactions (`speech: null`), a new Tamago "watches first".
+    The Watch shows the approved art as a still picture (D-119), so those reactions are invisible there.
+- **Decision:** `TAMAGO_PROFILE.behavior.silenceIsAllowed` and `nonverbalResponseAllowed` are **false** for now.
+  - The system prompt says "Always answer in words".
+  - If a rule or the model still picks silence, the orchestrator supplies short in-character words
+    (`wordsForSilence`: "Oh. Hi.", "Mm. Sure.", "I hear you.", "Got it.", "I'm here.") and traces `speak_instead`.
+  - The nonverbal path stays implemented and tested (tests pass `profile: GESTURES`). Turn it back on when the
+    Watch can animate a reaction.
+- **Also:**
+  - The clock is answered by rule, never guessed: "It's 7:12. Early morning here." (`kind: 'time'`). The model had
+    said "06:08" at 07:08.
+  - A punctuation-only transcript (".") counts as nothing heard, so the Watch gets "I didn't catch that."
+- **Owner's live view (owner's request: "i need to see where those texts/voice arrive … set up a local host with proper
+  looking UI"):** `TAMAGO_MONITOR=1`, which `scripts/tamago-up.sh` sets.
+  - What it shows:
+    - The terminal prints every hop.
+    - A dashboard at `http://127.0.0.1:8788` shows each exchange as chat bubbles with timed hops (voice arrived →
+      heard → answered → voice made → Watch fetched it).
+    - Also: Watch last seen, gateway/Ollama/voice status, the open pairing code, replay of the last 20 voice clips,
+      and a test box.
+  - It shows the owner's words, so:
+    - The dashboard is bound to 127.0.0.1 only, checks Host (DNS rebinding) and Origin (cross-site posts).
+    - It holds events and clips in memory only.
+    - The metadata-only JSON log moves to `<state dir>/logs/gateway.log`.
+    - `logger` never receives words; a test enforces it.
+- **Restart path:** `scripts/tamago-up.sh`.
+  - It stops if `/Volumes/Storage` isn't mounted.
+  - It starts Ollama in its own session, so Ctrl-C or closing the window leaves it running.
+  - It runs the gateway with the owner's settings: brain + llama3.2:3b, Apple transcription, Kokoro af_heart 0.9×.
+  - Running it at login (launchd) is the next step, once the owner is happy with the live view.

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tamago Live</title>
+<style>
+  :root {
+    --bg: #050608;
+    --panel: #0d0f14;
+    --panel-2: #12151c;
+    --line: #1d212b;
+    --text: #e9ecf2;
+    --muted: #8a92a3;
+    --faint: #5b6273;
+    --you: #1f3a5f;
+    --you-text: #dcebff;
+    --tamago: #171b24;
+    --good: #3ddc97;
+    --warn: #f5b945;
+    --bad: #ff6b6b;
+    --voice: #c792ff;
+    --accent: #7cc4ff;
+    --radius: 14px;
+    font-family: ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { min-height: 100vh; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 40px; display: grid; gap: 20px;
+          grid-template-columns: minmax(0, 1fr) 320px; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } aside { order: -1; } }
+
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; }
+  .hero { width: 64px; height: 64px; border-radius: 18px; overflow: hidden; background: #000;
+          box-shadow: 0 0 0 1px var(--line), 0 10px 40px rgba(124,196,255,.08); flex: none; }
+  .hero img { width: 100%; height: 100%; object-fit: cover; animation: bob 4.8s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-2.5px); } }
+  @media (prefers-reduced-motion: reduce) { .hero img { animation: none; } }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .live { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.up { background: var(--good); box-shadow: 0 0 10px rgba(61,220,151,.6); }
+  .dot.warn { background: var(--warn); }
+  .dot.down { background: var(--bad); }
+
+  main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .feed { display: flex; flex-direction: column; gap: 14px; }
+  .empty { border: 1px dashed var(--line); border-radius: var(--radius); padding: 36px 20px; text-align: center;
+           color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .ex { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 12px;
+        animation: in .25s ease-out; }
+  @keyframes in { from { opacity: 0; transform: translateY(6px); } }
+  .ex-head { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--faint); margin-bottom: 10px; }
+  .ex-head .src { color: var(--muted); }
+  .ex-head .id { margin-left: auto; font-family: ui-monospace, "SF Mono", monospace; }
+  .row { display: flex; margin: 6px 0; }
+  .row.you { justify-content: flex-end; }
+  .bubble { max-width: 78%; padding: 9px 13px; border-radius: 16px; font-size: 15px; line-height: 1.4; }
+  .you .bubble { background: var(--you); color: var(--you-text); border-bottom-right-radius: 5px; }
+  .tamago .bubble { background: var(--tamago); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+  .bubble.pending { color: var(--muted); font-style: italic; }
+  .bubble.silent { color: var(--muted); font-style: italic; }
+  .bubble.err { border-color: rgba(255,107,107,.4); color: #ffb3b3; }
+  .who { font-size: 11px; color: var(--faint); margin: 0 6px 3px; }
+  .you .who { text-align: right; }
+  .state { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--panel-2);
+           color: var(--muted); margin-left: 6px; font-style: normal; vertical-align: 1px; }
+  .hops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .hop { font-size: 11.5px; padding: 3px 9px; border-radius: 99px; background: var(--panel-2); color: var(--muted);
+         border: 1px solid var(--line); white-space: nowrap; }
+  .hop b { font-weight: 600; color: var(--text); }
+  .hop.ok { border-color: rgba(61,220,151,.3); }
+  .hop.voice { border-color: rgba(199,146,255,.35); }
+  .hop.bad { border-color: rgba(255,107,107,.45); color: #ffb3b3; }
+  .hop.wait { border-style: dashed; }
+  .play { margin-left: auto; background: none; border: 1px solid rgba(199,146,255,.45); color: var(--voice);
+          border-radius: 99px; padding: 3px 11px; font-size: 12px; cursor: pointer; }
+  .play:hover { background: rgba(199,146,255,.1); }
+
+  form { position: sticky; bottom: 12px; display: flex; gap: 8px; background: rgba(13,15,20,.92); backdrop-filter: blur(10px);
+         border: 1px solid var(--line); border-radius: 99px; padding: 6px 6px 6px 16px; }
+  input { flex: 1; min-width: 0; background: none; border: 0; color: var(--text); font-size: 15px; outline: none; }
+  input::placeholder { color: var(--faint); }
+  button.send { background: var(--accent); color: #041018; border: 0; border-radius: 99px; padding: 8px 16px;
+                font-weight: 600; font-size: 14px; cursor: pointer; }
+  button.send:disabled { opacity: .5; cursor: default; }
+
+  aside { display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin: 0 0 10px; font-weight: 600; }
+  .stat { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px; }
+  .stat + .stat { border-top: 1px solid var(--line); }
+  .stat .k { flex: 1; }
+  .stat .v { color: var(--muted); font-size: 12.5px; text-align: right; }
+  .code { font-family: ui-monospace, "SF Mono", monospace; font-size: 26px; letter-spacing: .12em; color: var(--text); }
+  .note { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .log { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow: auto; font-size: 12.5px; }
+  .log div { color: var(--muted); line-height: 1.4; }
+  .log .t { color: var(--faint); font-family: ui-monospace, "SF Mono", monospace; margin-right: 6px; }
+  .log .bad { color: #ffb3b3; }
+  .log .warn { color: #ffd98a; }
+  .log .good { color: #9ff0cb; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hero"><img src="/octopus.jpg" alt=""></div>
+    <div>
+      <h1>Tamago Live</h1>
+      <div class="sub" id="sub">What the Watch sends and what Tamago answers, as it happens.</div>
+    </div>
+    <div class="live"><span class="dot" id="liveDot"></span><span id="liveText">Connecting…</span></div>
+  </header>
+
+  <main>
+    <div class="feed" id="feed">
+      <div class="empty" id="empty">
+        Nothing yet. Hold the octopus on your Watch and talk,<br>or type below to test from this Mac.
+      </div>
+    </div>
+    <form id="say" autocomplete="off">
+      <input id="text" placeholder="Test message, as if from the Watch…" maxlength="500">
+      <button class="send" id="sendBtn">Send</button>
+    </form>
+  </main>
+
+  <aside>
+    <div class="card">
+      <h2>Connection</h2>
+      <div class="stat"><span class="dot" id="dWatch"></span><span class="k">Watch</span><span class="v" id="vWatch">not seen yet</span></div>
+      <div class="stat"><span class="dot" id="dGateway"></span><span class="k">Gateway</span><span class="v" id="vGateway">…</span></div>
+      <div class="stat"><span class="dot" id="dOllama"></span><span class="k">Brain (Ollama)</span><span class="v" id="vOllama">…</span></div>
+      <div class="stat"><span class="dot" id="dIn"></span><span class="k">Voice in</span><span class="v" id="vIn">…</span></div>
+      <div class="stat"><span class="dot" id="dOut"></span><span class="k">Voice out</span><span class="v" id="vOut">…</span></div>
+    </div>
+    <div class="card" id="pairCard" hidden>
+      <h2>Pairing code</h2>
+      <div class="code" id="code"></div>
+      <div class="note">Only needed for a new or reset Watch. Open for 10 minutes after the gateway starts.</div>
+    </div>
+    <div class="card">
+      <h2>Events</h2>
+      <div class="log" id="log"><div>Warnings, rejected requests and pairing show here.</div></div>
+    </div>
+    <div class="card note">
+      Words shown here stay in this Mac's memory only and disappear when Tamago stops. This page is reachable from this Mac only.
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const exchanges = new Map();
+  let status = {};
+  let firstLog = true;
+
+  const time = (at) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const secs = (ms) => (typeof ms === 'number' ? `${(ms / 1000).toFixed(1)} s` : '');
+  const kb = (b) => `${Math.max(1, Math.round(b / 1024))} KB`;
+  const ago = (at) => {
+    const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+    if (s < 60) return `${s} s ago`;
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    return `${Math.round(s / 3600)} h ago`;
+  };
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+  const isMac = (ip) => ip === '127.0.0.1' || ip === '::1';
+
+  function exchange(e) {
+    let x = exchanges.get(e.requestId);
+    if (x) return x;
+    x = { id: e.requestId, at: e.at, hops: [] };
+    exchanges.set(e.requestId, x);
+    x.node = el('div', 'ex');
+    const feed = $('feed');
+    $('empty')?.remove();
+    feed.prepend(x.node);
+    return x;
+  }
+
+  function render(x) {
+    const n = x.node;
+    n.replaceChildren();
+    const head = el('div', 'ex-head');
+    head.append(el('span', '', time(x.at)));
+    head.append(el('span', 'src', x.from ? (isMac(x.from) ? '· test from this Mac' : `· Watch ${x.from}`) : ''));
+    if (x.retry) head.append(el('span', '', '· retried'));
+    head.append(el('span', 'id', `#${x.id.slice(0, 4)}`));
+    n.append(head);
+
+    // Owner's side
+    const you = el('div', 'row you');
+    const yb = el('div');
+    yb.append(el('div', 'who', x.kind === 'audio' ? 'You said' : 'You typed'));
+    let youText, youCls = 'bubble';
+    if (x.kind === 'audio') {
+      if (x.heard === undefined && !x.heardFailed) { youText = 'Listening to the recording…'; youCls += ' pending'; }
+      else if (x.heardFailed) { youText = `Couldn't transcribe: ${x.heardFailed}`; youCls += ' err'; }
+      else if (!x.heard) { youText = '(nothing usable heard)'; youCls += ' pending'; }
+      else youText = x.heard;
+    } else youText = x.typed ?? '';
+    yb.append(el('div', youCls, youText));
+    you.append(yb);
+    n.append(you);
+
+    // Tamago's side
+    const tm = el('div', 'row tamago');
+    const tb = el('div');
+    tb.append(el('div', 'who', 'Tamago'));
+    let bubble;
+    if (x.reply) {
+      if (x.reply.text) bubble = el('div', 'bubble', x.reply.text);
+      else bubble = el('div', 'bubble silent', 'Reacted without words');
+      bubble.append(el('span', 'state', x.reply.characterState));
+    } else if (x.error) {
+      bubble = el('div', 'bubble err', `No answer: ${x.error.code}${x.error.message ? `, ${x.error.message}` : ''}`);
+    } else bubble = el('div', 'bubble pending', 'Thinking…');
+    tb.append(bubble);
+    tm.append(tb);
+    n.append(tm);
+
+    // Hops
+    const hops = el('div', 'hops');
+    for (const h of x.hops) {
+      const c = el('span', `hop ${h.cls ?? ''}`);
+      c.append(document.createTextNode(`${h.label} `));
+      if (h.value) c.append(el('b', '', h.value));
+      hops.append(c);
+    }
+    if (x.clip) {
+      const b = el('button', 'play', '▶ Play voice');
+      b.onclick = () => new Audio(`/clip/${x.id}`).play().catch(() => { b.textContent = 'Clip expired'; });
+      hops.append(b);
+    }
+    n.append(hops);
+  }
+
+  function hop(x, label, value, cls) { x.hops.push({ label, value, cls }); }
+
+  function log(at, text, cls) {
+    const box = $('log');
+    if (firstLog) { box.replaceChildren(); firstLog = false; }
+    const d = el('div', cls);
+    d.append(el('span', 't', time(at)), document.createTextNode(text));
+    box.prepend(d);
+  }
+
+  function onEvent(e) {
+    switch (e.kind) {
+      case 'auth_failed': return log(e.at, `Rejected a ${e.route} from ${e.from}: wrong or missing token. Re-pair the Watch.`, 'bad');
+      case 'pair': return log(e.at, e.outcome === 'ok' ? `Paired ${e.deviceName ?? 'a Watch'} (${e.from})` : `Pairing attempt: ${e.outcome} (${e.from})`, e.outcome === 'ok' ? 'good' : 'bad');
+      case 'warn': return log(e.at, e.message, 'warn');
+      case 'error': return log(e.at, e.message, 'bad');
+    }
+    if (!e.requestId) return;
+    const x = exchange(e);
+    switch (e.kind) {
+      case 'audio_in':
+        x.kind = 'audio'; x.from = e.from; x.retry ||= e.duplicate;
+        if (!e.duplicate) hop(x, '🎤 Voice arrived', kb(e.bytes), 'ok');
+        break;
+      case 'text_in':
+        x.kind = 'text'; x.from = e.from; x.typed = e.text; x.retry ||= e.duplicate;
+        if (!e.duplicate) hop(x, '💬 Text arrived', '', 'ok');
+        break;
+      case 'heard':
+        x.heard = e.text; hop(x, '👂 Heard in', secs(e.ms), e.text ? 'ok' : 'bad');
+        break;
+      case 'heard_failed':
+        x.heardFailed = e.message; hop(x, '👂 Transcription failed', secs(e.ms), 'bad');
+        break;
+      case 'reply':
+        if (!x.reply) hop(x, '🐙 Answered in', secs(e.ms), 'ok');
+        x.reply = e;
+        break;
+      case 'reply_error':
+        x.error = e; hop(x, `🐙 ${e.code}`, secs(e.ms), 'bad');
+        break;
+      case 'voice_ready':
+        x.clip = e.clip; hop(x, `🔊 Voice made (${e.voice})`, secs(e.ms), 'voice');
+        break;
+      case 'voice_failed':
+        hop(x, '🔊 Voice failed, Watch speaks itself', secs(e.ms), 'bad');
+        break;
+      case 'voice_fetch':
+        if (e.status === 200) hop(x, '📲 Watch played the Mac voice', `waited ${secs(e.waitedMs)}`, 'voice');
+        else hop(x, `📲 Voice ${e.status === 404 ? 'not available' : 'not ready'}, Watch speaks itself`, '', 'wait');
+        break;
+    }
+    render(x);
+  }
+
+  function setStat(key, state, text) {
+    $(`d${key}`).className = `dot ${state}`;
+    $(`v${key}`).textContent = text;
+  }
+
+  function onStatus(s) {
+    status = s;
+    const watchRecent = s.watchSeenAt && Date.now() - s.watchSeenAt < 10 * 60_000;
+    setStat('Watch', s.watchSeenAt ? (watchRecent ? 'up' : 'warn') : '', s.watchSeenAt ? `${ago(s.watchSeenAt)} · ${s.watchFrom}` : 'not seen yet');
+    setStat('Gateway', s.gateway === 'up' ? 'up' : s.gateway === 'down' ? 'down' : '', s.gateway === 'up' ? s.address : s.gateway);
+    setStat('Ollama', s.ollama === 'up' ? 'up' : s.ollama === 'down' ? 'down' : '', s.ollama === 'up' ? s.brain : 'not running');
+    setStat('In', s.voiceIn && !/unavailable/.test(s.voiceIn) ? 'up' : 'warn', s.voiceIn ?? '…');
+    setStat('Out', s.voiceOut && !/unavailable/.test(s.voiceOut) ? 'up' : 'warn', s.voiceOut ?? '…');
+    $('pairCard').hidden = !s.pairingCode;
+    if (s.pairingCode) $('code').textContent = `${s.pairingCode.slice(0, 3)} ${s.pairingCode.slice(3)}`;
+    const allUp = s.gateway === 'up' && s.ollama === 'up';
+    $('liveDot').className = `dot ${allUp ? 'up' : 'down'}`;
+    $('liveText').textContent = allUp ? 'Live' : 'Something is down';
+  }
+  setInterval(() => status.watchSeenAt && onStatus(status), 5000);
+
+  function connect() {
+    const es = new EventSource('/events');
+    es.addEventListener('hello', (m) => {
+      const { status: s, events } = JSON.parse(m.data);
+      exchanges.clear();
+      $('feed').replaceChildren(Object.assign(el('div', 'empty'), { id: 'empty', innerHTML: 'Nothing yet. Hold the octopus on your Watch and talk,<br>or type below to test from this Mac.' }));
+      events.forEach(onEvent);
+      onStatus(s);
+    });
+    es.addEventListener('event', (m) => onEvent(JSON.parse(m.data)));
+    es.addEventListener('status', (m) => onStatus(JSON.parse(m.data)));
+    es.onerror = () => {
+      $('liveDot').className = 'dot down';
+      $('liveText').textContent = 'Gateway stopped: run scripts/tamago-up.sh';
+    };
+  }
+  connect();
+
+  $('say').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const text = $('text').value.trim();
+    if (!text) return;
+    // Cleared at once, so you can type the next one while Tamago thinks.
+    $('text').value = '';
+    try {
+      const r = await fetch('/api/say', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+      if (!r.ok && r.status >= 500) log(Date.now(), `Test message failed (${r.status})`, 'bad');
+    } catch {
+      log(Date.now(), 'Test message failed: gateway not reachable', 'bad');
+    }
+  });
+})();
+</script>
+</body>
+</html>

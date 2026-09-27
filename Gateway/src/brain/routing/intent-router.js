@@ -16,6 +16,8 @@ const SMALL_TALK = /^how('?s| is| are| r| have| do)\b.*\b(you|u|it going|things)
 // Live information Tamago can't see yet (Brain E): weather, news, whether something is running.
 const LIVE = /\b(weather|forecast|news|headlines|traffic)\b|\b(is|are)\b.*\b(running|online|offline|down|up|working|reachable)( right)?( now)?[?.!]*$/;
 const PRONOUN = /\b(it|that|they|them)\b/;
+// The clock is known locally: answered exactly by rule, never guessed by a model ("06:08" at 07:08, 2026-09-27).
+const TIME = /^(so |hey |tamago,? )?(what('?s| is) the time|what time (of day )?is it|do you (know|have) the time|what'?s the time)\b/;
 
 /**
  * @returns {{kind: string, complexity: 'simple'|'complex', isQuestion: boolean,
@@ -36,6 +38,7 @@ export function classify(text) {
   if (AFFIRMATION.test(t)) return { ...base, kind: 'affirmation' };
   if (GREETING.test(t) && wordCount <= 4) return { ...base, kind: 'greeting' };
   if (FORGET.test(t)) return { ...base, kind: 'forget' };
+  if (TIME.test(t)) return { ...base, kind: 'time' };
   if (TOOL.test(t) && !isQuestion) return { ...base, kind: 'tool_request' };
   if (isQuestion && LIVE.test(t) && !/\byou\b/.test(t)) return { ...base, kind: 'live_info' };
   if (isQuestion) return { ...base, kind: /\b(my|i|me|mine)\b/.test(t) ? 'recall' : 'question' };

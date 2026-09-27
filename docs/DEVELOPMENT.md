@@ -81,6 +81,31 @@ If CoreSimulator is unavailable in a restricted session, report that limitation;
 do not change signing, provisioning, targets or deployment settings. Physical
 deployment is a separate owner-led task.
 
+## After the Mac restarts: `scripts/tamago-up.sh` and the live dashboard (D-122)
+
+Nothing starts Tamago at login yet. After a restart, run from the repository root:
+
+```sh
+scripts/tamago-up.sh
+```
+
+It checks `/Volumes/Storage` is mounted, starts Ollama (loopback, models on Storage) if needed and runs the LAN
+gateway in that terminal with the owner's settings: brain + `llama3.2:3b`, on-device transcription, Kokoro
+`af_heart` at 0.9×. The Watch stays paired (same token). Every setting can be overridden from the environment.
+
+With `TAMAGO_MONITOR=1` (the script sets it) you get:
+
+- **the terminal**: one line per hop: 🎤 voice arrived, 👂 heard "…", 🐙 Tamago "…", 🔊 voice made, 📲 Watch fetched it;
+- **the dashboard**: <http://127.0.0.1:8788> (this Mac only). It shows:
+  - conversations as chat bubbles with each hop timed;
+  - when the Watch last checked in, and the gateway, Ollama and voice status;
+  - the open pairing code;
+  - ▶ replay of recent voice clips;
+  - a box to send a test message as if from the Watch.
+
+The words stay in memory and on screen only. The JSON log (metadata only) goes to `$TAMAGO_STATE_DIR/logs/gateway.log`.
+Ctrl-C stops the gateway and leaves Ollama running.
+
 ## The Watch ↔ Mac loop (D-115, D-116)
 
 Two gateway modes:

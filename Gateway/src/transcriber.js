@@ -43,6 +43,8 @@ export function createTranscriber({ binPath, locale = 'en_CA', timeoutMs = 15_00
  * ("What's my dog?,,',',,," on the owner's Watch). Drop those; keep real words.
  */
 export function cleanTranscript(text) {
+  // Only punctuation ("." from a silent hold, 2026-09-27) means nothing was heard.
+  if (!/[\p{L}\p{N}]/u.test(String(text))) return '';
   return String(text)
     .replace(/(\s*[,'’"]\s*){2,}/g, ' ')
     .replace(/^[\s,'’"]+|[\s,'’"]+$/g, '')

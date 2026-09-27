@@ -49,11 +49,14 @@ const silentLogger = { info() {}, warn() {}, error() {} };
  *   recording + its transcript there. Off by default; the owner's voice is otherwise never stored.
  * @param {object|null} [opts.synthesizer] text-to-speech (tts.js); null = no `speechAudio` (§16)
  * @param {number} [opts.speechWaitMs]   how long GET /v1/speech waits for a pending synthesis
+ * @param {Function|null} [opts.monitor] OWNER'S LIVE VIEW ONLY (TAMAGO_MONITOR=1, monitor.js): gets each
+ *   hop of a conversation, including what was heard and said, to print on the owner's own terminal.
+ *   Never persisted and never mixed into `logger`, which stays metadata-only. Off by default.
  */
 export function createGateway({
   provider, authToken, timeoutMs = 20000, logger = silentLogger, now = Date.now,
   gatewayId = null, gatewayName = 'TamagoAI', pairing = null, transcriber = null, keepAudioDir = null,
-  synthesizer = null, speechWaitMs = SPEECH_WAIT_MS,
+  synthesizer = null, speechWaitMs = SPEECH_WAIT_MS, monitor = null,
 }) {
   if (!provider || typeof provider.generate !== 'function') {
     throw new Error('createGateway requires a provider with generate().');
@@ -68,6 +71,15 @@ export function createGateway({
   const recent = new Map();
   // requestId -> { at, state: 'pending'|'ready'|'failed', promise, audio?, controller }
   const speech = new Map();
+
+  // A broken monitor must never break a conversation.
+  const show = (event) => {
+    if (!monitor) return;
+    try { monitor({ at: now(), ...event }); } catch { /* the live view is best-effort */ }
+  };
+  const showReply = (requestId, body, ms) => show(body.status === 'ok'
+    ? { kind: 'reply', requestId, text: body.text, characterState: body.characterState, haptic: body.haptic, ms }
+    : { kind: 'reply_error', requestId, code: body.error?.code, message: body.error?.message, ms });
 
   const server = http.createServer((req, res) => {
     handle(req, res).catch((err) => {
@@ -89,7 +101,11 @@ export function createGateway({
       // The Watch probes health when Tamago comes to the front: a good moment to
       // load the local model so the first question doesn't pay for it. The
       // provider rate-limits this; it never blocks the answer.
-      provider.warm?.().catch(() => {});
+      // The owner's dashboard polls with ?monitor=1: that's not the Watch, and not a reason to load the model.
+      if (!url.searchParams.has('monitor')) {
+        provider.warm?.().catch(() => {});
+        show({ kind: 'health', from: peer(req) });
+      }
       return send(res, 200, {
         status: 'ok',
         protocolVersion: PROTOCOL_VERSION,
@@ -149,6 +165,7 @@ export function createGateway({
       // Drain without buffering so the client sees the 401 rather than a reset.
       req.resume();
       logger.warn({ event: 'request', status: 'error', code: 'auth_failed' });
+      show({ kind: 'auth_failed', route: 'request', from: peer(req) });
       return sendError(res, null, 'auth_failed', 'Missing or invalid bearer token.');
     }
 
@@ -182,6 +199,7 @@ export function createGateway({
     pruneRecent();
     let entry = recent.get(request.requestId);
     const duplicate = entry !== undefined;
+    show({ kind: 'text_in', requestId: request.requestId, text: request.text, from: peer(req), duplicate });
     if (!entry) {
       entry = { at: now(), promise: runProvider(request).then(attachSpeech) };
       recent.set(request.requestId, entry);
@@ -197,6 +215,7 @@ export function createGateway({
       duplicate,
       ms: now() - started,
     });
+    showReply(request.requestId, body, now() - started);
     return send(res, httpStatus, body);
   }
 
@@ -210,6 +229,7 @@ export function createGateway({
     if (!isAuthorized(req.headers.authorization)) {
       req.resume();
       logger.warn({ event: 'audio', status: 'error', code: 'auth_failed' });
+      show({ kind: 'auth_failed', route: 'audio', from: peer(req) });
       return sendError(res, null, 'auth_failed', 'Missing or invalid bearer token.');
     }
     const requestId = String(req.headers['x-tamago-request-id'] ?? '').toLowerCase();
@@ -245,6 +265,7 @@ export function createGateway({
     pruneRecent();
     let entry = recent.get(requestId);
     const duplicate = entry !== undefined;
+    show({ kind: 'audio_in', requestId, bytes: audio.length, from: peer(req), duplicate });
     if (!entry) {
       entry = { at: now(), promise: runAudio(requestId, audio, contentType).then(attachSpeech) };
       recent.set(requestId, entry);
@@ -254,6 +275,7 @@ export function createGateway({
       event: 'audio', requestId, status: body.status, code: body.error?.code, duplicate,
       bytes: audio.length, transcribeMs, ms: now() - started,
     });
+    showReply(requestId, body, now() - started);
     return send(res, httpStatus, body);
   }
 
@@ -274,11 +296,13 @@ export function createGateway({
       }
     } catch (err) {
       logger.warn({ event: 'transcribe_failed', requestId, message: err?.message?.slice(0, 200) });
+      show({ kind: 'heard_failed', requestId, message: err?.message?.slice(0, 200), ms: now() - t0 });
       return { ...errorOutcome(requestId, 'provider_error', "Couldn't make out the audio."), transcribeMs: now() - t0 };
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
     const transcribeMs = now() - t0;
+    show({ kind: 'heard', requestId, text: transcript, ms: transcribeMs });
     if (!transcript) {
       // Heard nothing usable. Say so: a silent shrug looked like "no reply" on
       // the owner's Watch (first hold-to-talk run, 2026-09-27).
@@ -323,10 +347,12 @@ export function createGateway({
         entry.state = 'ready';
         entry.audio = audio;
         logger.info({ event: 'speech_synth', requestId, engine: synthesizer.engine, voice: synthesizer.voice, bytes: audio.length, ms: now() - t0 });
+        show({ kind: 'voice_ready', requestId, voice: `${synthesizer.engine}/${synthesizer.voice || 'default'}`, bytes: audio.length, ms: now() - t0, audio });
       },
       (err) => {
         entry.state = 'failed';
         logger.warn({ event: 'speech_synth_failed', requestId, engine: synthesizer.engine, code: err?.code, ms: now() - t0 });
+        show({ kind: 'voice_failed', requestId, code: err?.code, message: err?.message?.slice(0, 200), ms: now() - t0 });
       },
     );
     speech.set(requestId, entry);
@@ -346,6 +372,7 @@ export function createGateway({
     const started = now();
     if (!isAuthorized(req.headers.authorization)) {
       logger.warn({ event: 'speech', status: 'error', code: 'auth_failed' });
+      show({ kind: 'auth_failed', route: 'speech', from: peer(req) });
       return sendError(res, null, 'auth_failed', 'Missing or invalid bearer token.');
     }
     const requestId = rawId.toLowerCase();
@@ -354,6 +381,7 @@ export function createGateway({
     const entry = speech.get(requestId);
     if (!entry) {
       logger.info({ event: 'speech', requestId, status: 404 });
+      show({ kind: 'voice_fetch', requestId, status: 404, from: peer(req) });
       return sendError(res, requestId, 'not_found', 'No speech for this request (never made, already fetched, or expired).');
     }
     if (entry.state === 'pending') {
@@ -363,11 +391,13 @@ export function createGateway({
     }
     if (entry.state !== 'ready') {
       logger.info({ event: 'speech', requestId, status: 503, state: entry.state, waitedMs: now() - started });
+      show({ kind: 'voice_fetch', requestId, status: 503, state: entry.state, waitedMs: now() - started, from: peer(req) });
       const message = entry.state === 'failed' ? 'Speech synthesis failed.' : "Speech isn't ready yet.";
       return sendError(res, requestId, 'provider_unavailable', message);
     }
     speech.delete(requestId);   // served once, then gone
     logger.info({ event: 'speech', requestId, status: 200, bytes: entry.audio.length, waitedMs: now() - started });
+    show({ kind: 'voice_fetch', requestId, status: 200, bytes: entry.audio.length, waitedMs: now() - started, from: peer(req) });
     res.writeHead(200, {
       'content-type': 'audio/mp4',
       'content-length': entry.audio.length,
@@ -397,6 +427,7 @@ export function createGateway({
     const outcome = pairing.attempt(body?.pairingCode);
     const deviceName = typeof body?.deviceName === 'string' ? body.deviceName.slice(0, 64) : undefined;
     logger.info({ event: 'pair', outcome, deviceName });
+    show({ kind: 'pair', outcome, deviceName, from: peer(req) });
     if (outcome === 'closed') {
       return fail(410, 'pairing_closed', 'No pairing window is open. Restart the gateway to get a new code.');
     }
@@ -506,6 +537,10 @@ function readBuffer(req, maxBytes) {
     });
     req.on('error', reject);
   });
+}
+
+function peer(req) {
+  return (req.socket?.remoteAddress ?? '').replace(/^::ffff:/, '');
 }
 
 function sha256(s) {

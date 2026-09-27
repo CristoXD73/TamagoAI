@@ -1100,3 +1100,47 @@ Pro simulator shows the new screen.
 **Known issues:** the iPhone launch screen is still white (needs an Info.plist / project setting).
 **Cross-agent impact:** none; the project file is untouched.
 **Signed-by:** Claude Code
+
+### 2026-09-27T07:14:00-04:00: Claude Code — Tamago back after the Mac restart; live dashboard; replies always have words (D-122)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `cbea65d`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- New: `scripts/tamago-up.sh`, `Gateway/src/monitor.js`, `Gateway/src/monitor-ui.js`, `Gateway/src/monitor-ui.html`,
+  `Gateway/test/monitor.test.js`, `.claude/launch.json` (dashboard preview)
+- `Gateway/src/server.js`: `monitor` hooks; dashboard health polls don't warm the model
+- `Gateway/src/cli.js`: monitor mode, dashboard, clean Ctrl-C
+- `Gateway/src/transcriber.js`: punctuation-only transcripts are empty
+- Brain: `profile.js`, `orchestrator.js`, `routing/intent-router.js`, `routing/model-router.js`
+- Tests: `brain.test.js`, `brain-gateway.test.js`, `audio.test.js`
+- Docs: `DECISIONS.md` D-122, `DEVELOPMENT.md`
+**Work performed:**
+- **Diagnosis.** The owner said Tamago didn't reply after the Mac restarted: the gateway and Ollama weren't running.
+- **Restart path.** Added a one-command restart and the owner's live view: terminal lines plus a loopback dashboard.
+- **Silent replies.** The dashboard then showed the Watch's messages arriving but "Hello" / "Can you hear me?"
+  answered without words, which is invisible on the still-picture Watch. Every reply now has words (D-122).
+- **Clock.** The time is answered by rule.
+- **Transcripts.** "." is treated as nothing heard.
+- **Restart bugs fixed:**
+  - Ctrl-C used to kill Ollama too (same process group); it now runs in its own session.
+  - The gateway hung on exit while a dashboard was open; it now exits cleanly.
+**Tests/builds actually performed (by me):**
+- `npm test`: 140 pass / 0 fail / 1 skipped.
+- Live on the owner's Mac, via the dashboard:
+  - "Hello" → "Oh. Hi."
+  - "what time is it?" → "It's 7:12. Early morning here."
+  - Kokoro voice made for each.
+- Live from the owner's Watch, before the D-122 restart:
+  - voice arrived → heard in 0.2 s → answered in 1.4–2.6 s → Kokoro voice made → Watch fetched it.
+- Ctrl-C leaves Ollama running.
+**Things NOT verified:**
+- The owner hearing the D-122 replies on the Watch.
+- Starting at login (launchd, not done yet).
+**Known issues:** llama3.2:3b answers are weak ("I am functioning.", "Tentacles absorb nutrients"); a stronger
+model is planned (D-118).
+**Cross-agent impact:**
+- Silence is off by default, so brain tests that exercise wordless replies pass `profile: GESTURES`.
+- The JSON log moves to a file only in monitor mode.
+**Signed-by:** Claude Code

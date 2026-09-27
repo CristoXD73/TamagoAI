@@ -1354,3 +1354,21 @@ the Swift compiles. `swift test` passes 147/147 and the TamagoWatch simulator bu
    synthesis ms, KB and engine RAM against the budgets.
 
 **Do not redo:** the engine research and licensing; the §16 contract; the fallback rules.
+
+---
+
+### 2026-09-27 07:14 EDT: Claude Code (local): restart script, live dashboard, every reply has words (D-122)
+
+**Done:**
+- `scripts/tamago-up.sh` brings Tamago back after a Mac restart.
+- `TAMAGO_MONITOR=1` gives terminal lines plus a dashboard at http://127.0.0.1:8788, loopback only, memory only.
+- The brain always answers in words while the Watch can't show gestures. The time is answered by rule, and "." counts as nothing heard.
+
+**Tests:** gateway 140 pass / 0 fail / 1 skipped.
+**Verified live:** the Watch → Mac → Watch hops are visible on the dashboard, and the new replies came back via its test box.
+**Unverified:** the owner hearing the new replies on the Watch.
+
+**Next recommended task (ONE):** once the owner is happy with the live view, run the gateway and Ollama at login
+with launchd user agents. Wait for `/Volumes/Storage` to mount first; the logs go on Storage. The dashboard stays at
+127.0.0.1:8788.
+**Do not redo:** the monitor privacy split (words only on screen and in memory; `logger` stays metadata-only).

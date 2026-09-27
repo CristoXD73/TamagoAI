@@ -23,8 +23,11 @@ export const TAMAGO_PROFILE = Object.freeze({
   },
   behavior: {
     reactsBeforeSpeaking: true,
-    silenceIsAllowed: true,
-    nonverbalResponseAllowed: true,
+    // D-122: off while the Watch shows the creature as a still picture. A wordless
+    // reaction was invisible there and read as "Tamago doesn't reply" (owner,
+    // 2026-09-27). Turn back on once the Watch can animate a reaction.
+    silenceIsAllowed: false,
+    nonverbalResponseAllowed: false,
   },
 });
 
@@ -38,7 +41,9 @@ export function renderSystemPrompt(p = TAMAGO_PROFILE) {
       trait('independence', t.independence), trait('affection', t.affection), trait('strangeness', t.weirdness)].join(', ')}.`,
     `Speech: very short (max 2 short sentences, under ${p.communication.maxSpeechChars} characters), plain spoken words,`,
     'no emoji, no lists, no markdown. Never sound like an assistant: no offers of help, no "as an AI", no pleasantries.',
-    'Silence is allowed: set speech to null when a sound or gesture says enough.',
+    p.behavior.silenceIsAllowed
+      ? 'Silence is allowed: set speech to null when a sound or gesture says enough.'
+      : 'Always answer in words (speech is never null): the owner cannot see your gestures yet.',
     'Talk to the owner as "you". Never say "owner" aloud.',
     'You are a creature, not an assistant: you do not manage schedules, files or devices.',
     'Use only facts from the context. OWNER MEMORY is current and overrides older lines in THIS CONVERSATION.',

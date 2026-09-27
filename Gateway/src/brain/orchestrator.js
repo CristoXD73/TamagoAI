@@ -118,6 +118,12 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       }
     }
 
+    // 6b. D-122: while the Watch can't show a gesture, every reply has words.
+    if (intent.speech === null && profile.behavior?.nonverbalResponseAllowed === false) {
+      intent = { ...intent, speech: wordsForSilence(cls, text, relationship) };
+      step('speak_instead', { reason: 'nonverbal replies are invisible on the Watch (D-122)' });
+    }
+
     // 7. speech composer: Watch constraints regardless of which model spoke
     if (intent.speech !== null) {
       const composed = composeSpeech(intent.speech, profile);
@@ -170,6 +176,13 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       return makeIntent({ speech: "I can't check that yet.", emotion: 'uncertain', sound: 'uncertain_hum', haptic: 'none',
         behavior: 'look_away', thought: 'Live information (weather, news, service status) needs tools (Brain E).' });
     }
+    if (cls.kind === 'time') {
+      const [h, m] = world.localTime.split(':').map(Number);
+      const part = { night: 'Night', early_morning: 'Early morning', morning: 'Morning', afternoon: 'Afternoon',
+        evening: 'Evening', late_evening: 'Late evening' }[world.timeOfDay];
+      return makeIntent({ speech: `It's ${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}. ${part} here.`, emotion: 'content',
+        haptic: 'none', behavior: 'settle', thought: 'The clock is known; no model needed.' });
+    }
     if (cls.kind === 'tool_request') {
       return makeIntent({ speech: "I can't do that yet.", emotion: 'uncertain', sound: 'uncertain_hum', haptic: 'none',
         behavior: 'look_away', thought: `Tool request "${text}" — tools arrive in Brain E.` });
@@ -186,6 +199,19 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     return makeIntent(familiar
       ? { speech: null, emotion: 'content', sound: 'soft_ack', haptic: 'click', behavior: 'slow_blink', thought: `Learned: ${candidates[0]?.text}` }
       : { speech: 'Got it.', emotion: 'content', sound: 'soft_ack', haptic: 'click', behavior: 'settle', thought: `Learned: ${candidates[0]?.text}` });
+  }
+
+  // Short in-character words for the moments Tamago would otherwise only gesture (D-122).
+  function wordsForSilence(cls, text, relationship) {
+    const warm = relationship.stage === 'familiar' || relationship.stage === 'bonded';
+    if (/\b(hear|hearing) me\b|\byou there\b|\bare you (awake|listening|here)\b/i.test(text)) return 'I hear you.';
+    switch (cls.kind) {
+      case 'greeting': return relationship.stage === 'new' ? 'Oh. Hi.' : 'Hi.';
+      case 'gratitude': return warm ? 'Anytime.' : 'Mm. Sure.';
+      case 'affirmation': return 'Mm-hm.';
+      case 'statement': return 'Got it.';
+      default: return cls.isQuestion ? "Hm. I'm not sure." : "I'm here.";
+    }
   }
 
   return {

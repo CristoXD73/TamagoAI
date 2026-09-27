@@ -15,7 +15,7 @@ import { validateIntent, toV1Result, makeIntent } from '../src/brain/response-sc
 import { stageFor } from '../src/brain/relationship/model.js';
 import { buildContext, CONTEXT_BUDGET_CHARS } from '../src/brain/context-builder.js';
 import { createOllamaReasoner } from '../src/brain/reasoners/ollama.js';
-import { renderSystemPrompt } from '../src/brain/personality/profile.js';
+import { renderSystemPrompt, TAMAGO_PROFILE } from '../src/brain/personality/profile.js';
 import { buildOkResponse, validateResponse } from '../src/protocol.js';
 import { ID } from './helpers.js';
 
@@ -26,6 +26,9 @@ function tmpDb() {
   const dir = mkdtempSync(join(tmpdir(), 'tamago-brain-'));
   return { path: join(dir, 'brain.sqlite'), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
+
+// Gestures on: how Tamago behaves once the Watch can show a wordless reaction (D-122 turns this off for now).
+const GESTURES = { ...TAMAGO_PROFILE, behavior: { ...TAMAGO_PROFILE.behavior, silenceIsAllowed: true, nonverbalResponseAllowed: true } };
 
 function clock(start = T0) {
   let t = start;
@@ -39,14 +42,14 @@ test('milestone: learns a fact, survives a restart, recalls it, thanks is nonver
   const db = tmpDb();
   const now = clock();
   try {
-    let brain = await createBrain({ dbPath: db.path, now });
+    let brain = await createBrain({ dbPath: db.path, now, profile: GESTURES });
     const taught = await brain.handle('Hey, my Jellyfin runs on this Mac.');
     assert.equal(taught.intent.speech, 'Got it.');
     assert.deepEqual(taught.trace.memoryOps.map((o) => o.op), ['stored']);
     brain.close();
 
     now.advance(60_000);
-    brain = await createBrain({ dbPath: db.path, now }); // "restart process"
+    brain = await createBrain({ dbPath: db.path, now, profile: GESTURES }); // "restart process"
     const recalled = await brain.handle('Where does my Jellyfin run?');
     assert.equal(recalled.intent.speech, 'On this Mac.');
     assert.equal(recalled.trace.route, 'fast');
@@ -201,7 +204,7 @@ test('behavior policy: greeting is watchful when new, verbal once acquainted; fa
   const db = tmpDb();
   const now = clock();
   try {
-    const brain = await createBrain({ dbPath: db.path, now });
+    const brain = await createBrain({ dbPath: db.path, now, profile: GESTURES });
     const first = await brain.handle('Hi Tamago');
     assert.equal(first.intent.speech, null);
     assert.equal(first.intent.behavior, 'inspect_owner');
@@ -214,6 +217,47 @@ test('behavior policy: greeting is watchful when new, verbal once acquainted; fa
     const learned = await brain.handle('My name is Cristo.');
     assert.equal(learned.intent.speech, null, 'a familiar Tamago acknowledges without words');
     assert.equal(learned.trace.memoryOps[0].op, 'stored');
+    brain.close();
+  } finally {
+    db.cleanup();
+  }
+});
+
+test('D-122: while the Watch shows a still picture, every reply has words', async () => {
+  const db = tmpDb();
+  const now = clock();
+  try {
+    const silent = { name: 'silent', available: true, reason: async () => ({ intent: makeIntent({ speech: null, emotion: 'curious' }), attempts: 1 }) };
+    const brain = await createBrain({ dbPath: db.path, now, reasoner: silent });
+    assert.equal((await brain.handle('Hello')).intent.speech, 'Oh. Hi.', 'a new Tamago still answers a greeting');
+    assert.equal((await brain.handle('Thanks.')).intent.speech, 'Mm. Sure.');
+    const hear = await brain.handle('Can you hear me?');
+    assert.equal(hear.intent.speech, 'I hear you.', 'a model that picks silence is overruled');
+    assert.ok(hear.trace.steps.some((s) => s.step === 'speak_instead' || s.name === 'speak_instead' || JSON.stringify(s).includes('speak_instead')));
+    assert.equal((await brain.handle('What is an octopus?')).intent.speech, "Hm. I'm not sure.");
+    for (const text of ['Hello', 'Thanks.', 'ok', 'Can you hear me?', 'My dog is Pixel.']) {
+      const r = await brain.handle(text);
+      assert.notEqual(r.v1.nonverbal, true, text);
+    }
+    assert.match(renderSystemPrompt(), /Always answer in words/);
+    assert.match(renderSystemPrompt(GESTURES), /Silence is allowed/);
+    brain.close();
+  } finally {
+    db.cleanup();
+  }
+});
+
+test('time: the clock is answered exactly by rule, never by a model', async () => {
+  const db = tmpDb();
+  try {
+    const cap = capturingReasoner();
+    const brain = await createBrain({ dbPath: db.path, now: clock(new Date(2026, 8, 27, 7, 8).getTime()), reasoner: cap.reasoner });
+    for (const text of ['What time is it?', 'what time of day is it for you?', "What's the time", 'Tamago, what time is it']) {
+      const r = await brain.handle(text);
+      assert.equal(r.trace.route, 'rule', text);
+      assert.equal(r.intent.speech, "It's 7:08. Early morning here.", text);
+    }
+    assert.equal(cap.prompts.length, 0);
     brain.close();
   } finally {
     db.cleanup();

@@ -135,6 +135,7 @@ test('audio: punctuation runs from trailing silence are cleaned before the brain
   assert.equal(cleanTranscript("What's my dog?,,',',,,"), "What's my dog?");
   assert.equal(cleanTranscript('Can you tell me 10, fun, facts?,,,,,'), 'Can you tell me 10, fun, facts?');
   assert.equal(cleanTranscript("What's your name?"), "What's your name?");
+  for (const noise of ['.', ' . ', '?', ',,,', '']) assert.equal(cleanTranscript(noise), '', `"${noise}" is nothing heard`);
   assert.equal(cleanTranscript(',,, '), '');
   const gw = await startGateway({ transcriber: stubTranscriber("ping,,',',,,").transcriber });
   try {
