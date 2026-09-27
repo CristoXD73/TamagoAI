@@ -988,3 +988,23 @@ Release `generic/platform=iOS` build → succeeded, `CFBundleShortVersionString`
 **Known issues:** none.
 **Cross-agent impact:** the app version is now 0.1.1.
 **Signed-by:** Claude Code
+
+### 2026-09-27T03:02:32-04:00: Claude Code — verified the cloud voice work on the Mac; fixed a compile error
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `15ea94a` (my Xcode Cloud commit, rebased onto the cloud agent's `90b8c9e`)
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:** `Apple/WatchApp/AudioReplyPlayer.swift` (`AVFileType.m4a.rawValue` → its string value
+`"com.apple.m4a-audio"`; header), new `Apple/AppleTamago.xcodeproj/xcshareddata/xcodecloud/manifest.json` (created
+by Xcode when the owner set up Xcode Cloud; product IDs only), this file.
+**Work performed:** my push was rejected because the cloud agent had pushed natural-voice parts 1–3 meanwhile;
+rebased (only the append-only worklog conflicted; kept both). Then ran the combined code on this Mac: the cloud
+agent's Swift didn't compile (`AVFileType` is in AVFoundation, not imported). Fixed with the equivalent string.
+**Tests/builds actually performed (by me):** `npm test` → 134 tests, 133 pass, 1 skipped (the cloud agent's
+real-engine TTS test: engine not installed yet); `swift test` → 147/147; TamagoWatch simulator build → failed on
+`AudioReplyPlayer.swift:33`, then succeeded after the fix.
+**Things NOT verified:** the voice pipeline end to end (the TTS engine isn't installed on the Mac yet).
+**Known issues:** none new.
+**Cross-agent impact:** fixes the cloud agent's UNVERIFIED Swift so Xcode Cloud archives of this branch can build.
+**Signed-by:** Claude Code

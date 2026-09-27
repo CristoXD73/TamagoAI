@@ -1,7 +1,8 @@
 // AudioReplyPlayer.swift
 //
-// VERIFICATION: UNVERIFIED (written in the cloud, not compiled). Nothing here
-// has been heard on a Watch or in the simulator.
+// VERIFICATION: compiles for the watchOS 27 simulator (local Claude Code,
+// 2026-09-27, after fixing one AVFoundation-only symbol). Nothing here has been
+// heard on a Watch or in the simulator yet.
 //
 // D-121 / PROTOCOL_V1 §16: plays the reply audio the owner's Mac synthesized
 // (AAC in MP4, mono 24 kHz) fetched from GET /v1/speech/<requestId>.
@@ -30,7 +31,9 @@ final class AudioReplyPlayer: NSObject, AVAudioPlayerDelegate {
     /// built-in voice instead.
     func play(_ data: Data) async -> TimeInterval? {
         stop()
-        guard let player = try? AVAudioPlayer(data: data, fileTypeHint: AVFileType.m4a.rawValue) else {
+        // "com.apple.m4a-audio" is AVFileType.m4a's raw value; AVFileType lives in
+        // AVFoundation, which this file doesn't import (the cloud draft did not compile).
+        guard let player = try? AVAudioPlayer(data: data, fileTypeHint: "com.apple.m4a-audio") else {
             Self.log.error("reply audio could not be decoded (\(data.count, privacy: .public) bytes)")
             return nil
         }
