@@ -78,7 +78,9 @@ try {
   console.error(`tamagoai-gateway: ${err.message}`);
   process.exit(1);
 }
-const server = createGateway({ ...config, pairing, transcriber, keepAudioDir, synthesizer, logger, monitor });
+// PROTOCOL_V1 §18 / D-127: the iPhone conversation (memory only). TAMAGO_CONVERSATION=off keeps none.
+const conversation = process.env.TAMAGO_CONVERSATION === 'off' ? null : undefined;
+const server = createGateway({ ...config, pairing, transcriber, keepAudioDir, synthesizer, logger, monitor, conversation });
 
 let advertiser = null;
 let ipWatch = null;

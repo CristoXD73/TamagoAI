@@ -9,7 +9,7 @@ Structure decided in `docs/DECISIONS.md` **D-101** (Phase 3, Xcode 27.0).
 | `WatchApp/` | `TamagoWatch` target (watchOS 27.0). Placeholder screen only. `Info.plist` holds `NSAllowsLocalNetworking` (D-107). | launch: `SIMULATOR_VERIFIED_ONLY` |
 | `Complication/` | `TamagoComplication` WidgetKit extension, embedded in the Watch app. Static placeholder. | build only |
 | `PhoneWidget/` | iPhone WidgetKit extension sources (D-122): the octopus in all 6 iPhone families; a tap opens the app. **Not yet a target**: set it up on the Mac with `docs/WIDGETS.md` §4. | UNVERIFIED |
-| `iPhoneApp/` | `TamagoPhone` target (iOS 27.0), embeds the Watch app. Placeholder screen only. | build only |
+| `iPhoneApp/` | `TamagoPhone` target (iOS 27.0), embeds the Watch app. **The chat where Tamago's words land (D-127):** pairs with the Mac, shows the conversation (Watch + phone) and long answers, and sends typed messages. Local-network permission comes from `Config/TamagoPhone-Info.plist` via `Tamago.xcconfig`. | chat: UNVERIFIED (not compiled) |
 | `Config/Tamago.xcconfig` | Placeholder bundle prefix `com.example.appletamago`, empty team. Put real values in git-ignored `Config/Local.xcconfig`. | n/a |
 
 Targets: `TamagoWatch`, `TamagoComplication`, `TamagoPhone`, and `TamagoTests`

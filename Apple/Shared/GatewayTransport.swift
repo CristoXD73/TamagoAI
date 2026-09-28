@@ -5,6 +5,7 @@
 // DEVICE_VERIFIED.
 //
 // VERIFICATION (speechAudio(path:), D-121): UNVERIFIED (written in the cloud, not compiled).
+// VERIFICATION (conversation(after:), clearConversation(), D-127): UNVERIFIED (cloud, not compiled).
 //
 // Executes CharacterStateMachine's `.sendRequest`/`.cancelRequest` effects
 // (D-103, D-115) and the pairing/reachability calls (D-116). Pure Foundation,
@@ -197,6 +198,34 @@ public actor GatewayClient {
               (http.value(forHTTPHeaderField: "content-type") ?? "").lowercased().hasPrefix("audio/"),
               !data.isEmpty else { return nil }
         return data
+    }
+
+    /// GET `/v1/conversation?after=` (PROTOCOL_V1 §18): what the iPhone shows.
+    /// nil when the Mac can't be reached or answers anything but a page.
+    public func conversation(after: Int = 0, timeout: TimeInterval = 10) async -> TamagoConversationPage? {
+        var components = URLComponents(url: configuration.baseURL.appendingPathComponent("v1/conversation"),
+                                       resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "after", value: String(max(0, after)))]
+        guard let url = components?.url else { return nil }
+        var urlRequest = URLRequest(url: url, timeoutInterval: timeout)
+        urlRequest.httpMethod = "GET"
+        if let token = configuration.authToken {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        }
+        guard let (data, response) = try? await fetch(urlRequest),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return try? decoder.decode(TamagoConversationPage.self, from: data)
+    }
+
+    /// DELETE `/v1/conversation`: the owner clears it from the phone. True when the Mac confirmed.
+    public func clearConversation() async -> Bool {
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/conversation"), timeoutInterval: 10)
+        urlRequest.httpMethod = "DELETE"
+        if let token = configuration.authToken {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        }
+        guard let (_, response) = try? await fetch(urlRequest) else { return false }
+        return (response as? HTTPURLResponse)?.statusCode == 200
     }
 
     /// GET `/v1/health`, classified. Never used on the request path itself.

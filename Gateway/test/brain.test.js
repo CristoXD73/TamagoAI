@@ -419,6 +419,7 @@ test('speech: Tamago says "your", not "owner\'s"; the prompt says memory beats o
   assert.ok(r.changed.includes('addressed'));
   const p = renderSystemPrompt();
   assert.match(p, /as "you"/);
+  assert.match(p, /General knowledge \(how-to, recipes, science\) you may answer/, 'recipes are not refused (Gemma did, 2026-09-28)');
   assert.match(p, /OWNER MEMORY is current/);
   assert.match(p, /cannot see live information/);
 });
@@ -472,7 +473,7 @@ test('context builder stays within budget and system prompt is compact', () => {
     relationship: { stage: 'familiar', daysKnown: 6, lastSeenAgoSec: 30 }, world: { timeOfDay: 'evening', localTime: '20:00', energy: 0.5 },
   });
   assert.ok(ctx.prompt.length <= CONTEXT_BUDGET_CHARS + 700);
-  assert.ok(renderSystemPrompt().length < 1200);
+  assert.ok(renderSystemPrompt().length < 1400);   // 1200 → 1300 (D-127 needsDetail) → 1400 (general knowledge line, 2026-09-28)
 });
 
 test('D-118 defaults: ollama without a named model uses llama3.2:3b; nothing set stays deterministic', async () => {

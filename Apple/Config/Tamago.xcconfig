@@ -20,6 +20,12 @@ TAMAGO_APPICON_TamagoWatch = AppIcon
 TAMAGO_APPICON_TamagoPhone = AppIcon
 ASSETCATALOG_COMPILER_APPICON_NAME = $(TAMAGO_APPICON_$(TARGET_NAME))
 
+// D-127: keys build settings can't express (the ATS dictionary) live in a per-target Info.plist. Only the
+// iPhone app uses this: it talks plain HTTP to the owner's Mac on the LAN (NSAllowsLocalNetworking), like the
+// Watch app's own Info.plist. Targets that set INFOPLIST_FILE themselves (Watch, complication, phone widget) keep theirs.
+TAMAGO_INFOPLIST_TamagoPhone = Config/TamagoPhone-Info.plist
+INFOPLIST_FILE = $(TAMAGO_INFOPLIST_$(TARGET_NAME))
+
 // TestFlight/App Store export compliance: the apps use no encryption beyond the
 // OS's own (plain HTTP on the LAN, Keychain), so uploads don't stop to ask.
 INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO

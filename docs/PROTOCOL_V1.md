@@ -108,6 +108,7 @@ has something to show, say, and play.
 | `haptic` | enum | See §7 |
 | `followUpExpected` | boolean | `true` → Watch may go straight back to `listening` after speaking |
 | `error` | object | Present **iff** `status == "error"`: `{ code, message, retryable }` |
+| `longAnswer` | object | Optional (D-127, §18): `{ "status": "pending", "seq": n }`. This reply is a gist; the full answer is being written on the Mac and fills in conversation turn `seq`. Old clients ignore it. |
 
 ### 5.1 Nonverbal reactions (clarification, 2026-09-27, D-117)
 
@@ -319,3 +320,93 @@ audio. Synthesis starts in the background when the reply is ready, and the Watch
   ID, engine, voice, byte count and timings only. Nothing leaves the Mac. No cloud TTS, no API keys.
 - **Voices named after OpenAI voices are refused** (`af_alloy`, `af_nova`, `am_echo`, `am_onyx`, `bm_fable`), as is
   any voice cloning. See `docs/VOICE_RESEARCH.md`.
+
+## 17. Inbox (reserved)
+
+Reserved for the relay's `GET /v1/inbox` (docs/RELAY_PLAN.md §5, R3). Not specified yet.
+
+## 18. Conversation and long answers (added in D-127; backward compatible)
+
+The owner's iPhone shows every exchange with Tamago, from the Watch or the phone. It's also where long answers land:
+the Watch speaks a short gist and offers the rest.
+
+### 18.1 Long answers
+
+- **Flag:** a provider may mark an `ok` result `needsDetail` (the brain does when an answer needs more than two
+  sentences) and implement `detail()`.
+- **The reply isn't held back.** The gateway returns right away with:
+  - **Watch** (any `client.device` except `phone`):
+    - `speechText` = the gist + *"That one's long. Check your phone, or should I say it all?"*
+    - `followUpExpected: true`
+    - `longAnswer: { status: "pending", seq }`
+  - **Phone** (`client.device: "phone"`): the gist as `text`/`speechText`, plus `longAnswer`. No spoken offer.
+- **Background:** the gateway asks the provider for the full answer (≤ 120 s, ≤ 1,500 chars, may use light markdown)
+  and fills in conversation turn `seq`: `tamago` becomes the full text and `long.status` becomes `ready` (or
+  `failed`).
+- **The owner's next Watch utterance within 3 minutes**, if it's a short answer to the offer, is answered by the
+  gateway without the model:
+
+  | Owner says (whole utterance) | Tamago |
+  |---|---|
+  | "yes", "say it all", "read it to me", "tell me everything", "go ahead"… | Waits for the full answer (up to the request timeout − 1.5 s), then `text` = the full answer and `speechText` = its spoken form (list markers and markdown removed). If it isn't ready: *"It's still coming. I'll put it on your phone."* |
+  | "no", "phone", "check my phone", "later", "not now"… | *"Okay. It's on your phone."* (or *"…I'll put it on your phone."* while it's still being written) |
+  | anything else | an ordinary new question; the offer ends |
+
+- **Spoken length:** a read-aloud longer than one Mac synthesis (§16, 300 chars) carries **no `speechAudio`**. The
+  Watch reads it with its built-in voice rather than play audio that stops halfway. Chunked Mac audio is a later
+  step.
+- **Watch builds:** no change is needed. The offer is ordinary speech, and the answer is an ordinary hold-to-talk.
+
+### 18.2 `GET /v1/conversation?after=<n>`
+
+```
+GET /v1/conversation?after=0
+authorization: Bearer <token>
+```
+
+```json
+{
+  "protocolVersion": 1,
+  "latest": 7,
+  "turns": [
+    { "seq": 3, "rev": 7, "requestId": "…", "at": "2026-09-27T14:02:03.456Z", "from": "watch",
+      "you": "How do I make sourdough?", "tamago": "Here is the whole thing:\n\n1. Feed your starter…",
+      "said": "Sourdough needs a starter… That one's long. Check your phone, or should I say it all?",
+      "long": { "status": "ready" } },
+    { "seq": 6, "rev": 6, "requestId": "…", "at": "…", "from": "watch", "you": "Say it all.",
+      "tamago": "", "said": "Here is the whole thing: …", "note": "read_aloud", "about": 3 }
+  ]
+}
+```
+
+- **Paging:** `after` is the last `latest` you saw (0 = everything). A turn comes back when it's new **or changed**:
+  a long answer filling in bumps its `rev`.
+  - If `latest` is smaller than what you sent, the Mac restarted. Start over with `after=0`.
+  - At most 100 turns per page.
+- **Turn fields:**
+
+  | Field | Meaning |
+  |---|---|
+  | `from` | `watch` \| `phone` |
+  | `you` | the owner's words (typed, or what the Mac heard) |
+  | `tamago` | Tamago's full reply text |
+  | `said` | what the Watch spoke |
+  | `long` | `{status: pending\|ready\|failed}` on a long answer |
+  | `error` | an error code (§8) when there was no answer |
+  | `note` | `read_aloud` \| `phone`: the owner answered an offer; `about` is that long answer's `seq` |
+
+- **`DELETE /v1/conversation`** clears it (the phone's "Clear conversation"). `200 { turns: [], latest, cleared: true }`.
+- **Errors:**
+  - `401 auth_failed`
+  - `400 invalid_request` (bad `after`)
+  - `404 not_found` (the gateway keeps no conversation: `TAMAGO_CONVERSATION=off`)
+  - `405` for other methods
+- **Privacy:**
+  - The conversation holds the owner's words, like the live dashboard (D-123).
+  - It's **memory only**: a restart clears it. It keeps at most 200 turns and 24 h.
+  - It's served only behind the bearer token and never logged. Log lines carry counts only.
+  - The phone stores nothing but its pairing.
+- **Discovery:** `GET /v1/protocol` lists `features`, containing `conversation` and, when the provider can write
+  long answers, `long-answers`.
+- **Pairing a phone:** same as the Watch (§14). The pairing window is single-use per gateway start, so pairing the
+  phone after the Watch means restarting the gateway for a fresh code. Both devices get the same token.

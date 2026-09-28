@@ -1440,3 +1440,24 @@ with launchd user agents. Wait for `/Volumes/Storage` to mount first; the logs g
 **Unverified:** on-device sound order; the owner's Watch.
 **Next recommended task (ONE):** ship to TestFlight (merge to `main`), then relay R2 (docs/RELAY_PLAN.md §7).
 **Do not redo:** model selection (BRAIN_EVAL.md R1); the owner's sound and sign picks.
+
+---
+
+### 2026-09-27: Claude Code (cloud): iPhone chat + long answers offered from the Watch (D-127), local branch, not pushed
+
+**Branch:** `claude/phone-chat`, committed in the cloud session only. The owner asked for no push, so nothing is on GitHub.
+**Done:**
+- Tamago's words land on the phone. The Watch speaks a gist and offers "check your phone, or should I say it all?".
+- The full answer is written in the background into the gateway's in-memory conversation (PROTOCOL_V1 §18).
+- The phone app pairs with the Mac and shows it in a dark chat UI (`docs/phone-chat/mock.png`). The Watch is unchanged.
+
+**Tests:** gateway 162 tests, 160 pass, 2 skipped. Swift not compiled.
+**Unverified:** all Swift; Gemma's `needsDetail`; detail time on the 16 GB Mac; the offer's audio timing.
+**Next recommended task (ONE), agent on the Mac:**
+1. Bring this work over. It isn't on GitHub, so the owner must allow a push of `claude/phone-chat`, or reapply it from D-127.
+2. Build `TamagoPhone`, and run `swift test` + the `TamagoWatch` tests.
+3. Pair the phone after a gateway restart and ask a long question on the Watch (e.g. "How do I make sourdough?").
+4. Say "say it all", and check the phone.
+5. Record timings in `docs/DEVICE_TEST_LOG.md`.
+
+**Do not redo:** the §18 contract, the follow-up phrases, the UI direction (unless the owner changes it).

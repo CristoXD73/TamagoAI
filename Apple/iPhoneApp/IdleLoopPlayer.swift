@@ -4,8 +4,10 @@
 // docs/HANDOFF_LOG.md. Not DEVICE_VERIFIED.
 //
 // Tamago's 10 s idle loop (D-124; owner direction 2026-09-27) as a silent,
-// endlessly looping video on black: IdleLoop.mp4 (H.264, 600×800, no audio
-// track, so it never interrupts the owner's music). Stills on Reduce Motion.
+// endlessly looping video: IdleLoop.mov, HEVC with alpha (600×800, no audio
+// track, so it never interrupts the owner's music). Transparent, so the octopus
+// floats on the chat's gradient instead of sitting in a black box (the H.264
+// version on black did, 2026-09-28). Stills on Reduce Motion.
 
 import AVFoundation
 import SwiftUI
@@ -16,14 +18,18 @@ struct IdleLoopPlayer: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PlayerView {
         let view = PlayerView()
-        view.backgroundColor = .black
-        guard let url = Bundle.main.url(forResource: "IdleLoop", withExtension: "mp4") else { return view }
+        view.backgroundColor = .clear
+        view.isOpaque = false
+        guard let url = Bundle.main.url(forResource: "IdleLoop", withExtension: "mov") else { return view }
         let player = AVQueuePlayer()
         player.isMuted = true
         player.preventsDisplaySleepDuringVideoPlayback = false
         context.coordinator.looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
         view.playerLayer.player = player
         view.playerLayer.videoGravity = .resizeAspect
+        view.playerLayer.backgroundColor = UIColor.clear.cgColor
+        // BGRA keeps the HEVC alpha channel; the default pixel format drops it to black.
+        view.playerLayer.pixelBufferAttributes = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         return view
     }
 

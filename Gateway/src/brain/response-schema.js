@@ -35,6 +35,11 @@ export const INTENT_JSON_SCHEMA = {
     haptic: { type: 'string', enum: HAPTICS },
     behavior: { type: 'string', enum: BEHAVIORS },
     followUpExpected: { type: 'boolean' },
+    needsDetail: {
+      type: 'boolean',
+      description: 'true only when a complete answer needs more than two sentences (steps, a recipe, a list). '
+        + 'speech is then a one-sentence gist; the full answer is written separately for the owner\'s phone.',
+    },
     memoryCandidates: {
       type: 'array',
       items: {
@@ -82,11 +87,15 @@ export function validateIntent(raw) {
     haptic: pick('haptic', HAPTICS, 'none'),
     behavior: pick('behavior', BEHAVIORS, 'none'),
     followUpExpected: raw.followUpExpected === true,
+    needsDetail: raw.needsDetail === true,
     memoryCandidates: [],
     tool: null,
   };
   if (raw.followUpExpected !== undefined && typeof raw.followUpExpected !== 'boolean') {
     errors.push('followUpExpected must be a boolean');
+  }
+  if (raw.needsDetail !== undefined && raw.needsDetail !== null && typeof raw.needsDetail !== 'boolean') {
+    errors.push('needsDetail must be a boolean');
   }
   if (raw.memoryCandidates !== undefined) {
     if (!Array.isArray(raw.memoryCandidates)) errors.push('memoryCandidates must be an array');
@@ -126,6 +135,8 @@ export function toV1Result(intent) {
     characterState,
     haptic: intent.haptic,
     followUpExpected: intent.followUpExpected,
+    // D-127: the gateway writes the full answer for the phone in the background (provider.detail()).
+    ...(intent.needsDetail ? { needsDetail: true } : {}),
   };
 }
 

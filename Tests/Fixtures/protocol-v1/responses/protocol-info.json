@@ -12,6 +12,10 @@
   "outputTypes": [
     "text"
   ],
+  "features": [
+    "conversation",
+    "long-answers"
+  ],
   "characterStates": [
     "sleeping",
     "idle",

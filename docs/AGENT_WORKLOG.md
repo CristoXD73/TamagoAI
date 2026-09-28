@@ -1276,6 +1276,48 @@ model is planned (D-118).
 **Cross-agent impact:** the Watch TabView now has Settings at tag 1 and Debug at tag 2.
 **Signed-by:** Claude Code
 
+---
+
+### 2026-09-27T14:09:47+0000: Claude Code (cloud) — iPhone chat + long answers from the Watch (D-127), local branch `claude/phone-chat`, NOT pushed
+
+**Agent:** Claude Code (cloud; no Xcode, Swift toolchain, Ollama or devices)
+**Branch:** `claude/phone-chat` (local only, off `claude/great-volta-ogpuw8` at `34880c1`). **The owner said "just dont push anything".**
+**Ending commit SHA:** the commit containing this entry
+**Files changed:**
+- Gateway, new: `src/conversation.js`, `src/handoff.js`, `test/conversation.test.js`, `test/long-answer-brain.test.js`
+- Gateway, changed: `src/server.js`, `src/cli.js`, `src/providers/mock.js`, and the brain (`response-schema.js`, `personality/profile.js`,
+  `reasoners/ollama.js`, `orchestrator.js`, `index.js`); `test/brain.test.js` (prompt guard < 1300); `protocol-info.json` fixture (`features`)
+- Apple: `Shared/TamagoProtocolV1.swift`, `Shared/GatewayTransport.swift`, `Shared/Tests/.../GatewayClientTests.swift`;
+  `iPhoneApp/` (new ChatModel, ChatView, ChatTheme, PairingScreen, PairingStore, TamagoAvatar asset; TamagoPhoneApp rewritten);
+  `Config/Tamago.xcconfig` + new `Config/TamagoPhone-Info.plist`
+- Docs: `PROTOCOL_V1.md` (§5 `longAnswer`, §17 reserved, §18), `DECISIONS.md` (D-127), `DEVELOPMENT.md`, `BRAIN_ARCHITECTURE.md`, `Apple/README.md`,
+  `PROVENANCE.md`, `docs/phone-chat/mock.html` + `mock.png`, `HANDOFF_LOG.md`, this file
+
+**Work performed:**
+- Long answers: the brain flags `needsDetail`. The Watch hears the gist + "That one's long. Check your phone, or should I say it all?", and the full
+  answer is written in the background into an in-memory conversation.
+- "Say it all" / "phone" are handled by the gateway without a model call.
+- The phone pairs with the Mac, reads `GET /v1/conversation`, and types as `client.device = "phone"`, in a dark, Muse-inspired chat UI.
+- No Watch code changed.
+
+**Tests/builds actually performed (by me):**
+- `npm test`: 162 tests, 160 pass, 0 fail, 2 skipped (real TTS and transcriber).
+- A live no-auth dev server: `long` → gist + offer → conversation filled → "say it all" returned the full answer.
+- The HTML design mock was rendered in headless Chromium.
+- No Swift compile.
+
+**Things NOT verified:**
+- All Swift compiles or runs, and the phone ATS/local-network plist route through the xcconfig.
+- Gemma's real `needsDetail` judgement and detail time/quality.
+- The offer's audio timing on the Watch.
+
+**Known issues:**
+- A read-aloud over 300 chars uses the Watch's own voice (no Mac audio).
+- A background long answer holds Ollama for the next question.
+
+**Cross-agent impact:** Protocol V1 is additive only. The fixture manifest count is unchanged (23). Swift `TamagoResponse` and `TamagoProtocolInfo` gain optional fields.
+**Signed-by:** Claude Code (cloud)
+
 ### 2026-09-27T21:50:00-04:00: Claude Code — seamless mascot loop, no player flash (D-124 addendum); scripts/asc.mjs
 
 **Agent:** Claude Code (local, owner's Mac, Opus 5.5)
@@ -1303,4 +1345,31 @@ model is planned (D-118).
 - Launch burst in the simulator: the system launch spinner, then the octopus with no clock and no player.
 - Loop-seam pixel difference measured (above).
 **Things NOT verified:** on-device smoothness and battery.
+**Signed-by:** Claude Code
+
+### 2026-09-28T03:40:00-04:00: Claude Code — merged claude/phone-chat (D-127), compiled, fixed, verified in simulators
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `9845c23`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- The merge of `origin/claude/phone-chat` (37 files, cloud-written, never compiled).
+- `Apple/iPhoneApp/ChatView.swift` (crash fix), `PairingScreen.swift` (DEBUG pairing hook), `IdleLoopPlayer.swift`
+  (alpha).
+- `Apple/iPhoneApp/IdleLoop.mov` replaces `IdleLoop.mp4`.
+- `Gateway/src/brain/personality/profile.js`, `Gateway/test/brain.test.js`, `docs/DECISIONS.md` (D-127 addendum).
+**Work performed:** the owner asked to check for the phone-chat branch before pushing. It had appeared on GitHub
+since the last check. Merged it (only the worklog conflicted), compiled it for the first time, and ran it for real
+against the live gateway. Found and fixed three issues (D-127 addendum).
+**Tests/builds actually performed (by me):**
+- Gateway `npm test`: 161 pass / 1 skipped.
+- `swift test`: 152 pass.
+- TamagoPhone and TamagoWatch simulator builds: 0 errors.
+- Live end to end with Gemma: a phone question → gist → full answer in the conversation → rendered in the
+  iPhone simulator.
+- Conversation wipe while viewing: no crash.
+**Things NOT verified:**
+- Tapping in the iPhone simulator (access not granted), so typed sending was exercised through the API.
+- On-device.
 **Signed-by:** Claude Code

@@ -1099,3 +1099,82 @@ Heard on the Watch: UNVERIFIED until the owner listens.
     the owner releases the hold, never the same twice in a row.
   - **Waiting sign:** shows until the answer starts, then fades. The owner chooses B or D in the app's settings.
   - **Approval:** this is Visual Approval Gate #13, approved by owner direction from the preview.
+
+### D-127 The iPhone is where Tamago's words land: a chat on the phone, long answers offered from the Watch
+
+- **Owner, 2026-09-27:**
+  - "we have no choice but to implement a chat box on the phone as sometimes the answer i will receive might be a
+    bit too long so we want the ai on the watch to say you might wanna check your phone for this... or would you
+    like for me to say it all?"
+  - "make a really nice ui like muse chatbot … this chatbot ui is only for the phone the watch stays a tamagotchi"
+  - "the chatbot is for text to land the ai is running on the mac anyways"
+- **Decision:**
+  - **Watch (no code change):**
+    - A long answer is spoken as a one-sentence gist plus *"That one's long. Check your phone, or should I say it
+      all?"*, with `followUpExpected`.
+    - The owner answers with an ordinary hold-to-talk. "Say it all" (and similar) reads the full answer; "phone"
+      (and similar) acknowledges.
+    - The gateway handles that answer itself, with no model call (PROTOCOL_V1 §18.1).
+  - **Brain:**
+    - The model sets `needsDetail` when an answer needs more than two sentences. Speech stays ≤ 2 sentences /
+      140 chars.
+    - The full answer is written **after** the reply, in the background: a plain-text Ollama call to the smart
+      model, with the same memory context, ≤ 150 words.
+    - The reply therefore never waits. Gemma 4 12B needs ~5 s for a short reply, and a full answer could take
+      20 s or more.
+    - The system prompt grows by one line, so its size guard moves from < 1,200 to < 1,300 chars.
+  - **Gateway:**
+    - Every exchange (Watch or phone) is recorded in an in-memory conversation: 200 turns, 24 h, cleared on
+      restart.
+    - The phone reads it with `GET /v1/conversation?after=` and clears it with `DELETE`. Both are additive; V1 is
+      unchanged for old clients.
+    - `TAMAGO_CONVERSATION=off` disables it.
+  - **iPhone app:**
+    - Pairs with the same Mac, polls the conversation only while in front (1.5 s while something's on its way,
+      else 4 s), and sends typed messages as `client.device = "phone"`.
+    - The look, in the spirit of the assistant apps the owner pointed at (Meta's Muse), with no Meta branding:
+      - dark, with a faint top glow
+      - Tamago's words as clean text beside the approved avatar, with markdown for lists
+      - the owner's words as blue-to-violet bubbles, and "Said on your Watch" on Watch turns
+      - "Writing the full answer…" while a long answer is pending, then a "Full answer" tag
+      - a pill composer, and an empty state with the approved idle loop (gate #12) and suggestion chips
+    - The creature isn't animated beyond gate #12. The typing dots and the shimmer are interface motion.
+- **Why the gateway, not the brain, handles "say it all":** it's a yes/no about the previous answer. Rules can
+  answer it instantly, and it works with any provider. The phrases are whole-utterance matches, so "yes I want pizza"
+  is still a question.
+- **Known limits:**
+  - A read-aloud longer than 300 chars carries no Mac audio (§16's single-synthesis cap), so the Watch reads it
+    with its own voice. Chunked Kokoro audio is the next step if the owner wants the same voice throughout.
+  - The offer line adds ~60 chars to one synthesis. Gist + offer can pass the Watch's 2.5 s audio wait, and then
+    the Watch voice speaks it. Measure on the Mac.
+  - A background long answer holds Ollama. A question asked in the meantime waits for it
+    (`OLLAMA_NUM_PARALLEL` could change that on a 16 GB Mac: measure first).
+  - The phone app's plain-HTTP permission comes from `Config/TamagoPhone-Info.plist` (ATS
+    `NSAllowsLocalNetworking`), picked by `Tamago.xcconfig` for the TamagoPhone target only. The project file is
+    untouched.
+- **Verification:**
+  - Gateway + brain: `UNIT_TESTED_ONLY`. `npm test` 162 tests: 160 pass, 2 skipped (real engines). The new ones
+    are `conversation.test.js` and `long-answer-brain.test.js`.
+  - The real Gemma behaviour (does it set `needsDetail` sensibly? detail quality and time): UNVERIFIED.
+  - All Swift is UNVERIFIED (written in the cloud, not compiled): phone chat, pairing, Shared conversation models,
+    and tests.
+  - The UI look: a static HTML mock only (`docs/phone-chat/mock.png`).
+- **Addendum, local verification (Claude Code on the owner's Mac, 2026-09-28):** merged with the seamless-loop fix,
+  then compiled and run.
+  - **Tests and builds:** gateway 161 pass; Swift 152 pass; both apps build.
+  - **iPhone simulator, paired through a new DEBUG hook** (`TAMAGO_DEBUG_PAIRING_CODE` / `_ADDRESS`):
+    - the empty state and suggestions render;
+    - the long answer arrives as a proper step-by-step text;
+    - bubbles, avatar and "Connected to your Mac" all show.
+  - **Three fixes:**
+    1. **Crash.** `ChatView.timeLabel` indexed the live `model.turns` from rows being redrawn. When the Mac
+       restarted and the conversation emptied, the app crashed. Rows now use one snapshot, and the lookup is
+       bounds-checked. Re-tested by wiping the conversation mid-view: no crash.
+    2. **Gemma refused general knowledge.** "How do I make sourdough?" → "I cannot check recipes". The prompt line
+       "Use only facts from the context" is now limited to owner facts, plus "General knowledge (how-to, recipes,
+       science) you may answer from what you know". Re-tested: a gist reply in 5.5 s, then a 5-step full answer on
+       the phone.
+    3. **The phone's octopus sat in a black box** on the gradient. It's now HEVC with alpha (`IdleLoop.mov`,
+       2.6 MB, BGRA pixel buffers), so it floats on the background.
+  - **Not verified:** a first request right after a restart, while Gemma is loading (20 s timeout, seen once);
+    on-device.

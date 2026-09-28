@@ -41,6 +41,10 @@ export function createBrainProvider(options) {
       const brain = await brainP;
       return brain.asProvider().generate(request, opts);
     },
+    // D-127: only a reasoner that can write (Ollama) offers long answers; the deterministic one never flags them.
+    ...(typeof options.reasoner.detail === 'function'
+      ? { detail: async (request, opts) => (await brainP).detail(request, opts) }
+      : {}),
     close: () => brainP.then((b) => b.close()),
     warm: () => options.reasoner.warm?.() ?? Promise.resolve(false),
   };

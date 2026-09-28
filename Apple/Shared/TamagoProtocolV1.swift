@@ -7,6 +7,7 @@
 // toolchain.
 //
 // VERIFICATION (speechAudio, D-121): UNVERIFIED (written in the cloud, not compiled).
+// VERIFICATION (longAnswer + conversation, D-127): UNVERIFIED (written in the cloud, not compiled).
 //
 // Mirrors docs/PROTOCOL_V1.md and Gateway/src/protocol.js. Enum raw values
 // must match those files exactly. Pure Foundation, no UI or transport code.
@@ -154,6 +155,19 @@ public struct TamagoSpeechAudio: Codable, Sendable, Equatable {
     }
 }
 
+/// D-127: this reply is a gist; the full answer is being written on the Mac and
+/// will appear in the conversation (§18) as the turn with this `seq`.
+public struct TamagoLongAnswer: Codable, Sendable, Equatable {
+    /// `pending`, `ready` or `failed`.
+    public var status: String
+    public var seq: Int?
+
+    public init(status: String, seq: Int? = nil) {
+        self.status = status
+        self.seq = seq
+    }
+}
+
 public struct TamagoResponse: Codable, Sendable, Equatable {
     public var protocolVersion: Int
     /// Null only for errors raised before the gateway could read a request ID
@@ -168,6 +182,8 @@ public struct TamagoResponse: Codable, Sendable, Equatable {
     public var error: TamagoErrorInfo?
     /// Optional (§16): absent on old gateways, errors and nonverbal replies.
     public var speechAudio: TamagoSpeechAudio?
+    /// Optional (D-127): present when the full answer comes later, on the phone.
+    public var longAnswer: TamagoLongAnswer?
 
     /// Every response the gateway sends is decoded, not constructed (Codable
     /// synthesizes `init(from:)` for that; unaffected by this initializer).
@@ -181,7 +197,8 @@ public struct TamagoResponse: Codable, Sendable, Equatable {
         requestId: String?, status: TamagoResponseStatus, text: String, speechText: String,
         characterState: TamagoCharacterState, haptic: TamagoHaptic,
         followUpExpected: Bool = false, error: TamagoErrorInfo? = nil,
-        speechAudio: TamagoSpeechAudio? = nil
+        speechAudio: TamagoSpeechAudio? = nil,
+        longAnswer: TamagoLongAnswer? = nil
     ) {
         self.protocolVersion = TamagoProtocol.version
         self.requestId = requestId
@@ -193,6 +210,7 @@ public struct TamagoResponse: Codable, Sendable, Equatable {
         self.followUpExpected = followUpExpected
         self.error = error
         self.speechAudio = speechAudio
+        self.longAnswer = longAnswer
     }
 
     /// Stale-response guard: true only if this response belongs to `request`.
@@ -216,10 +234,49 @@ public struct TamagoProtocolInfo: Codable, Sendable {
     public var gatewayId: String?
     /// PROTOCOL_V1 §16; `["text", "speech-audio"]` when the Mac has a voice. Older gateways omit it.
     public var outputTypes: [String]?
+    /// PROTOCOL_V1 §18 / D-127: `conversation`, `long-answers`. Older gateways omit it.
+    public var features: [String]?
 
     public var supportsThisClient: Bool {
         supportedProtocolVersions.contains(TamagoProtocol.version)
     }
+}
+
+// MARK: - Conversation (PROTOCOL_V1 §18, D-127)
+
+/// One exchange with Tamago, from the Watch or the phone, as the iPhone shows it.
+public struct TamagoConversationTurn: Codable, Sendable, Equatable, Identifiable {
+    /// Stable identity of the turn (a long answer keeps its `seq` when it's filled in).
+    public var seq: Int
+    /// Bumps when the turn changes (e.g. its long answer arrives).
+    public var rev: Int
+    public var requestId: String
+    /// ISO 8601.
+    public var at: String
+    /// `watch` or `phone`.
+    public var from: String
+    /// What the owner said or typed.
+    public var you: String
+    /// Tamago's full reply (the long answer once it's ready).
+    public var tamago: String
+    /// What the Watch spoke, if anything.
+    public var said: String
+    public var long: TamagoLongAnswer?
+    /// An error code when Tamago couldn't answer.
+    public var error: String?
+    /// `read_aloud` or `phone`: the owner's answer to a long-answer offer; `about` is that answer's `seq`.
+    public var note: String?
+    public var about: Int?
+
+    public var id: Int { seq }
+    /// The gateway writes `Date.toISOString()` (UTC, fractional seconds).
+    public var date: Date? { try? Date(at, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) }
+}
+
+public struct TamagoConversationPage: Codable, Sendable, Equatable {
+    public var turns: [TamagoConversationTurn]
+    /// Pass as `after` next time. Smaller than what you sent means the Mac restarted: start over.
+    public var latest: Int
 }
 
 // MARK: - Pairing (PROTOCOL_V1 §14)
