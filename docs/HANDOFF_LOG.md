@@ -1461,3 +1461,33 @@ with launchd user agents. Wait for `/Volumes/Storage` to mount first; the logs g
 5. Record timings in `docs/DEVICE_TEST_LOG.md`.
 
 **Do not redo:** the §18 contract, the follow-up phrases, the UI direction (unless the owner changes it).
+
+---
+
+### 2026-09-28 18:20 EDT: Claude Code (local): Tamago's hands (D-128), relay R2 (D-129), System 1 test
+
+**Branch:** `claude/great-volta-ogpuw8` (`b9b1ca0` hands, `59b7b75` relay, then this docs commit). `main` is still at `35223f8`.
+**Done:**
+- **Hands:** Tamago controls the Mac with 15 allowlisted tools. Quitting apps and running Shortcuts wait for a spoken yes.
+  Every call is audited in `$STATE/logs/hands.log` (docs/TAMAGO_HANDS.md).
+- **Relay R2:**
+  - "Tell Claude/Codex to … on <project>" runs the agent on its own `tamago/<task>` branch in a worktree.
+  - Questions come back to the owner, and the next plain reply is passed on by rule.
+  - Status, stop, and the Claude/Codex usage percentages work.
+- **System 1 test:**
+  - Qwen 3.5 2B scored 21/40 on the command test, so it was not adopted and the model was removed.
+  - Write-up: docs/TAMAGO_AGENTS.md §4, BRAIN_EVAL.md R1 table.
+
+**Tests:** `cd Gateway && npm test`: 174 pass, 0 fail, 1 skipped. Hands and relay verified live with Gemma on the
+Sandbox project.
+**Unverified:**
+- Hands and relay from the Watch itself. The live tests went through the gateway.
+- Relay on the TamaWatch project (Sandbox only so far).
+
+**Open, needs the owner:**
+- Chrome Remote Desktop host: run the `sudo chmod +a …` line from this session in Terminal.
+- Vision: grant Screen Recording + Accessibility.
+- iPhone octopus edges: planned H.264 on black + feather, not done.
+
+**Next recommended task (ONE):** local coding tools for small jobs (TAMAGO_AGENTS.md §3 row 4).
+**Do not redo:** the model choice (Gemma / Qwen 9B), or the System 1 small-model test on 16 GB.

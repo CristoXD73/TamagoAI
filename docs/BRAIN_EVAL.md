@@ -80,6 +80,7 @@ Raw runs are in `/Volumes/Storage/AI/tamago-eval/r1/`.
 | granite4.1:8b | 5.3 GB | 5.9 GB | 29 / 40 | 2.2 / 2.6 s | not run | misses pause/stop/resume, answers, handoffs |
 | **qwen3.5:9b** | 6.6 GB | 5.5 GB | **35 / 40** | 3.0 / 3.4 s | 3.2 s (11/11 valid, 0 errors) | misses: "option two" kept verbatim, cancel → task, "carry on", resume → task, "why…" → answer |
 | **gemma4:12b-it-qat** | 7.2 GB | 7.6 GB | **39 / 40** | 3.2 / 3.8 s | 4.8 s (11/11 valid, 0 errors; 15.7 s cold under memory pressure) | best answers: three hearts right, real facts, nothing invented; writes in lower case (the composer now restores capitals) |
+| qwen3.5:2b (System 1 test, 2026-09-28) | 2.7 GB | ~2.5 GB | 21 / 40 | 1.05 / 1.24 s | not run | every answer to a waiting question read as a task; stop → pause; small talk and facts → task. Removed after the test |
 
 **Memory:** with Gemma loaded next to Xcode and the simulators, swap reached 6.6 GB and free memory 150 MB.
 
