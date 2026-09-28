@@ -5,6 +5,8 @@ import { createOllamaReasoner } from './reasoners/ollama.js';
 import { createDeterministicReasoner } from './reasoners/deterministic.js';
 import { defaultBrainPath } from './storage/database.js';
 import { defaultStateDir } from '../identity.js';
+import { createHands } from '../hands/agent.js';
+import { join } from 'node:path';
 
 /** D-118: verified on the owner's Mac (docs/BRAIN_EVAL.md). An interim test model; a stronger one comes later. */
 // D-125: Gemma 4 12B (scripts/tamago-up.sh picks Qwen 3.5 9B while Xcode runs). llama3.2:3b was removed from the Mac.
@@ -25,7 +27,12 @@ export function brainOptionsFromEnv(env = process.env) {
   } else {
     throw new Error(`Unknown TAMAGO_REASONER "${kind}" (expected ollama or deterministic).`);
   }
-  return { dbPath: env.TAMAGO_BRAIN_DB ?? defaultBrainPath(defaultStateDir(env)), reasoner };
+  // D-128: Tamago's hands (docs/TAMAGO_HANDS.md), on with a real model unless TAMAGO_HANDS=off.
+  const hands = kind === 'ollama' && env.TAMAGO_HANDS !== 'off'
+    ? createHands({ model: fastModel, baseUrl: env.OLLAMA_URL ?? 'http://127.0.0.1:11434',
+      auditLog: join(defaultStateDir(env), 'logs', 'hands.log') })
+    : null;
+  return { dbPath: env.TAMAGO_BRAIN_DB ?? defaultBrainPath(defaultStateDir(env)), reasoner, hands };
 }
 
 /**

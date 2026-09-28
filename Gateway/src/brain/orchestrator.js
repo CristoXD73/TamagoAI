@@ -32,7 +32,7 @@ import { ProviderError } from '../providers/provider.js';
  * @param {() => number} [opts.now]
  * @param {object} [opts.profile]
  */
-export async function createBrain({ dbPath, reasoner = createDeterministicReasoner(), now = Date.now, profile = TAMAGO_PROFILE } = {}) {
+export async function createBrain({ dbPath, reasoner = createDeterministicReasoner(), now = Date.now, profile = TAMAGO_PROFILE, hands = null } = {}) {
   const db = await openBrainDb(dbPath);
   const fallback = createDeterministicReasoner();
 
@@ -93,7 +93,28 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     let reasonerUsed = 'rule';
     const memoryOps = [];
 
-    if (route === 'rule') {
+    // 6a. D-128: Tamago's hands. A command about the Mac ("open Steam", "volume 30") or the owner's answer to a
+    // pending "Quit Safari? Say yes to go." goes to the tool loop. Never for private text. If Ollama is down,
+    // the honest rule answer below says so.
+    let handsOut = null;
+    if (hands && !privateText) {
+      try {
+        handsOut = await hands.handle(text, cls, { signal });
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        step('hands', { error: err.message });
+        if (cls.kind === 'hands') {
+          handsOut = { speech: "My hands aren't answering right now.", emotion: 'uncertain', behavior: 'look_away', thought: `Hands failed: ${err.message}`, steps: [] };
+        }
+      }
+    }
+    if (handsOut) {
+      route = 'hands';
+      reasonerUsed = 'hands';
+      intent = makeIntent({ speech: handsOut.speech, emotion: handsOut.emotion ?? 'content', behavior: handsOut.behavior ?? 'settle',
+        haptic: 'click', followUpExpected: handsOut.followUpExpected === true, thought: handsOut.thought ?? '' });
+      step('hands', { steps: handsOut.steps ?? [], pending: hands.pending });
+    } else if (route === 'rule') {
       intent = unknownFact && !refusedPrivate
         ? makeIntent({ speech: aboutMe ? "Not much yet." : "I don't know that yet.", emotion: 'uncertain', sound: 'uncertain_hum',
           haptic: 'none', behavior: 'look_away', thought: 'No memory holds that. Not guessing.' })
@@ -188,7 +209,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       return makeIntent({ speech: `It's ${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}. ${part} here.`, emotion: 'content',
         haptic: 'none', behavior: 'settle', thought: 'The clock is known; no model needed.' });
     }
-    if (cls.kind === 'tool_request') {
+    if (cls.kind === 'tool_request' || cls.kind === 'hands') {
       return makeIntent({ speech: "I can't do that yet.", emotion: 'uncertain', sound: 'uncertain_hum', haptic: 'none',
         behavior: 'look_away', thought: `Tool request "${text}" — tools arrive in Brain E.` });
     }

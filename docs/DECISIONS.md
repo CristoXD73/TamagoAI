@@ -1178,3 +1178,24 @@ Heard on the Watch: UNVERIFIED until the owner listens.
        2.6 MB, BGRA pixel buffers), so it floats on the background.
   - **Not verified:** a first request right after a restart, while Gemma is loading (20 s timeout, seen once);
     on-device.
+
+### D-128 Tamago's hands: an allowlisted tool loop on the local model, with spoken confirmation
+
+- **Owner, 2026-09-28:** "help me make tamago able to fully control my pc as it is my local ai model, does it have
+  to be agentic?", then "go and document well as you go".
+- **Decision (docs/TAMAGO_HANDS.md):** three tiers.
+  1. **Direct actions:** the local model (Gemma/Qwen, D-125) picks from 15 fixed tools through Ollama tool calling:
+     `think:false`, at most 4 steps, 10 s per tool. They are fixed programs run with `execFile`, and every argument is
+     validated.
+  2. **The owner's own macOS Shortcuts.**
+  3. **Real work:** handed to Claude Code / Codex (relay R2).
+- **Safety:**
+  - An allowlist only, with no way to run an arbitrary command.
+  - Quitting apps and running Shortcuts wait for a spoken "yes" (60 s).
+  - Never: deleting, the Trash, admin/sudo, payments, passwords, settings, sending messages, installing.
+  - An audit log in `$TAMAGO_STATE_DIR/logs/hands.log`, and `TAMAGO_HANDS=off` turns it all off.
+  - Private text never reaches the hands.
+- **Why not screen-driving by the local model:** a 9–12B model is reliable on single clear steps, not on long
+  open-ended ones. Tier 3 lends it Claude's hands. With 32–48 GB of RAM, a 27–31B local model could take more of
+  that on.
+- **Verified:** `test/hands.test.js` (stubbed model and exec), and live on the owner's Mac (TAMAGO_HANDS.md §6).

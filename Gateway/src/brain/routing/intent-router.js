@@ -16,6 +16,17 @@ const SMALL_TALK = /^how('?s| is| are| r| have| do)\b.*\b(you|u|it going|things)
 // Live information Tamago can't see yet (Brain E): weather, news, whether something is running.
 const LIVE = /\b(weather|forecast|news|headlines|traffic)\b|\b(is|are)\b.*\b(running|online|offline|down|up|working|reachable)( right)?( now)?[?.!]*$/;
 const PRONOUN = /\b(it|that|they|them)\b/;
+// D-128: things Tamago's hands can do on the Mac (docs/TAMAGO_HANDS.md). Checked before questions, so
+// "what's using my memory?" is a command for the hands, not small talk.
+const HANDS = new RegExp([
+  String.raw`^(please |can you |could you |tamago,? |hey tamago,? )*(open|launch|start|quit|close|find|search for|lock|mute|unmute|run|show me)\b`,
+  String.raw`\b(volume|louder|quieter|turn (it|the (volume|sound)) (up|down))\b`,
+  String.raw`\b(what'?s|what is|what are) (using|eating|hogging) (my |the )?(memory|ram|cpu)\b`,
+  String.raw`\bhow much (memory|ram|space|storage|disk)\b`,
+  String.raw`\b(what|which) apps? (are|is) (open|running)\b`,
+  String.raw`\b(game mode|my shortcuts?|shortcut called)\b`,
+  String.raw`\b(battery|plugged in)\b`,
+].join('|'));
 // The clock is known locally: answered exactly by rule, never guessed by a model ("06:08" at 07:08, 2026-09-27).
 const TIME = /^(so |hey |tamago,? )?(what('?s| is) the time|what time (of day )?is it|do you (know|have) the time|what'?s the time)\b/;
 
@@ -38,6 +49,7 @@ export function classify(text) {
   if (AFFIRMATION.test(t)) return { ...base, kind: 'affirmation' };
   if (GREETING.test(t) && wordCount <= 4) return { ...base, kind: 'greeting' };
   if (FORGET.test(t)) return { ...base, kind: 'forget' };
+  if (HANDS.test(t) && !/\bgame mode\b.*\?$/.test(t)) return { ...base, kind: 'hands' };
   if (TIME.test(t)) return { ...base, kind: 'time' };
   if (TOOL.test(t) && !isQuestion) return { ...base, kind: 'tool_request' };
   if (isQuestion && LIVE.test(t) && !/\byou\b/.test(t)) return { ...base, kind: 'live_info' };

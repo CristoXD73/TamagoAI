@@ -1373,3 +1373,32 @@ against the live gateway. Found and fixed three issues (D-127 addendum).
 - Tapping in the iPhone simulator (access not granted), so typed sending was exercised through the API.
 - On-device.
 **Signed-by:** Claude Code
+
+### 2026-09-28T12:25:00-04:00: Claude Code — Tamago's hands, stage 1 (D-128)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5); the owner is away from home, reaching this session by phone
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `b19e55c`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- New: `Gateway/src/hands/tools.js`, `Gateway/src/hands/agent.js`, `Gateway/test/hands.test.js`,
+  `docs/TAMAGO_HANDS.md`.
+- `Gateway/src/brain/orchestrator.js` (the hands hook, route "hands").
+- `Gateway/src/brain/routing/intent-router.js` (kind "hands"), `routing/model-router.js`, `brain/index.js`
+  (`TAMAGO_HANDS`).
+- `docs/DECISIONS.md` D-128.
+**Work performed:**
+- The owner asked for Tamago to control the Mac. Built the allowlisted tool loop with 15 tools and spoken
+  confirmation for the 2 risky ones, plus an audit log.
+- Also answered: 32 GB of RAM (48 GB comfortable) would allow a 27–31B local agent model.
+- **Bug found and fixed in the process:** my Python patch turned `\b` into backspace characters inside the new
+  router regex; the tests caught it.
+**Tests/builds actually performed (by me):**
+- Gateway `npm test`: 167 pass / 0 fail.
+- Live through the gateway with Gemma: the table in TAMAGO_HANDS.md §6. Calculator was opened and closed on the
+  owner's Mac.
+**Things NOT verified:**
+- From the Watch by voice. The owner is away; the path is the same `/v1/request` and `/v1/audio`.
+- Shortcuts tools: no Shortcuts to run.
+- `lock_screen`: not run, to avoid turning the owner's screens off while the owner is out.
+**Signed-by:** Claude Code

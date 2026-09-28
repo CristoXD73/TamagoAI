@@ -12,6 +12,7 @@ export function chooseRoute(cls, { extractedFacts = 0 } = {}) {
     case 'tool_request':        // tools arrive in Brain E; answered honestly by rule until then
     case 'live_info':
     case 'time':
+    case 'hands':               // D-128: the hands' own tool loop (or the honest rule when they're off)
       return 'rule';
     case 'statement':
       return extractedFacts > 0 ? 'rule' : 'fast';
