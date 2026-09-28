@@ -7,7 +7,8 @@ import { defaultBrainPath } from './storage/database.js';
 import { defaultStateDir } from '../identity.js';
 
 /** D-118: verified on the owner's Mac (docs/BRAIN_EVAL.md). An interim test model; a stronger one comes later. */
-export const DEFAULT_MODELS = Object.freeze({ fast: 'llama3.2:3b', smart: 'llama3.2:3b' });
+// D-125: Gemma 4 12B (scripts/tamago-up.sh picks Qwen 3.5 9B while Xcode runs). llama3.2:3b was removed from the Mac.
+export const DEFAULT_MODELS = Object.freeze({ fast: 'gemma4:12b-it-qat', smart: 'gemma4:12b-it-qat' });
 
 export function brainOptionsFromEnv(env = process.env) {
   const kind = env.TAMAGO_REASONER ?? (env.TAMAGO_FAST_MODEL ?? env.OLLAMA_MODEL ? 'ollama' : 'deterministic');

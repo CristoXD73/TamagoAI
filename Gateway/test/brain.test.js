@@ -476,10 +476,10 @@ test('context builder stays within budget and system prompt is compact', () => {
   assert.ok(renderSystemPrompt().length < 1400);   // 1200 → 1300 (D-127 needsDetail) → 1400 (general knowledge line, 2026-09-28)
 });
 
-test('D-118 defaults: ollama without a named model uses llama3.2:3b; nothing set stays deterministic', async () => {
+test('D-125 defaults: ollama without a named model uses gemma4:12b-it-qat; nothing set stays deterministic', async () => {
   const { brainOptionsFromEnv } = await import('../src/brain/index.js');
   assert.deepEqual(brainOptionsFromEnv({ TAMAGO_REASONER: 'ollama', TAMAGO_BRAIN_DB: ':memory:' }).reasoner.models,
-    { fast: 'llama3.2:3b', smart: 'llama3.2:3b' });
+    { fast: 'gemma4:12b-it-qat', smart: 'gemma4:12b-it-qat' });
   assert.deepEqual(brainOptionsFromEnv({ TAMAGO_FAST_MODEL: 'a', TAMAGO_BRAIN_DB: ':memory:' }).reasoner.models, { fast: 'a', smart: 'a' });
   assert.equal(brainOptionsFromEnv({ TAMAGO_BRAIN_DB: ':memory:' }).reasoner.name, 'deterministic');
 });

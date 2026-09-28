@@ -1,4 +1,5 @@
-// VERIFICATION: verified on the owner's Mac with llama3.2:3b (Ollama 0.34.4), 2026-09-27:
+// VERIFICATION: verified on the owner's Mac with gemma4:12b-it-qat and qwen3.5:9b (R1, D-125, BRAIN_EVAL.md) and,
+// before them, llama3.2:3b (Ollama 0.34.4), 2026-09-27:
 // 34 real model turns across three 25-turn runs (+2 through the gateway), all valid JSON on the first try, ~1 s
 // warm (docs/BRAIN_EVAL.md, D-118). Other models: unverified. Unit tests use a stubbed fetch.
 // Uses Ollama structured outputs (`format` = JSON schema).
