@@ -1275,3 +1275,32 @@ model is planned (D-118).
 - The settings page shows the system clock; that's fine for settings.
 **Cross-agent impact:** the Watch TabView now has Settings at tag 1 and Debug at tag 2.
 **Signed-by:** Claude Code
+
+### 2026-09-27T21:50:00-04:00: Claude Code — seamless mascot loop, no player flash (D-124 addendum); scripts/asc.mjs
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `4fc4261`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- `Apple/WatchApp/FloatingCreature.swift`.
+- New `Apple/WatchApp/IdleLoop/` (200 frames) and `Apple/WatchApp/ClockHider.mp4`.
+- Removed `Apple/WatchApp/IdleLoop.mp4` and `idle-000.jpg`.
+- `docs/DECISIONS.md` (D-124 addendum).
+**Work performed:**
+- **Two bugs, one cause.** The owner saw a loop chop and the video player flash on entry: both came from playing the
+  octopus as video.
+- **Octopus.** Now drawn from frames.
+- **Clock.** Hidden by an invisible 2 pt black video.
+- **Also:**
+  - The Mac restarted mid-session, and Tamago was brought back with `scripts/tamago-up.sh`.
+  - Added `scripts/asc.mjs`: Xcode Cloud / TestFlight status; the key stays on Storage.
+  - Build 5 (sounds and waiting signs) reached TestFlight.
+- **Chat UI branch.** The owner mentioned a branch with a chat UI for the phone. It isn't on GitHub, in either local
+  working copy, or in any PR. Asked the owner where it lives.
+**Tests/builds actually performed (by me):**
+- TamagoWatch simulator build.
+- Launch burst in the simulator: the system launch spinner, then the octopus with no clock and no player.
+- Loop-seam pixel difference measured (above).
+**Things NOT verified:** on-device smoothness and battery.
+**Signed-by:** Claude Code

@@ -9,12 +9,18 @@
 // Approval Gate sign-off for this motion (AGENTS.md §7). It replaces D-119's
 // floating still of the hero art.
 //
-// The 10 s loop plays as a silent looping video (IdleLoop.mp4: H.264, 300×400,
-// composited on black, no audio track), decoded by the Watch's video hardware.
-// It also hides the system clock: watchOS hides the time while a video is on
-// screen, and the owner asked for no clock ("we are working towards a charm").
-// Paused and replaced by the first frame (idle-000.jpg) whenever nobody can see
-// it (other page, Always-On / reduced luminance) and with Reduce Motion.
+// The 10 s loop is 200 JPEG frames (20 fps, 300×400 px, composited on black) in
+// WatchApp/IdleLoop, drawn by one pausable TimelineView. Frames loop exactly (the
+// renderer's t=0 and t=10 s match), so there's no seam; one frame is decoded at a
+// time, so memory stays flat. Paused on the first frame whenever nobody can see it
+// (other page, Always-On / reduced luminance) and with Reduce Motion.
+//
+// The clock: watchOS hides the time while a video plays on screen, and the owner
+// asked for no clock ("we are working towards a charm"). Playing the octopus
+// itself as video (build 4–5) showed the system player starting up on launch and
+// hitched each time the 10 s clip rolled over (owner, 2026-09-27). So the octopus
+// is frames again, and a practically invisible 2 pt video of black (ClockHider.mp4,
+// 3 KB) keeps the clock away.
 
 import AVFoundation
 import AVKit
@@ -32,18 +38,25 @@ struct FloatingCreature: View {
     @AppStorage(WaitingSignStyle.storageKey) private var waitingSign = WaitingSignStyle.dots.rawValue
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var loop = IdleLoop()
+    @State private var clock = ClockHider()
 
     private var isMoving: Bool { isVisible && !isLuminanceReduced && !reduceMotion }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             ZStack {
-                IdleLoop.poster.map { Image(uiImage: $0).resizable().scaledToFit() }
-                if isMoving, let player = loop.player {
+                TimelineView(.animation(minimumInterval: 1.0 / IdleLoop.fps, paused: !isMoving)) { context in
+                    if let image = IdleLoop.image(isMoving ? IdleLoop.frameIndex(at: context.date) : 0) {
+                        Image(uiImage: image).resizable().scaledToFit()
+                    }
+                }
+                if isMoving, let player = clock.player {
+                    // Not for looking at: its presence is what hides the clock. 2 pt, all but transparent.
                     VideoPlayer(player: player)
-                        .aspectRatio(3.0 / 4.0, contentMode: .fit)
-                        .allowsHitTesting(false)   // the creature's gestures stay the owner's
+                        .frame(width: 2, height: 2)
+                        .opacity(0.02)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
             .opacity(isLuminanceReduced ? 0.55 : 1)
@@ -66,23 +79,36 @@ struct FloatingCreature: View {
         }
         .animation(.easeInOut(duration: 0.3), value: caption)
         .animation(.easeInOut(duration: 0.4), value: isWaiting)
-        .onChange(of: isMoving, initial: true) { _, moving in loop.setPlaying(moving) }
+        .onChange(of: isMoving, initial: true) { _, moving in clock.setPlaying(moving) }
     }
 }
 
-/// The idle loop: one muted AVQueuePlayer for the app's lifetime. watchOS has no
-/// AVPlayerLooper, so two copies of the clip stay queued and a fresh one is
-/// appended each time one ends: no seek, so no visible seam.
+/// The idle loop's frames in the app bundle (`idle-000.jpg` … `idle-199.jpg`).
+enum IdleLoop {
+    static let fps: Double = 20
+    static let frameCount = 200
+
+    static func frameIndex(at date: Date) -> Int {
+        Int((date.timeIntervalSinceReferenceDate * fps).rounded(.down)) % frameCount
+    }
+
+    /// Decodes one frame from disk. Not cached: 200 decoded frames would be ~90 MB.
+    static func image(_ index: Int) -> UIImage? {
+        Bundle.main.path(forResource: String(format: "idle-%03d", index), ofType: "jpg").flatMap(UIImage.init(contentsOfFile:))
+    }
+}
+
+/// The clock hider: a 3 KB black clip looping on a muted AVQueuePlayer (watchOS has no
+/// AVPlayerLooper, so two copies stay queued and one is appended as each ends).
 @MainActor
-final class IdleLoop {
-    static let poster: UIImage? = Bundle.main.path(forResource: "idle-000", ofType: "jpg").flatMap(UIImage.init(contentsOfFile:))
+final class ClockHider {
 
     let player: AVQueuePlayer?
     private let url: URL?
     private var observer: NSObjectProtocol?
 
     init() {
-        url = Bundle.main.url(forResource: "IdleLoop", withExtension: "mp4")
+        url = Bundle.main.url(forResource: "ClockHider", withExtension: "mp4")
         guard let url else {
             player = nil
             return

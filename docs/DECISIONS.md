@@ -1061,6 +1061,14 @@ Heard on the Watch: UNVERIFIED until the owner listens.
   charm"), not a Watch utility. Watch chrome is kept to a minimum.
 - Verified in the watchOS simulator (SE 3 40 mm): the loop plays, no clock, and a hold reaches the app. Also in the
   iOS simulator (iPhone 18 Pro). Not yet on the owner's devices.
+- **Addendum (owner, TestFlight 0.1.2 build 5):** "animation is not stable theres a chop at some point" and "when u
+  first go into the app. You see a player start which shoukd never be seen".
+  - **Causes:** the octopus was the video itself. The system player showed as it started, and the clip rollover
+    hitched every 10 s.
+  - **The octopus is now 200 frames** (20 fps, 300×400 JPEG) drawn by a `TimelineView`. The loop point changes the
+    picture by 1.0 (mean pixel difference, 0–255), inside the normal 0.8–1.5 between neighbouring frames.
+  - **The clock is still hidden,** by a 2 pt, 2 %-opacity `VideoPlayer` looping a 3 KB black clip
+    (`ClockHider.mp4`). Checked in the simulator: no clock, and no player visible at launch or settled.
 
 ### D-125 The local brain: Gemma 4 12B, or Qwen 3.5 9B while Xcode runs
 
