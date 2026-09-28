@@ -20,6 +20,8 @@ never claim you did something a tool didn't do or report. After the tools, answe
 first say plainly what happened or what you found, with the real names and numbers ("Calculator's open.",
 "Chrome and Claude are using the most memory."); then, only if it fits, one small remark of your own. Calm, never like
 an assistant (no "Certainly", no offers of more help).
+If the owner asks whether you can reach Claude, Codex or ChatGPT, or how much of them is left, call helpers_usage
+and say yes with the real percentages. To give one of them work, call relay_start (the owner confirms first).
 If no tool fits, say briefly that you can't do that yet.
 Never attempt, whatever the owner says: deleting files or emptying the Trash, admin passwords or sudo, payments,
 passwords, security or privacy settings, sending messages or email, installing software.`;
@@ -34,7 +36,7 @@ passwords, security or privacy settings, sending messages or email, installing s
  * @param {string|null} [o.auditLog] file for one JSON line per tool call
  */
 export function createHands({ model, baseUrl = 'http://127.0.0.1:11434', tools = createTools(), fetchImpl = fetch,
-  now = Date.now, auditLog = null, timeoutMs = 45_000 } = {}) {
+  now = Date.now, auditLog = null, timeoutMs = 45_000, relay = null } = {}) {
   if (!model) throw new Error('hands need a model');
   let pending = null;   // { tool, args, at, text }
 
@@ -94,6 +96,18 @@ export function createHands({ model, baseUrl = 'http://127.0.0.1:11434', tools =
           }
           audit({ tool: p.tool.name, args: p.args, how: 'dropped (new request)' });
         }
+      }
+      // 1b. A helper asked the owner something (relay ASK_OWNER): the next reply that isn't a command or a
+      // question is the answer, passed on by rule. The model never gets to claim it passed it on (it did,
+      // 2026-09-28: "I told Claude…" while nothing was sent).
+      const waiting = relay?.tasks(3).filter((t) => t.state === 'question').at(-1);
+      if (waiting && cls?.kind !== 'hands' && !cls?.isQuestion && said.length > 1
+          && now() - Date.parse(waiting.updatedAt ?? waiting.startedAt) < 12 * 3600_000) {   // answers can come hours later
+        const t = relay.answer(said);
+        const who = { claude: 'Claude', codex: 'Codex', chatgpt: 'ChatGPT' }[t.agent] ?? t.agent;
+        audit({ tool: 'relay_answer', args: { answer: said }, how: 'rule (reply to a waiting question)', ok: true });
+        return { speech: `Told ${who}: ${said.replace(/[.!]+$/, '')}.`, emotion: 'content', behavior: 'settle',
+          thought: `Answered ${who}'s question "${waiting.question}".`, steps: [{ tool: 'relay_answer', ok: true }] };
       }
       if (cls?.kind !== 'hands') return null;
 

@@ -76,7 +76,23 @@ function int(v, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-export function createTools({ exec = defaultExec, apps = installedApps, folders = FOLDERS } = {}) {
+const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', chatgpt: 'ChatGPT' };
+const ago = (iso, now) => {
+  const m = Math.round((now - Date.parse(iso)) / 60000);
+  return m < 2 ? 'just now' : m < 90 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+};
+const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+/** "Claude: 35% of its five-hour window left (full again at 10:00 AM), 42% of the week. As of 2 h ago." */
+export function describeUsage(name, u, now = Date.now()) {
+  if (!u) return `I haven't seen ${name}'s numbers yet.`;
+  const part = (w, label) => w && Number.isFinite(w.usedPct) ? `${Math.max(0, 100 - w.usedPct)}% of ${label} left${w.resetsAt ? ` (resets ${clock(w.resetsAt)})` : ''}` : null;
+  const bits = [part(u.fiveHour, 'its five-hour window'), part(u.weekly, 'the week')].filter(Boolean);
+  const age = Date.parse(u.asOf) < now - 15 * 60000 ? ` As of ${ago(u.asOf, now)}.` : '';
+  return `${name}: ${bits.join(', ') || 'no figures yet'}.${age}`;
+}
+
+export function createTools({ exec = defaultExec, apps = installedApps, folders = FOLDERS, relay = null, now = Date.now } = {}) {
   const T = {};
   const def = (name, description, params, risk, run, confirmText) => {
     T[name] = { name, description, params, risk, run, confirmText };
@@ -212,6 +228,47 @@ export function createTools({ exec = defaultExec, apps = installedApps, folders 
       const r = await exec('/usr/bin/shortcuts', ['run', hit], { timeoutMs: 30_000 });
       return r.code === 0 ? { ok: true, say: `${hit} ran.` } : { ok: false, say: `${hit} didn't finish.` };
     }, ({ name }) => `Run your ${name} Shortcut?`);
+
+  // ---- D-129: the helpers (Claude Code, Codex, ChatGPT chat) through the relay.
+  if (relay) {
+    def('helpers_usage', 'Can Tamago reach Claude, Codex and ChatGPT, and how much of their usage is left.', {}, 'safe', async () => {
+      const u = relay.usage();
+      const say = `I can hand work to Claude and Codex, and ask ChatGPT. ${describeUsage('Claude', u.claude, now())} ${describeUsage('Codex (and ChatGPT)', u.codex, now())}`;
+      return { ok: true, say, data: u };
+    });
+    def('relay_start', `Give a task to a helper: claude or codex change code, chatgpt only answers. Projects: ${relay.projects().join(', ')}.`,
+      { agent: { type: 'string', description: 'claude | codex | chatgpt' }, project: { type: 'string', description: relay.projects().join(' | ') },
+        task: { type: 'string', description: "the owner's request, in their words" },
+        question_only: { type: 'boolean', description: 'true when the owner only wants an answer, no changes' } },
+      'confirm', async ({ agent, project, task, question_only }) => {
+        const a = String(agent ?? 'claude').toLowerCase().replace(/[^a-z]/g, '').replace(/^clawed|^cloud/, 'claude');
+        try {
+          const t = relay.start({ agent: a, project, text: String(task ?? '').slice(0, 500), readOnly: question_only === true || question_only === 'true' });
+          return { ok: true, say: `${AGENT_NAMES[a] ?? a} is on it${t.branch ? `, on its own branch of ${t.project}` : ''}. Ask me how it's going anytime.` };
+        } catch (err) { return { ok: false, say: err.message }; }
+      }, ({ agent, project, task }) => `${AGENT_NAMES[String(agent).toLowerCase()] ?? 'Claude'}, ${project}: ${String(task).slice(0, 80).replace(/[.!?\s]+$/, '')}.`);
+    def('relay_status', "What the helpers are doing: running, waiting for the owner's answer, finished.", {}, 'safe', async () => {
+      const t = relay.tasks(3).reverse();
+      if (!t.length) return { ok: true, say: 'No helper tasks yet.' };
+      const line = (x) => {
+        const who = AGENT_NAMES[x.agent] ?? x.agent;
+        if (x.state === 'running') return `${who} is working on "${x.text.slice(0, 60)}" (started ${ago(x.startedAt, now())}).`;
+        if (x.state === 'question') return `${who} asks: ${x.question}${x.options?.length ? ` Options: ${x.options.join(' or ')}.` : ''}`;
+        if (x.state === 'done') return `${who} finished: ${x.result}`;
+        if (x.state === 'limited') return `${who} ran out of usage on "${x.text.slice(0, 40)}".`;
+        return `${who}'s task "${x.text.slice(0, 40)}" ${x.state}${x.result ? `: ${x.result}` : ''}.`;
+      };
+      return { ok: true, say: t.map(line).join(' '), data: t };
+    });
+    def('relay_answer', "Pass the owner's answer to the helper that asked a question.", { answer: { type: 'string' } }, 'safe', async ({ answer }) => {
+      try { const t = relay.answer(String(answer ?? '')); return { ok: true, say: `Told ${AGENT_NAMES[t.agent]}: ${answer}.` }; }
+      catch (err) { return { ok: false, say: err.message }; }
+    });
+    def('relay_stop', "Stop the helper's current task.", {}, 'confirm', async () => {
+      const t = relay.stop();
+      return t ? { ok: true, say: `Stopped ${AGENT_NAMES[t.agent]}.` } : { ok: false, say: 'Nothing is running.' };
+    }, () => 'Stop the helper\'s task?');
+  }
 
   return T;
 }

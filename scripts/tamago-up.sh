@@ -66,6 +66,8 @@ export TAMAGO_TTS_VOICE="${TAMAGO_TTS_VOICE:-af_heart}"
 export TAMAGO_TTS_SPEED="${TAMAGO_TTS_SPEED:-0.9}"
 export TAMAGO_TTS_MODEL_DIR="${TAMAGO_TTS_MODEL_DIR:-$STORAGE/AI/tts}"
 export TAMAGO_MONITOR="${TAMAGO_MONITOR:-1}"
+# Hands commands can take a few model turns (D-128): allow 45 s instead of 20.
+export TAMAGO_TIMEOUT_MS="${TAMAGO_TIMEOUT_MS:-45000}"
 
 cd "$REPO/Gateway"
 exec node src/cli.js

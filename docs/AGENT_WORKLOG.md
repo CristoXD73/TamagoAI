@@ -1402,3 +1402,30 @@ against the live gateway. Found and fixed three issues (D-127 addendum).
 - Shortcuts tools: no Shortcuts to run.
 - `lock_screen`: not run, to avoid turning the owner's screens off while the owner is out.
 **Signed-by:** Claude Code
+
+### 2026-09-28T14:40:00-04:00: Claude Code — relay R2 (D-129), architecture doc, hands polish
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5); the owner is away, on the phone
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `b9b1ca0`
+**Ending commit SHA:** the commit containing this entry (see `git log`)
+**Files changed:**
+- New: `Gateway/src/relay/relay.js`, `Gateway/test/relay.test.js`, `docs/TAMAGO_AGENTS.md`.
+- `Gateway/src/hands/tools.js` (relay tools, `describeUsage`), `hands/agent.js` (answer by rule, prompt),
+  `brain/index.js`, `routing/intent-router.js`, `cli.js` (warm-up).
+- `scripts/tamago-up.sh` (45 s timeout).
+- Docs: `DECISIONS.md` D-129, `RELAY_PLAN.md` §10.
+**Work performed:**
+- The owner's local-agent architecture is written down (TAMAGO_AGENTS.md).
+- Relay R2 is built and tested live with real Claude Code runs on a sandbox repo: task, confirm, branch, done;
+  question, answer, resume, done; usage.
+- Five bugs were found live and fixed (RELAY_PLAN §10).
+- The relay's log writes can no longer crash the gateway.
+**Tests/builds actually performed (by me):**
+- Gateway `npm test`: 174 pass / 0 fail / 1 skipped.
+- Live: the RELAY_PLAN §10 table.
+**Things NOT verified:**
+- Codex live: its unit tests pass; not run live today, to spare its limits.
+- From the Watch by voice.
+- R3 (inbox/push) and R4 (credit handoff chain) are not built.
+**Signed-by:** Claude Code

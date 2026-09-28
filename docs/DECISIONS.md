@@ -1199,3 +1199,27 @@ Heard on the Watch: UNVERIFIED until the owner listens.
   open-ended ones. Tier 3 lends it Claude's hands. With 32–48 GB of RAM, a 27–31B local model could take more of
   that on.
 - **Verified:** `test/hands.test.js` (stubbed model and exec), and live on the owner's Mac (TAMAGO_HANDS.md §6).
+
+### D-129 The relay, stage R2: Tamago hands work to Claude Code / Codex / ChatGPT chat
+
+- **Owner, 2026-09-28:** "do the best with the current machine, and test it all yourself."
+  - Earlier: "i have to be able to say hey are you able to speak to claude for me and it should be able to say yes
+    and even tell me percentage of usage left".
+- **Built:** `Gateway/src/relay/relay.js` plus five hands tools: `helpers_usage`, `relay_start` (confirm),
+  `relay_status`, `relay_answer`, `relay_stop` (confirm).
+  - **Projects:** an allowlist in `$TAMAGO_STATE_DIR/projects.json` (TamaWatch, Sandbox).
+  - **Changing tasks:**
+    - run on their own `tamago/<task>` branch in a git worktree under `/Volumes/Storage/AI/relay/worktrees`, never
+      the checkout or `main`;
+    - Claude runs with `--permission-mode acceptEdits` and a short list of allowed tools;
+    - Codex runs in a `workspace-write` sandbox, and the relay commits for it.
+  - **Question-only tasks** run read-only (Claude `plan` mode, Codex `read-only`).
+  - **Output:** one task at a time per project, 30 min limit, full output in `relay/<task>.log`.
+  - **Endings:** `ASK_OWNER:` puts the task on hold. **The owner's next plain reply is passed on by rule**, because the
+    model once claimed "I told Claude…" when nothing had been sent.
+  - **Usage:** Claude's `rate_limit_event` from each run, and Codex's session files (free to read).
+  - **Off switch:** `TAMAGO_RELAY=off`.
+- **Also:** the gateway warms the model when it starts, and `tamago-up.sh` allows 45 s per request (hands commands
+  take a few model turns). That fixed a first-request timeout.
+- **Verified live** on a throwaway `Sandbox` project: docs/RELAY_PLAN.md §10. Not yet: handoff down the chain when
+  credits run out (R4), the Watch inbox and push (R3).

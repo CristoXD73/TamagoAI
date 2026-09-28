@@ -205,7 +205,7 @@ relay reads that agent's session file (Claude Code keeps them in `~/.claude/proj
 |---|---|---|---|
 | **R0** ✅ | Spike + decisions (done 2026-09-27, `docs/relay/R0_SPIKE.md`) | Claude and Codex run headless on a scratch repo, from the gateway: streaming output, session ids, resume, a real usage-limit message captured (or the documented one), timings. Check whether the installed **OpenClaw** already does part of this (reuse policy, `docs/UPSTREAM_REUSE.md`). | a short spike report with real outputs; section 9 answered |
 | **R1** | Stronger local brain | 3 candidate models measured, winner chosen (D-entry); relay intents in the router with the 40-command test set | ≥ 38/40 commands routed right; median ≤ 3 s |
-| **R2** | Relay core | projects allowlist, tasks/runs in the brain database, Claude + Codex adapters, worktree per task, lock, limits; **Tasks** panel on the dashboard; driven from the dashboard box first | a real small task done end-to-end by each agent from a typed command |
+| **R2** ✅ | Relay core (built 2026-09-28, D-129) | projects allowlist, tasks/runs in the brain database, Claude + Codex adapters, worktree per task, lock, limits; **Tasks** panel on the dashboard; driven from the dashboard box first | a real small task done end-to-end by each agent from a typed command |
 | **R3** | Questions | `ASK_OWNER` rule, question trimming, answer → resume; Protocol V1 §17 `GET /v1/inbox`; push notifications (APNs key + Watch entitlement); the Watch speaks waiting questions on open or from the notification | ask → push on the Watch → voice answer → agent continues |
 | **R4** | Credits, baton, chain | failure sorting, availability table, baton builder, automatic transfer down the chain (Claude ⇄ Codex → ChatGPT chat), supervision watchdog, resume when credits return | a forced "out of credits" (fake adapters) walks a half-done task down the whole chain with nothing lost, and it comes back to a coding agent afterwards |
 | **R5** | Watch polish | status on open, complication badge for waiting questions, haptics | owner can run a task a whole day from the Watch |
@@ -241,3 +241,28 @@ Each phase:
    by name when the owner asks ("add my Jellyfin project").
 4. **Push notifications: now,** in R3.
 5. **Protocol V1 §17 `GET /v1/inbox`: approved** ("Inbox and push now").
+
+## 10. R2 verification record (2026-09-28, LOCAL_VERIFIED, the owner away)
+
+Through the real gateway (`/v1/request`, as the phone sends it), Gemma 4 12B, real Claude Code runs, on a throwaway
+`Sandbox` repo with two deliberately failing tests.
+
+| Said | Tamago | What happened |
+|---|---|---|
+| "tell Claude to fix the failing tests in the Sandbox project" | "Claude, Sandbox: fix the failing tests. Say yes to go." | nothing ran yet |
+| "yes" | "Claude is on it, on its own branch of Sandbox." | worktree `tamago/fix-the-failing-tests-he6c`; Claude fixed `add` and `greet`, committed, `DONE:` |
+| "what's Claude doing?" | "Claude finished fixing bugs in calc.py and greet." | status from the task record |
+| "hey are you able to speak to claude for me?" | "Yes, I can reach Claude with 63% of its five-hour window and 17% of its weekly usage left." | usage from Claude's own `rate_limit_event` |
+| "tell Claude to rename the greet function in Sandbox, but I must choose the new name" → "yes" | Claude asked: "What should I rename greet() to?" | `ASK_OWNER` recorded; the task waits |
+| "call it say_hello" | "Told Claude: call it say hello." (0.1 s, rule) | same session resumed; `greet` → `say_hello` in code and test, committed |
+| "is Claude done?" | "Claude has finished both tasks." | |
+
+`main` of the sandbox is untouched; both branches carry the agents' commits.
+
+**Bugs found live and fixed:**
+- A 20 s timeout on the first request after a restart: warm-up plus a 45 s limit.
+- "Go? Say yes to go." (a doubled question) and a double period.
+- `helpers_usage` not called for "can you talk to Claude": a prompt line.
+- **The owner's answer went to plain conversation**, which claimed to have passed it on: the answer is now passed on
+  by rule.
+- A 30-minute answer window was too short: now 12 h.

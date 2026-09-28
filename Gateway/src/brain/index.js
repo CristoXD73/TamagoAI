@@ -6,6 +6,8 @@ import { createDeterministicReasoner } from './reasoners/deterministic.js';
 import { defaultBrainPath } from './storage/database.js';
 import { defaultStateDir } from '../identity.js';
 import { createHands } from '../hands/agent.js';
+import { createTools } from '../hands/tools.js';
+import { createRelay } from '../relay/relay.js';
 import { join } from 'node:path';
 
 /** D-118: verified on the owner's Mac (docs/BRAIN_EVAL.md). An interim test model; a stronger one comes later. */
@@ -28,10 +30,14 @@ export function brainOptionsFromEnv(env = process.env) {
     throw new Error(`Unknown TAMAGO_REASONER "${kind}" (expected ollama or deterministic).`);
   }
   // D-128: Tamago's hands (docs/TAMAGO_HANDS.md), on with a real model unless TAMAGO_HANDS=off.
-  const hands = kind === 'ollama' && env.TAMAGO_HANDS !== 'off'
-    ? createHands({ model: fastModel, baseUrl: env.OLLAMA_URL ?? 'http://127.0.0.1:11434',
-      auditLog: join(defaultStateDir(env), 'logs', 'hands.log') })
-    : null;
+  // D-129: the relay to Claude Code / Codex, unless TAMAGO_RELAY=off.
+  let hands = null;
+  if (kind === 'ollama' && env.TAMAGO_HANDS !== 'off') {
+    const relay = env.TAMAGO_RELAY === 'off' ? null
+      : createRelay({ stateDir: defaultStateDir(env), relayDir: env.TAMAGO_RELAY_DIR ?? '/Volumes/Storage/AI/relay' });
+    hands = createHands({ model: fastModel, baseUrl: env.OLLAMA_URL ?? 'http://127.0.0.1:11434', relay,
+      tools: createTools({ relay }), auditLog: join(defaultStateDir(env), 'logs', 'hands.log') });
+  }
   return { dbPath: env.TAMAGO_BRAIN_DB ?? defaultBrainPath(defaultStateDir(env)), reasoner, hands };
 }
 

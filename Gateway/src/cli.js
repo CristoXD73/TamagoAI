@@ -87,6 +87,8 @@ let ipWatch = null;
 
 server.listen(config.port, config.host, () => {
   const port = server.address().port;
+  // Load the model now, so the first request (often a multi-step hands command) doesn't pay for it.
+  config.provider.warm?.().catch(() => {});
   logger.info({
     event: 'listening',
     gatewayVersion: GATEWAY_VERSION,
