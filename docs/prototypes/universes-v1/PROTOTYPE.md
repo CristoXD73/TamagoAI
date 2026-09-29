@@ -15,3 +15,23 @@ No image generator was used: a text-only generator would have drawn a different 
 
 1400 × 1400 each, plus `review-trio.png`. Made by `tools/brand/universes.py` (Pillow only; deterministic
 except for noise, seeded).
+
+## Cardboard v2 (after the owner's references, 2026-09-29)
+
+The owner: "I want you to improve on the cardboard design. Here are some references". The four references are in
+`references/`: a stylized hand-painted box, Valve's Half-Life: Alyx box set, a worn Priority Mail box, and a
+painted box with star stickers. They are the owner's inspiration only, not for shipping.
+
+`tamago-cardboard-v2.png` (`tools/brand/cardboard_v2.py`):
+- **Material:** dusty grey-tan kraft, flatter panels, and a fold down the mantle so the head is a box corner.
+- **Wear:** scored creases, a scuffed light edge, water rings, grime toward the bottom, two tears showing the
+  corrugation.
+- **Graphics:**
+  - torn-edged packing tape along the seam;
+  - a white shipping label, "TAMAGO EXPRESS · deliver to: your wrist · from: the Mac mini", with a barcode;
+  - handling pictograms with FRAGILE and a red FRAGILE stamp;
+  - an orange "LIVE CARGO" sticker;
+  - red, blue and yellow star stickers;
+  - "to: you ♥" in marker.
+- **Eyes:** marker eyes with the heavy lid.
+- **Presentation:** corrugated flutes on the cut side, on a dark slate backdrop like the references.
