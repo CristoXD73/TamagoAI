@@ -47,6 +47,8 @@ final class TamagoConnection {
     let sounds: CreatureSoundPlayer
 
     var canTalk: Bool { credential != .unpaired }
+    /// The paired Mac, for listening mode's uploads (D-130); nil while unpaired.
+    var pairedClient: GatewayClient? { canTalk ? client : nil }
     var semanticState: CreatureSemanticState {
         .derive(visual: controller?.state.visual ?? .idle, link: transport.phase)
     }

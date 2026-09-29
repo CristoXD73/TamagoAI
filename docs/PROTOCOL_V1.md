@@ -35,6 +35,9 @@ Sources of truth that must agree:
 | `POST` | `/v1/request` | yes | one user utterance → one answer |
 | `POST` | `/v1/pair` | no (pairing code) | exchange a one-time code for the token (§14) |
 | `POST` | `/v1/audio` | yes | hold-to-talk: recorded audio, transcribed on the Mac, answered like `/v1/request` (§15) |
+| `POST` | `/v1/listen/chunk` | yes | listening mode: one ~1 min piece of a continuous recording, kept and transcribed on the Mac (§19) |
+| `POST` | `/v1/listen/end` | yes | listening mode stopped (§19) |
+| `GET` | `/v1/listen/sessions[/<id>]` | yes | listening sessions, and one session's clean transcript (§19) |
 
 ## 2. `GET /v1/health`
 
@@ -410,3 +413,53 @@ authorization: Bearer <token>
   long answers, `long-answers`.
 - **Pairing a phone:** same as the Watch (§14). The pairing window is single-use per gateway start, so pairing the
   phone after the Watch means restarting the gateway for a fresh code. Both devices get the same token.
+
+## 19. Listening mode (added in D-130; backward compatible)
+
+The owner switches Tamago from AI to listening. The Watch then records without stopping, and the Mac keeps the
+audio and writes it out, filler words removed. Nothing is answered.
+
+```
+POST /v1/listen/chunk
+authorization: Bearer <token>
+content-type: audio/mp4                 (16 kHz mono AAC; audio/wav and audio/aiff also accepted)
+x-tamago-listen-session: <UUID>         (one per listening session, chosen by the Watch)
+x-tamago-listen-seq: <integer ≥ 0>      (the chunk's number within the session)
+x-tamago-listen-started-at: <ms since 1970, or ISO 8601>   (when the chunk started; the transcript's times)
+x-tamago-protocol-version: 1            (optional)
+<body: the audio, ≤ LIMITS.maxListenChunkBytes = 4 MiB>
+
+→ 200 { "protocolVersion": 1, "status": "ok", "session": "<UUID>", "seq": 3, "stored": true, "duplicate": false,
+        "pending": 1 }
+```
+
+- **Stored means stored:** the reply comes as soon as the chunk is on the Mac's disk. Transcription and clean-up run
+  afterwards, one chunk at a time. The Watch deletes a chunk only after this `200`.
+- **Retries are safe:** the same `(session, seq)` again replaces the chunk and reports `duplicate: true`.
+- **Chunks** are about a minute: the Watch cuts at the first pause after 45 s, and at 90 s regardless.
+- **`POST /v1/listen/end`** `{ "session": "<UUID>" }` → `200 { status: "ok", session, chunks }`. Best effort: it
+  only records the stop time in the transcript.
+- **`GET /v1/listen/sessions`** → `200 { status: "ok", sessions: [{ session, startedAt, endedAt, chunks, words }] }`,
+  newest first. **`GET /v1/listen/sessions/<UUID>`** adds `text`, the clean transcript. No Mac paths are sent.
+- **Errors:**
+  - `401 auth_failed`
+  - `400 invalid_request`: bad session, seq, content type or JSON, or an empty body
+  - `413 payload_too_large`
+  - `404 not_found`
+  - `405` for other methods
+  - `503 provider_unavailable`: no transcriber on this Mac, or `TAMAGO_LISTEN=off`
+- **What the Mac keeps:** unlike every other path, this one saves words, because that is what the owner turned it
+  on for. They live in `$TAMAGO_STATE_DIR/listening/<date>_<time>_<session8>/` (owner-only permissions), on the
+  Storage disk:
+  - each chunk's audio;
+  - the raw and cleaned text of each chunk;
+  - `meta.json`;
+  - `transcript.md`, every cleaned chunk in order with the time it was said.
+- **Logging:** log lines carry session, seq, byte counts, word counts and timings, never words. The live dashboard
+  shows the words, as it does for hold-to-talk.
+- **Clean-up:**
+  1. **Rules, always:** um/uh/er/hmm, stutters, and comma-bound "you know / I mean / like".
+  2. **The local model, when it's running:** false starts, context-dependent fillers, punctuation. Its version is
+     kept only if it still carries the words: 55–110% of them, no preamble. Otherwise the rule-cleaned text stands.
+- **Discovery:** `GET /v1/protocol` lists `listening` in `features`, and `limits.maxListenChunkBytes`.
+

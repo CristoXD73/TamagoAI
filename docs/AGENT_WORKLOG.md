@@ -1456,3 +1456,33 @@ new `scripts/encode-phone-idle.sh`.
 
 **Things NOT verified:** on the owner's iPhone (needs a TestFlight build).
 **Signed-by:** Claude Code
+
+### 2026-09-29T07:15:00-04:00: Claude Code — listening mode (D-130): Watch records without stopping, Mac keeps and writes it out
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Files changed:**
+- **Gateway:** new `src/listening.js`; `src/server.js` (`/v1/listen/*`); `src/cli.js`; `src/protocol.js`
+  (`maxListenChunkBytes`); `src/transcriber.js` (per-call timeout); `src/monitor.js`; new
+  `test/listening.test.js`; the protocol-info fixture.
+- **Shared:** `GatewayTransport.swift` (`uploadListenChunk`, `endListening`) and tests.
+- **Watch:** new `ListeningMode.swift` and `ListeningBadge.swift`; `TamagoWatchApp.swift`, `SettingsPage.swift`,
+  `TamagoConnection.swift`, `Info.plist` (`WKBackgroundModes: audio`).
+- **Docs:** PROTOCOL_V1 §19, DECISIONS D-130.
+
+**Tests/builds actually performed (by me):**
+- Gateway `npm test`: 180 pass, 1 skipped.
+- `swift test`: 155 pass.
+- TamagoWatch simulator build: succeeded.
+- Real clip (29 s of `say` speech full of fillers) through a loopback gateway with the real transcriber:
+  - two chunks stored, transcribed and cleaned;
+  - `transcript.md` written with times;
+  - end and sessions endpoints worked.
+
+**Things NOT verified:**
+- The Gemma clean-up on real speech. Ollama was SIGSTOPped by Console Mode while Control ran; I didn't wake it.
+- The simulator run. Control was using 12 GB and the Mac was swapping, so I didn't boot a simulator.
+- Everything on the owner's Watch.
+- The live gateway still runs the old code. Restart it after gaming.
+
+**Signed-by:** Claude Code

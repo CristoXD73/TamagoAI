@@ -372,3 +372,47 @@ struct GatewayClientConversationTests {
         #expect(r.followUpExpected)
     }
 }
+
+// MARK: - Listening mode (PROTOCOL_V1 §19, D-130)
+
+@Suite("GatewayClient listening")
+struct GatewayClientListeningTests {
+    let baseURL = URL(string: "http://gateway.test:8787")!
+    let session = "6f1c2a90-1b2c-4d3e-8f40-123456789abc"
+
+    func makeClient(_ stub: StubFetch) -> GatewayClient {
+        GatewayClient(configuration: GatewayConfiguration(baseURL: baseURL, authToken: "test-token-0123456789"), fetch: stub.fetch)
+    }
+
+    @Test func chunkUploadCarriesSessionSequenceAndStartTime() async throws {
+        let stub = StubFetch(.success(json: #"{"protocolVersion":1,"status":"ok","session":"x","seq":3,"stored":true}"#))
+        let ok = await makeClient(stub).uploadListenChunk(Data([1, 2, 3]), session: session, seq: 3,
+                                                          startedAt: Date(timeIntervalSince1970: 1_790_000_000))
+        #expect(ok)
+        let request = try #require(stub.captured)
+        #expect(request.url?.path == "/v1/listen/chunk")
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "x-tamago-listen-session") == session)
+        #expect(request.value(forHTTPHeaderField: "x-tamago-listen-seq") == "3")
+        #expect(request.value(forHTTPHeaderField: "x-tamago-listen-started-at") == "1790000000000")
+        #expect(request.value(forHTTPHeaderField: "authorization") == "Bearer test-token-0123456789")
+        #expect(request.value(forHTTPHeaderField: "content-type") == "audio/mp4")
+        #expect(request.httpBody == Data([1, 2, 3]))
+    }
+
+    @Test func anythingButAStoredChunkIsAFailureToRetry() async {
+        let offline = StubFetch(.failure(URLError(.cannotConnectToHost)))
+        #expect(await makeClient(offline).uploadListenChunk(Data([1]), session: session, seq: 0, startedAt: .now) == false)
+        let refused = StubFetch(.success(json: #"{"protocolVersion":1,"status":"error","error":{"code":"auth_failed"}}"#, httpStatus: 401))
+        #expect(await makeClient(refused).uploadListenChunk(Data([1]), session: session, seq: 0, startedAt: .now) == false)
+    }
+
+    @Test func endSendsTheSession() async throws {
+        let stub = StubFetch(.success(json: #"{"protocolVersion":1,"status":"ok","session":"x","chunks":2}"#))
+        #expect(await makeClient(stub).endListening(session: session))
+        let request = try #require(stub.captured)
+        #expect(request.url?.path == "/v1/listen/end")
+        let body = try #require(request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] })
+        #expect(body["session"] == session)
+    }
+}

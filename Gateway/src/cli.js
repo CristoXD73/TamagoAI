@@ -3,6 +3,7 @@ import { loadConfig } from './config.js';
 import { createGateway, GATEWAY_VERSION } from './server.js';
 import { createPairingWindow, PAIRING_DEFAULTS } from './pairing.js';
 import { createTranscriberFromEnv } from './transcriber.js';
+import { createListening, createPolisher } from './listening.js';
 import { createSynthesizerFromEnv } from './tts.js';
 import { pickLanIPv4, startAdvertising, WELL_KNOWN_HOST } from './advertise.js';
 import { createConsoleMonitor, createMonitorLogger } from './monitor.js';
@@ -80,7 +81,19 @@ try {
 }
 // PROTOCOL_V1 §18 / D-127: the iPhone conversation (memory only). TAMAGO_CONVERSATION=off keeps none.
 const conversation = process.env.TAMAGO_CONVERSATION === 'off' ? null : undefined;
-const server = createGateway({ ...config, pairing, transcriber, keepAudioDir, synthesizer, logger, monitor, conversation });
+// PROTOCOL_V1 §19 / D-130: listening mode. Chunks, transcripts and audio go to $TAMAGO_STATE_DIR/listening (the
+// Storage disk via tamago-up.sh). TAMAGO_LISTEN=off disables it; TAMAGO_LISTEN_POLISH=off keeps the rule clean-up only.
+const listening = transcriber && process.env.TAMAGO_LISTEN !== 'off'
+  ? createListening({
+    dir: process.env.TAMAGO_LISTEN_DIR ?? join(defaultStateDir(process.env), 'listening'),
+    transcriber,
+    polish: process.env.TAMAGO_LISTEN_POLISH === 'off' ? null
+      : createPolisher({ model: process.env.TAMAGO_LISTEN_MODEL ?? process.env.OLLAMA_MODEL, baseUrl: process.env.OLLAMA_URL }),
+    logger,
+    show: monitor ? (e) => { try { monitor({ at: Date.now(), ...e }); } catch { /* best-effort */ } } : undefined,
+  })
+  : null;
+const server = createGateway({ ...config, pairing, transcriber, keepAudioDir, synthesizer, logger, monitor, conversation, listening });
 
 let advertiser = null;
 let ipWatch = null;
@@ -107,7 +120,8 @@ server.listen(config.port, config.host, () => {
       `  🐙 TamagoAI is listening${ip ? ` at http://${ip}:${port}` : ` on ${config.host}:${port}`}`,
       `     brain: ${config.provider.name}${process.env.OLLAMA_MODEL ? ` (${process.env.OLLAMA_MODEL})` : ''}`,
       `     voice in: ${transcriber ? transcriber.name : 'unavailable'}   voice out: ${voiceOutput}`,
-      '     Words are shown here only, never saved. Ctrl-C stops Tamago.',
+      `     listening mode: ${listening ? `on, saved to ${listening.dir}` : 'off'}`,
+      '     Words are shown here only, never saved (except listening mode). Ctrl-C stops Tamago.',
       '',
     ].join('\n'));
     const ui = createMonitorUI({

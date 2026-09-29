@@ -1223,3 +1223,41 @@ Heard on the Watch: UNVERIFIED until the owner listens.
   take a few model turns). That fixed a first-request timeout.
 - **Verified live** on a throwaway `Sandbox` project: docs/RELAY_PLAN.md §10. Not yet: handoff down the chain when
   credits run out (R4), the Watch inbox and push (R3).
+
+### D-130 Listening mode: the Watch records without stopping; the Mac keeps it and writes it out cleanly
+
+- **Owner, 2026-09-29:** "an always listening mode, that runs on the watch if possible and simply keeps the audio
+  sends it to the mac and then all the filler words get taken out and properly transcribed … you go to the octopus
+  and instead of ai mode you switch it to listening mode. And watch doesn't stop listening until you stop it or
+  watch dies."
+- **The switch:** the Settings page (one swipe from Tamago) has **Mode: AI / Listening**. While listening, a small
+  red dot and a timer sit under Tamago, and holding Tamago asks "Stop listening?" instead of talking to it.
+- **On the Watch** (`ListeningMode.swift`):
+  - 16 kHz mono AAC chunks of about a minute, cut at the first pause after 45 s (90 s at most). The next recorder
+    starts before the old one stops, so there's no gap and words aren't split.
+  - Chunks wait on the Watch and go to the Mac oldest first. One is deleted only after the Mac stores it. Offline,
+    they queue (300 MB cap, about 3 days of audio) and retry with backoff.
+  - Interruptions (calls, Siri) pause the chunk, and recording resumes when they end.
+- **Why background recording is allowed here:** `WKBackgroundModes: audio`, because the app genuinely records audio.
+  That is the mode's purpose, and the system's microphone indicator stays on. AGENTS.md §2 forbids *faked*
+  background work (silent audio, dummy workouts), and this is neither.
+- **Limit, honestly:** if watchOS ends the app (memory, a crash), listening resumes the next time Tamago is opened.
+  An app can't start the microphone from the background.
+- **On the Mac** (`Gateway/src/listening.js`, PROTOCOL_V1 §19):
+  - Each chunk is kept, transcribed with the same on-device Apple SpeechAnalyzer as hold-to-talk (180 s timeout per
+    chunk), and cleaned in two steps: rules first, then the local model, guarded against summaries.
+  - Everything is appended to `transcript.md` per session, under `$TAMAGO_STATE_DIR/listening` on the Storage disk.
+  - `TAMAGO_LISTEN=off` turns it off; `TAMAGO_LISTEN_POLISH=off` keeps the rules only.
+- **Privacy change:** this is the first gateway path that saves the owner's words and audio, on purpose and only
+  while the owner has listening mode on. Logs stay metadata-only.
+- **Verified:**
+  - Gateway tests (`test/listening.test.js`) and Swift client tests.
+  - A real 29 s clip with fillers through the live transcriber and HTTP path, on the Mac. Result: every um/uh/"you
+    know" removed.
+  - The Watch app builds for the simulator.
+- **Not yet verified:**
+  - The Gemma pass on real speech (Ollama was frozen by Console Mode during a game).
+  - The simulator run (Control was using 12 GB of memory).
+  - Everything on the owner's Watch: background recording with the screen off, battery drain, and Wi-Fi uploads
+    with the wrist down.
+

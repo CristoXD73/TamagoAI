@@ -157,6 +157,42 @@ public actor GatewayClient {
         return await perform(urlRequest, requestId: requestId)
     }
 
+    /// POST `/v1/listen/chunk` (PROTOCOL_V1 §19, D-130): one piece of a listening-mode recording. `true` only when
+    /// the Mac says it stored it; anything else (offline, wrong token, error) is `false` and the Watch retries
+    /// later. Re-sending the same `(session, seq)` is safe: the Mac replaces the chunk.
+    public func uploadListenChunk(_ audio: Data, session: String, seq: Int, startedAt: Date,
+                                  contentType: String = "audio/mp4", timeout: TimeInterval = 60) async -> Bool {
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/listen/chunk"), timeoutInterval: timeout)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue(contentType, forHTTPHeaderField: "content-type")
+        urlRequest.setValue(session, forHTTPHeaderField: "x-tamago-listen-session")
+        urlRequest.setValue(String(seq), forHTTPHeaderField: "x-tamago-listen-seq")
+        urlRequest.setValue(String(Int64(startedAt.timeIntervalSince1970 * 1000)), forHTTPHeaderField: "x-tamago-listen-started-at")
+        urlRequest.setValue(String(TamagoProtocol.version), forHTTPHeaderField: "x-tamago-protocol-version")
+        urlRequest.httpBody = audio
+        return await listenOK(urlRequest)
+    }
+
+    /// POST `/v1/listen/end` (§19): the owner stopped listening. Best effort; the transcript is complete either way.
+    public func endListening(session: String, timeout: TimeInterval = 10) async -> Bool {
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/listen/end"), timeoutInterval: timeout)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
+        urlRequest.httpBody = try? JSONSerialization.data(withJSONObject: ["session": session])
+        return await listenOK(urlRequest)
+    }
+
+    private func listenOK(_ request: URLRequest) async -> Bool {
+        var urlRequest = request
+        if let token = configuration.authToken {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        }
+        guard let (data, response) = try? await fetch(urlRequest),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        return body["status"] as? String == "ok"
+    }
+
     private func perform(_ request: URLRequest, requestId: String) async -> GatewayExchange {
         var urlRequest = request
         if let token = configuration.authToken {

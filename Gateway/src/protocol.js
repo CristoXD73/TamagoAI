@@ -113,6 +113,7 @@ export const ERROR_CODES = Object.keys(ERRORS);
 export const LIMITS = {
   maxBodyBytes: 16 * 1024,
   maxAudioBytes: 1024 * 1024,   // POST /v1/audio (§15): ~30 s of 16 kHz mono AAC is well under this
+  maxListenChunkBytes: 4 * 1024 * 1024,   // POST /v1/listen/chunk (§19): a chunk is ~1 min, at most 2 min
   maxInputTextChars: 2000,
   maxResponseTextChars: 1000,
 };

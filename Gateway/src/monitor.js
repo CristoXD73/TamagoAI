@@ -58,6 +58,17 @@ export function createConsoleMonitor({ write = (line) => console.log(line), colo
       case 'voice_fetch':
         if (e.status === 200) return line('📲', paint('magenta', 'Watch fetched the voice'), `waited ${secs(e.waitedMs)}`);
         return line('📲', paint('yellow', `Watch asked for the voice: ${e.status === 404 ? 'gone or never made' : `not ready (${e.state})`}`), 'the Watch speaks it itself');
+      // Listening mode (D-130): one line per chunk stored, one per chunk transcribed.
+      case 'listen_chunk':
+        return line('🎙️', paint('cyan', `Listening: chunk ${e.seq} stored (${kb(e.bytes)})`), e.duplicate ? 'retry, replaced' : '');
+      case 'listen_text':
+        return e.text
+          ? line('📝', `${paint('cyan', `Chunk ${e.seq}:`)} ${quote(e.text.length > 160 ? `${e.text.slice(0, 157)}…` : e.text)}`, secs(e.ms))
+          : line('📝', paint('dim', `Chunk ${e.seq}: silence`), secs(e.ms));
+      case 'listen_failed':
+        return line('📝', paint('red', `Chunk ${e.seq} couldn't be transcribed: ${e.message}`), 'the audio is kept');
+      case 'listen_end':
+        return line('🎙️', paint('blue', `Listening stopped (${e.chunks} chunks)`));
       case 'warn':
         return line('⚠️ ', paint('yellow', e.message ?? e.event));
       case 'error':

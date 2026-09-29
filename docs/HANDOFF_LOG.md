@@ -1491,3 +1491,28 @@ Sandbox project.
 
 **Next recommended task (ONE):** local coding tools for small jobs (TAMAGO_AGENTS.md §3 row 4).
 **Do not redo:** the model choice (Gemma / Qwen 9B), or the System 1 small-model test on 16 GB.
+
+---
+
+### 2026-09-29 07:15 EDT: Claude Code (local): listening mode (D-130)
+
+**Branch:** `claude/great-volta-ogpuw8` (not yet on `main`; build 7 on TestFlight has the octopus-edge fix only).
+**Done:**
+- Watch Settings → **Mode: AI / Listening**. Listening records without stopping (about 1 min chunks, cut in
+  pauses) and queues the chunks on the Watch. They go to the Mac (PROTOCOL_V1 §19).
+- The Mac keeps the audio, transcribes on-device, removes fillers (rules, then Gemma when it's up), and writes
+  `transcript.md` per session in `/Volumes/Storage/AI/TamagoAI/listening/`.
+
+**Tests:** gateway 180 pass / 1 skipped; swift 155 pass; Watch simulator build OK; real-audio HTTP run OK (rules only).
+**Unverified:**
+- The Gemma pass on real speech.
+- The Watch simulator run.
+- Everything on the device: background recording, battery, uploads with the wrist down.
+
+**Next recommended task (ONE):**
+1. When the Mac isn't gaming, restart the gateway (`scripts/tamago-up.sh`).
+2. Rerun the real clip with Gemma.
+3. Do a simulator run with `SIMCTL_CHILD_TAMAGO_DEBUG_LISTEN=1 SIMCTL_CHILD_TAMAGO_DEBUG_LISTEN_CHUNK=8`.
+4. Then ship to TestFlight for the owner's Watch.
+
+**Do not redo:** the chunk and queue design; the privacy stance (saved only while listening mode is on).

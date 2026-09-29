@@ -62,6 +62,7 @@
   "limits": {
     "maxBodyBytes": 16384,
     "maxAudioBytes": 1048576,
+    "maxListenChunkBytes": 4194304,
     "maxInputTextChars": 2000,
     "maxResponseTextChars": 1000
   }

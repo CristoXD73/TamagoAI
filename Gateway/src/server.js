@@ -57,6 +57,7 @@ const silentLogger = { info() {}, warn() {}, error() {} };
  * @param {Function|null} [opts.monitor] OWNER'S LIVE VIEW ONLY (TAMAGO_MONITOR=1, monitor.js): gets each
  *   hop of a conversation, including what was heard and said, to print on the owner's own terminal.
  *   Never persisted and never mixed into `logger`, which stays metadata-only. Off by default.
+ * @param {object|null} [opts.listening] listening mode (listening.js, PROTOCOL_V1 §19, D-130); null disables /v1/listen/*
  * @param {object|null} [opts.conversation] what the owner's iPhone shows (conversation.js, PROTOCOL_V1 §18):
  *   every exchange including full long answers, memory only. Default: a fresh one; null disables §18 and
  *   long answers (D-127).
@@ -64,7 +65,7 @@ const silentLogger = { info() {}, warn() {}, error() {} };
 export function createGateway({
   provider, authToken, timeoutMs = 20000, logger = silentLogger, now = Date.now,
   gatewayId = null, gatewayName = 'TamagoAI', pairing = null, transcriber = null, keepAudioDir = null,
-  synthesizer = null, speechWaitMs = SPEECH_WAIT_MS, monitor = null, conversation: conversationOpt,
+  synthesizer = null, speechWaitMs = SPEECH_WAIT_MS, monitor = null, conversation: conversationOpt, listening = null,
 }) {
   if (!provider || typeof provider.generate !== 'function') {
     throw new Error('createGateway requires a provider with generate().');
@@ -143,7 +144,7 @@ export function createGateway({
         authRequired: expectedTokenHash !== null,
         inputTypes: transcriber ? ['text', 'audio'] : ['text'],
         outputTypes: synthesizer ? ['text', 'speech-audio'] : ['text'],
-        features: [...(conversation ? ['conversation'] : []), ...(longAnswers ? ['long-answers'] : [])],
+        features: [...(conversation ? ['conversation'] : []), ...(longAnswers ? ['long-answers'] : []), ...(listening ? ['listening'] : [])],
         characterStates: CHARACTER_STATES,
         reactionStates: REACTION_STATES,
         haptics: HAPTICS,
@@ -161,6 +162,10 @@ export function createGateway({
     if (url.pathname === '/v1/audio') {
       if (req.method !== 'POST') return sendError(res, null, 'method_not_allowed');
       return handleAudio(req, res);
+    }
+
+    if (url.pathname.startsWith('/v1/listen/')) {
+      return handleListen(req, res, url);
     }
 
     if (url.pathname === '/v1/conversation') {
@@ -296,6 +301,60 @@ export function createGateway({
     });
     showReply(requestId, body, now() - started);
     return send(res, httpStatus, body);
+  }
+
+  // PROTOCOL_V1 §19 / D-130: listening mode. The Watch records without stopping and sends ~1 min chunks; each one
+  // is stored, transcribed and cleaned in the background (listening.js), so the reply only says "stored".
+  async function handleListen(req, res, url) {
+    const sub = url.pathname.slice('/v1/listen/'.length);
+    const allowed = { chunk: 'POST', end: 'POST', sessions: 'GET' }[sub.split('/')[0]];
+    if (!allowed) { req.resume(); return sendError(res, null, 'not_found'); }
+    if (req.method !== allowed) { req.resume(); return sendError(res, null, 'method_not_allowed'); }
+    if (!isAuthorized(req.headers.authorization)) {
+      req.resume();
+      logger.warn({ event: 'listen', status: 'error', code: 'auth_failed' });
+      show({ kind: 'auth_failed', route: 'listen', from: peer(req) });
+      return sendError(res, null, 'auth_failed', 'Missing or invalid bearer token.');
+    }
+    if (!listening) { req.resume(); return sendError(res, null, 'provider_unavailable', "Listening mode isn't set up on this Mac."); }
+    const ok = (extra) => send(res, 200, { protocolVersion: PROTOCOL_VERSION, status: 'ok', ...extra });
+    try {
+      if (sub === 'chunk') {
+        const contentType = String(req.headers['content-type'] ?? '').toLowerCase();
+        if (!contentType.startsWith('audio/')) { req.resume(); return sendError(res, null, 'invalid_request', 'content-type must be audio/*.'); }
+        let audio;
+        try {
+          audio = await readBuffer(req, LIMITS.maxListenChunkBytes);
+        } catch (err) {
+          if (err.code === 'payload_too_large') return sendError(res, null, 'payload_too_large', `Chunk exceeds ${LIMITS.maxListenChunkBytes} bytes.`);
+          throw err;
+        }
+        const startedAt = req.headers['x-tamago-listen-started-at'];
+        const r = listening.acceptChunk({
+          session: req.headers['x-tamago-listen-session'], seq: req.headers['x-tamago-listen-seq'],
+          startedAt: /^\d+$/.test(String(startedAt ?? '')) ? Number(startedAt) : startedAt, contentType, audio,
+        });
+        return ok({ ...r, stored: true, pending: listening.pending });
+      }
+      if (sub === 'end') {
+        const body = JSON.parse((await readBody(req, LIMITS.maxBodyBytes)) || '{}');
+        return ok(listening.end(body.session));
+      }
+      if (sub === 'sessions') {
+        const s = listening.sessions().map(({ folder, ...rest }) => rest);   // never the Mac's paths
+        return ok({ sessions: s });
+      }
+      const id = sub.slice('sessions/'.length);
+      const t = listening.transcript(id);
+      if (!t) return sendError(res, null, 'not_found');
+      const { folder, ...rest } = t;
+      return ok(rest);
+    } catch (err) {
+      if (err.code === 'invalid_request' || err instanceof SyntaxError) {
+        return sendError(res, null, 'invalid_request', err.code === 'invalid_request' ? err.message : 'Body is not valid JSON.');
+      }
+      throw err;
+    }
   }
 
   async function runAudio(requestId, audio, contentType) {

@@ -8,7 +8,11 @@
 		<true/>
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Tamago listens while you hold it, and sends what you say to your Mac.</string>
+	<string>Tamago listens while you hold it, or all the time in listening mode, and sends what you say to your Mac.</string>
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Tamago talks to its brain on your Mac over your home network.</string>
 </dict>

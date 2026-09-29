@@ -23,9 +23,10 @@ export function createTranscriberFromEnv(env = process.env) {
 export function createTranscriber({ binPath, locale = 'en_CA', timeoutMs = 15_000, execFileImpl = execFile }) {
   return {
     name: 'apple-speech',
-    transcribe(file, { signal } = {}) {
+    // Listening mode (D-130) passes a longer timeoutMs: its chunks are about a minute, not a few seconds.
+    transcribe(file, { signal, timeoutMs: callTimeoutMs } = {}) {
       return new Promise((resolve, reject) => {
-        execFileImpl(binPath, [file, locale], { timeout: timeoutMs, signal, maxBuffer: 64 * 1024 }, (err, stdout, stderr) => {
+        execFileImpl(binPath, [file, locale], { timeout: callTimeoutMs ?? timeoutMs, signal, maxBuffer: 64 * 1024 }, (err, stdout, stderr) => {
           if (err) {
             const e = new Error(`transcriber failed: ${String(stderr || err.message).trim().slice(0, 200)}`);
             e.code = signal?.aborted ? 'aborted' : 'transcriber_failed';
