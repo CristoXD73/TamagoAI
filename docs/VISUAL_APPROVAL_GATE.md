@@ -62,6 +62,7 @@ is compared side by side with the approved prototype, and the owner signs off.
 | 13 | Waiting signs: B three dots under the tentacles, D ripples from the head (owner picks in Settings) | preview page (4 options, 2026-09-27) | **APPROVED (owner direction)** | "B and D keep both and we will make it so you can pick" (D-126). |
 | 14 | Pixel hero, three takes: A faithful, B chibi mascot, C hero with a face and a wave (brand character, still art) | `docs/prototypes/pixel-hero-v1/` | **A APPROVED** (B, C not chosen) | Owner, 2026-09-29: "Lets go with A keep it in our assets." Master in `Assets/Brand/pixel-hero/`. |
 | 15 | Other universes: sticker, foam, shipping cardboard (brand still art) | `docs/prototypes/universes-v1/` | PROTOTYPE_READY_FOR_REVIEW | Owner, 2026-09-29: "imagine our main octopus reimagined in different universes … a sticker … made of foam … made of brown shipping cardboard box". |
+| 16 | Owner's universe set: neon, ink, stone and moss, velvet, sprout (brand still art) | `Assets/Brand/universes/` | **APPROVED (owner-provided)** | "Add this to our assets collection" (2026-09-29). Creator and licence still to be recorded by the owner before public use. |
 
 Existing Stage A character behavior (D-114) predates this gate. It stays as is and isn't expanded until the
 replacement animations are approved. Engineering-only fixes to it remain allowed.
