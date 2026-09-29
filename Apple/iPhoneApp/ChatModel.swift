@@ -36,6 +36,10 @@ final class ChatModel {
     private(set) var outgoing: [Outgoing] = []
     private(set) var link: Link = .unpaired
     private(set) var gatewayName: String?
+    /// While offline: what to do about it (owner, 2026-09-29: sending into the void made it look like a slow Mac).
+    private(set) var offlineHelp: String?
+    /// The Mac answers but refuses this phone: only pairing again fixes it.
+    private(set) var needsRepair = false
     var draft = ""
 
     @ObservationIgnored private var client: GatewayClient?
@@ -50,7 +54,9 @@ final class ChatModel {
     var isEmpty: Bool { turns.isEmpty && outgoing.isEmpty }
     /// A typed message is waiting for its answer (show Tamago "typing").
     var isWaitingForReply: Bool { outgoing.contains { !$0.failed } }
-    var canSend: Bool { isPaired && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// Only while the Mac is actually answering: a message typed into a dead link would sit there looking "slow".
+    var canSend: Bool { isPaired && link == .online && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var isOffline: Bool { if case .offline = link { true } else { false } }
 
     // MARK: Pairing
 
@@ -74,7 +80,7 @@ final class ChatModel {
         case .wrongCode:
             return "That code didn't match. Check the Mac and try again."
         case .closed:
-            return "The Mac isn't pairing right now. Restart Tamago on the Mac for a fresh code."
+            return "That code is used up or expired. Press New pairing code on the Mac's dashboard."
         case let .unreachable(reason):
             return reason
         }
@@ -89,6 +95,8 @@ final class ChatModel {
         outgoing = []
         latest = 0
         link = .unpaired
+        offlineHelp = nil
+        needsRepair = false
     }
 
     /// "tamagoai.local", "192.168.0.74", "http://mac.local:8787" → a gateway base URL (http, port 8787 by default).
@@ -134,10 +142,12 @@ final class ChatModel {
     func refresh() async {
         guard let client else { return }
         guard let page = await client.conversation(after: latest) else {
-            link = .offline("Can't reach \(gatewayName ?? "your Mac")")
+            await diagnose(client)
             return
         }
         link = .online
+        offlineHelp = nil
+        needsRepair = false
         if page.latest < latest {
             // The Mac restarted (the conversation lives in its memory): start over from what it has.
             turns = []
@@ -146,6 +156,31 @@ final class ChatModel {
             return
         }
         merge(page)
+    }
+
+    /// Why the conversation didn't load, in words the owner can act on.
+    private func diagnose(_ client: GatewayClient) async {
+        let mac = gatewayName ?? "your Mac"
+        let network = "This phone has to be on the same Wi-Fi as the Mac. If it is, turn on Settings › Privacy & Security › Local Network › Tamago."
+        switch await client.probe() {
+        case .reachable:
+            // Tamago answers, but not to this phone's token: its pairing was reset or replaced.
+            link = .offline("\(mac) doesn't recognise this phone")
+            offlineHelp = "Pair again with a new code from the dashboard on the Mac."
+            needsRepair = true
+        case .wrongGateway:
+            link = .offline("A different Tamago answered")
+            offlineHelp = "Pair again with the Mac you want."
+            needsRepair = true
+        case .notFound:
+            link = .offline("Can't find \(mac) on this network")
+            offlineHelp = network
+            needsRepair = false
+        case .unreachable:
+            link = .offline("Can't reach \(mac)")
+            offlineHelp = "\(network) Also check Tamago is running on the Mac."
+            needsRepair = false
+        }
     }
 
     private func merge(_ page: TamagoConversationPage) {
@@ -163,7 +198,7 @@ final class ChatModel {
 
     func send(_ text: String? = nil) async {
         let message = (text ?? draft).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty, let client else { return }
+        guard !message.isEmpty, let client, link == .online else { return }
         if text == nil { draft = "" }
         let request = TamagoRequest(text: String(message.prefix(2000)),
                                     client: TamagoClientInfo(device: "phone", route: "direct", appVersion: Self.appVersion))
@@ -172,8 +207,8 @@ final class ChatModel {
         if exchange.reachedGateway {
             link = .online
         } else {
-            link = .offline(exchange.response.error?.message ?? "Can't reach \(gatewayName ?? "your Mac")")
             if let i = outgoing.firstIndex(where: { $0.id == request.requestId }) { outgoing[i].failed = true }
+            await diagnose(client)
         }
         await refresh()
     }

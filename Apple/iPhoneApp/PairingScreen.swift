@@ -5,7 +5,7 @@
 // D-127: the phone pairs with the owner's Mac exactly like the Watch did
 // (PROTOCOL_V1 §14): the Mac's address and the 6-digit code it shows. The
 // gateway opens one pairing window each time it starts, so a fresh code means
-// restarting Tamago on the Mac (scripts/tamago-up.sh); its dashboard shows it.
+// the Mac's dashboard (127.0.0.1:8788 → New pairing code) or a restart of Tamago; each code pairs one device.
 
 import SwiftUI
 
@@ -89,7 +89,7 @@ struct PairingScreen: View {
                         Text("Where's the code?")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(ChatTheme.primaryText)
-                        Text("On the Mac, restart Tamago (scripts/tamago-up.sh). The dashboard at 127.0.0.1:8788 and the terminal show a 6-digit code for 10 minutes. Leave the address empty to use tamagoai.local, or type the Mac's IP address.")
+                        Text("On the Mac, open the dashboard (127.0.0.1:8788) and press New pairing code. Each code pairs one device and lasts 10 minutes. Leave the address empty to use tamagoai.local, or type the Mac's IP address.")
                             .font(.footnote)
                             .foregroundStyle(ChatTheme.secondaryText)
                     }

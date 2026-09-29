@@ -136,10 +136,11 @@
       <div class="stat"><span class="dot" id="dIn"></span><span class="k">Voice in</span><span class="v" id="vIn">…</span></div>
       <div class="stat"><span class="dot" id="dOut"></span><span class="k">Voice out</span><span class="v" id="vOut">…</span></div>
     </div>
-    <div class="card" id="pairCard" hidden>
+    <div class="card" id="pairCard">
       <h2>Pairing code</h2>
-      <div class="code" id="code"></div>
-      <div class="note">Only needed for a new or reset Watch. Open for 10 minutes after the gateway starts.</div>
+      <div class="code" id="code">—</div>
+      <div class="note" id="pairNote">Each code pairs one device (Watch or phone) and lasts 10 minutes.</div>
+      <button class="send" id="newCode" type="button" style="margin-top:10px">New pairing code</button>
     </div>
     <div class="card">
       <h2>Events</h2>
@@ -312,8 +313,8 @@
     setStat('Ollama', s.ollama === 'up' ? 'up' : s.ollama === 'down' ? 'down' : '', s.ollama === 'up' ? s.brain : 'not running');
     setStat('In', s.voiceIn && !/unavailable/.test(s.voiceIn) ? 'up' : 'warn', s.voiceIn ?? '…');
     setStat('Out', s.voiceOut && !/unavailable/.test(s.voiceOut) ? 'up' : 'warn', s.voiceOut ?? '…');
-    $('pairCard').hidden = !s.pairingCode;
-    if (s.pairingCode) $('code').textContent = `${s.pairingCode.slice(0, 3)} ${s.pairingCode.slice(3)}`;
+    $('code').textContent = s.pairingCode ? `${s.pairingCode.slice(0, 3)} ${s.pairingCode.slice(3)}` : '—';
+    $('newCode').textContent = s.pairingCode ? 'Replace code' : 'New pairing code';
     const allUp = s.gateway === 'up' && s.ollama === 'up';
     $('liveDot').className = `dot ${allUp ? 'up' : 'down'}`;
     $('liveText').textContent = allUp ? 'Live' : 'Something is down';
@@ -352,6 +353,10 @@
     }
   });
 })();
+  $('newCode').addEventListener('click', async () => {
+    $('newCode').disabled = true;
+    try { await fetch('/api/pairing-code', { method: 'POST' }); } finally { $('newCode').disabled = false; }
+  });
 </script>
 </body>
 </html>

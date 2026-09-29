@@ -133,3 +133,15 @@ test('pairing is unavailable without a pairing window, and malformed bodies are 
     await gw.close();
   }
 });
+
+test('pairing can be reopened for the next device without a restart; the old code dies', async () => {
+  const { createPairing } = await import('../src/pairing.js');
+  const p = createPairing({ code: '111111' });
+  assert.equal(p.attempt('111111'), 'ok');
+  assert.equal(p.isOpen, false, 'single use');
+  const next = p.reopen();
+  assert.match(next, /^\d{6}$/);
+  assert.equal(p.isOpen, true);
+  assert.equal(p.attempt('111111') === 'ok' && next !== '111111', false, 'the old code no longer pairs');
+  assert.equal(p.attempt(next), 'ok');
+});

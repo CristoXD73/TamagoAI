@@ -29,7 +29,7 @@ const ART = new URL('../../Apple/WatchApp/Assets.xcassets/Creature.imageset/Crea
  * @param {() => string|null} [opts.pairingCode] the current code, if a window is open
  * @param {string} [opts.ollamaUrl]
  */
-export function createMonitorUI({ port = 8788, gatewayUrl, authToken, info, pairingCode = () => null, ollamaUrl = 'http://127.0.0.1:11434' }) {
+export function createMonitorUI({ port = 8788, gatewayUrl, authToken, info, pairingCode = () => null, newPairingCode = null, ollamaUrl = 'http://127.0.0.1:11434' }) {
   const events = [];
   const clips = new Map();       // requestId -> Buffer (memory only)
   const clients = new Set();
@@ -108,6 +108,14 @@ export function createMonitorUI({ port = 8788, gatewayUrl, authToken, info, pair
       const clip = clips.get(url.pathname.slice('/clip/'.length));
       if (!clip) return res.writeHead(404).end();
       return res.writeHead(200, { 'content-type': 'audio/mp4', 'content-length': clip.length, 'cache-control': 'no-store' }).end(clip);
+    }
+    // A fresh pairing code, for the next device (the Watch and the phone need one each). This Mac only, same origin.
+    if (req.method === 'POST' && url.pathname === '/api/pairing-code') {
+      if (String(req.headers.origin ?? '') !== `http://${host}`) return res.writeHead(403).end('Cross-origin request refused.');
+      if (!newPairingCode) return res.writeHead(404).end('Pairing is off on this gateway.');
+      newPairingCode();
+      broadcast('status', snapshot());
+      return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true }));
     }
     if (req.method === 'POST' && url.pathname === '/api/say') {
       const origin = String(req.headers.origin ?? '');

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { loadConfig } from './config.js';
 import { createGateway, GATEWAY_VERSION } from './server.js';
-import { createPairingWindow, PAIRING_DEFAULTS } from './pairing.js';
+import { createPairing, PAIRING_DEFAULTS } from './pairing.js';
 import { createTranscriberFromEnv } from './transcriber.js';
 import { createListening, createPolisher } from './listening.js';
 import { createSynthesizerFromEnv } from './tts.js';
@@ -56,7 +56,7 @@ if (config.provider.ready) {
   }
 }
 
-const pairing = config.pairingEnabled ? createPairingWindow() : null;
+const pairing = config.pairingEnabled ? createPairing() : null;
 const transcriber = createTranscriberFromEnv(process.env);
 const keepAudioDir = process.env.TAMAGO_KEEP_AUDIO_DIR || null;   // diagnostics only
 // PROTOCOL_V1 §16 / D-121: natural voice from the Mac. Checked once at startup;
@@ -129,6 +129,11 @@ server.listen(config.port, config.host, () => {
       gatewayUrl: `http://127.0.0.1:${port}`,
       authToken: config.authToken,
       pairingCode: () => (pairing?.isOpen ? pairing.code : null),
+      newPairingCode: pairing ? () => {
+        const code = pairing.reopen();
+        console.log(`\n  TamagoAI pairing code: ${code.slice(0, 3)} ${code.slice(3)}   (new, from the dashboard; valid 10 min, single use)\n`);
+        return code;
+      } : null,
       info: {
         address: ip ? `${ip}:${port}` : `${config.host}:${port}`,
         brain: process.env.OLLAMA_MODEL ?? config.provider.name,

@@ -67,7 +67,12 @@ struct ChatView: View {
             ChatHeader(model: model, confirmClear: $confirmClear)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Composer(model: model, focused: $composerFocused)
+            // No typing into a dead link: say what's wrong and how to fix it instead (owner, 2026-09-29).
+            if model.isOffline {
+                OfflinePanel(model: model)
+            } else {
+                Composer(model: model, focused: $composerFocused)
+            }
         }
         .confirmationDialog("Clear the conversation on your Mac?", isPresented: $confirmClear, titleVisibility: .visible) {
             Button("Clear", role: .destructive) { Task { await model.clearConversation() } }
@@ -420,6 +425,59 @@ private struct EmptyChat: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
+    }
+}
+
+// MARK: - Offline
+
+private struct OfflinePanel: View {
+    let model: ChatModel
+    @State private var checking = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "wifi.exclamationmark")
+                    .foregroundStyle(ChatTheme.offline)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ChatTheme.primaryText)
+            }
+            if let help = model.offlineHelp {
+                Text(help)
+                    .font(.footnote)
+                    .foregroundStyle(ChatTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 10) {
+                Button {
+                    checking = true
+                    Task { await model.refresh(); checking = false }
+                } label: {
+                    Label(checking ? "Checking…" : "Try again", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(checking)
+                Button {
+                    model.unpair()
+                } label: {
+                    Label("Pair again", systemImage: "link")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(model.needsRepair ? Color(red: 0.36, green: 0.4, blue: 0.97) : ChatTheme.surface)
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+        .padding(16)
+        .background(.ultraThinMaterial.opacity(0.9))
+        .overlay(alignment: .top) { ChatTheme.hairline.frame(height: 0.5) }
+    }
+
+    private var title: String {
+        if case let .offline(reason) = model.link { return "\(reason). Messages can't be sent right now." }
+        return "Messages can't be sent right now."
     }
 }
 
