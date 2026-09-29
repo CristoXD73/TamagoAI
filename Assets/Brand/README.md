@@ -6,4 +6,4 @@ Owner-approved or owner-provided brand art for Tamago. The character's ground tr
 | Folder | What | Status |
 |---|---|---|
 | `pixel-hero/` | Pixel hero "A" (53 × 74 master + scaled) | approved, VISUAL_APPROVAL_GATE #14 |
-| `universes/` | Tamago in five universes: neon, ink, stone and moss, velvet, sprout | owner-provided; licence to record |
+| `universes/` | Tamago in eight universes: neon, ink, stone and moss, velvet, sprout, metal, x-ray, cardboard | owner-provided; licence to record |

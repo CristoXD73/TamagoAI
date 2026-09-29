@@ -1,7 +1,7 @@
 # Tamago in other universes: the owner's set
 
 Added 2026-09-29 at the owner's request ("Add this to our assets collection"). The same octopus (the approved
-look: glossy dark eyes, lumpy crown, curled arms, suckers) reimagined in five materials and styles.
+look: glossy dark eyes, lumpy crown, curled arms, suckers) reimagined in eight materials and styles (five added first, three more the same day).
 
 | File | Universe | Size | Background |
 |---|---|---|---|
@@ -10,6 +10,9 @@ look: glossy dark eyes, lumpy crown, curled arms, suckers) reimagined in five ma
 | `tamago-stone-moss.png` | Carved stone ruin, cracks, moss and sprouts | 1013 × 1553 | black |
 | `tamago-velvet.png` | Soft purple velvet / flocked plush, pale suckers | 1013 × 1552 | black |
 | `tamago-sprout.png` | Glossy red with a stem and a green leaf on its head | 1013 × 1553 | black |
+| `tamago-metal.png` | Brushed-steel robot: riveted panel seams, metal disc suckers | 1240 × 1268 | black |
+| `tamago-xray.png` | X-ray / translucent ghost: glowing blue-white, inner structure visible | 1013 × 1553 | black |
+| `tamago-cardboard.png` | Hand-built cardboard: faceted panels, tape patches, corrugated edges, star stickers, pen doodles | 1086 × 1448 | light grey |
 
 ## Provenance
 
@@ -22,6 +25,7 @@ look: glossy dark eyes, lumpy crown, curled arms, suckers) reimagined in five ma
 
 ## Related
 
-- Our own takes on the same idea (sticker, foam, cardboard v1/v2) wait for the owner's decision in
+- `tamago-cardboard.png` is the owner's own cardboard version, after the references they sent for the cardboard
+  redesign. Our takes on the same idea (sticker, foam, cardboard v1/v2) wait for the owner's decision in
   `docs/prototypes/universes-v1/` (VISUAL_APPROVAL_GATE #15).
 - The approved pixel hero is in `../pixel-hero/`.
