@@ -2,12 +2,12 @@
 
 Made by Claude Code, 2026-09-29, for the owner's brand character request: "make my octopus an
 anthropomorphic brand character. We are gonna need a bunch of designs to use in different parts of the app.
-Lets start with a pixel version of the hero … make three versions." Status: PROTOTYPE_READY_FOR_REVIEW
-(VISUAL_APPROVAL_GATE #14). Still art; nothing is in the app.
+Lets start with a pixel version of the hero … make three versions." Status: **A APPROVED** by the owner, 2026-09-29 ("Lets go with A keep it in our assets"); B and C not chosen
+(VISUAL_APPROVAL_GATE #14). The master is in `Assets/Brand/pixel-hero/`. Still art; nothing is in the app.
 
 | | What | Size (1×) | Anthropomorphic touches |
 |---|---|---|---|
-| **A Faithful** | The approved front render (`idle-front-v1`), reduced to pixels on a 13-colour pearl palette, outlined, eyes redrawn crisp | 50 × 74 | none: the octopus as approved |
+| **A Faithful** | The approved front render (`idle-front-v1`), reduced to pixels on a 13-colour pearl palette, outlined, eyes redrawn crisp | 53 × 74 | none: the octopus as approved |
 | **B Mascot** | Chibi brand character: big head, big lidded glossy eyes, blush, closed smile, four stubby curling arms, one raised in a "hi" | 38 × 38 | face, blush, smile, a hand-like wave |
 | **C Hero** | The approved art at 96 px, made a character: larger glossy eyes with catchlights, a small smile, a touch of blush, and the right arm raised in a wave | 82 × 102 | expressive eyes, smile, blush, a wave |
 
