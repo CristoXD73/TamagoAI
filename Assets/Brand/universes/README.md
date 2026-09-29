@@ -29,3 +29,11 @@ look: glossy dark eyes, lumpy crown, curled arms, suckers) reimagined in eight m
   redesign. Our takes on the same idea (sticker, foam, cardboard v1/v2) wait for the owner's decision in
   `docs/prototypes/universes-v1/` (VISUAL_APPROVAL_GATE #15).
 - The approved pixel hero is in `../pixel-hero/`.
+
+## Cut-outs and aligned layers (2026-09-29)
+
+- `cutouts/`: each image with its background removed (Apple Vision subject lifting), cropped, transparent PNG.
+- `aligned/`: the same, scaled and moved so the eyes sit exactly on the hero's (1024 × 1400; the hero idle frame
+  sits at (128, 280)). `onion-check.png` shows all of them stacked. Used by the startup sequence
+  (`docs/prototypes/startup-v1/`).
+
