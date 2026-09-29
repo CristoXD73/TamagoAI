@@ -4,7 +4,7 @@ Made by Claude Code, 2026-09-29. Owner: "remove the background of all the octopu
 up on each other as accurately as possible and do a motion design where they all transform … in rapid succession
 ramping up until it becomes our original hero, then the idle floating animation begins. I think it would be a
 good startup sequence. Feel free to add sound and effects and polish it. Show me v1."
-Status: PROTOTYPE_READY_FOR_REVIEW (VISUAL_APPROVAL_GATE #17).
+Status: **APPROVED**, "Sure ship that" (VISUAL_APPROVAL_GATE #17). Shipped in the iPhone app (`Apple/iPhoneApp/StartupSequence.swift`).
 
 `startup-v1.mp4`: 1080 × 1920, 60 fps, 8.7 s, AAC stereo. `keyframes.png`: six moments.
 

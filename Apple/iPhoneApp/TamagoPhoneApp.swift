@@ -9,6 +9,8 @@ import TamagoShared
 @main
 struct TamagoPhoneApp: App {
     @State private var model = ChatModel()
+    /// The startup sequence plays once per launch (VISUAL_APPROVAL_GATE #17).
+    @State private var showStartup = true
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -19,6 +21,9 @@ struct TamagoPhoneApp: App {
                 } else {
                     PairingScreen(model: model)
                 }
+            }
+            .overlay {
+                if showStartup { StartupSequence { showStartup = false } }
             }
             .preferredColorScheme(.dark)
             // Read the conversation only while the app is in front (no background work).
