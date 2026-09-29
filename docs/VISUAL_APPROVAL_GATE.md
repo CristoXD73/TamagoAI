@@ -64,6 +64,7 @@ is compared side by side with the approved prototype, and the owner signs off.
 | 15 | Other universes: sticker, foam, shipping cardboard (brand still art) | `docs/prototypes/universes-v1/` | PROTOTYPE_READY_FOR_REVIEW | Owner, 2026-09-29: "imagine our main octopus reimagined in different universes … a sticker … made of foam … made of brown shipping cardboard box". |
 | 16 | Owner's universe set: neon, ink, stone and moss, velvet, sprout, metal, x-ray, cardboard (brand still art) | `Assets/Brand/universes/` | **APPROVED (owner-provided)** | "Add this to our assets collection", then "These too" (2026-09-29). Creator and licence still to be recorded by the owner before public use. |
 | 17 | Startup sequence: the eight universes flick faster and faster, land on the hero, idle float begins (with sound) | `docs/prototypes/startup-v1/` | **APPROVED** | "Sure ship that … i wanna see it on the app" (2026-09-29). In the iPhone app as `StartupSequence` (5.6 s trim, tap to skip, sound follows the ringer switch). |
+| 18 | Startup sequence v2: the fight for the spot (Control-inspired glitch, shake, particles, overload, black, reveal) | `docs/prototypes/startup-v2/` | PROTOTYPE_READY_FOR_REVIEW | Owner, 2026-09-29: "more motion, screen shake, particle effects … like one is fighting for a place to stay, and a proper climax". |
 
 Existing Stage A character behavior (D-114) predates this gate. It stays as is and isn't expanded until the
 replacement animations are approved. Engineering-only fixes to it remain allowed.
