@@ -25,6 +25,8 @@ struct ListeningBadge: View {
                 if let note {
                     Text(note)
                         .font(.caption2)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
                         .foregroundStyle(.white.opacity(0.55))
                 }
             }

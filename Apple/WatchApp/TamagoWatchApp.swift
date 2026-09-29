@@ -90,8 +90,15 @@ private struct RootView: View {
                     if ProcessInfo.processInfo.environment["TAMAGO_DEBUG_LISTEN"] == "1" { await listening.start() }
                 }
             } else if ProcessInfo.processInfo.environment["TAMAGO_DEBUG_LISTEN"] == "1" {
-                // Same switch as the Settings page's Mode picker (D-130).
-                Task { await listening.start() }
+                // Same switch as the Settings page's Mode picker (D-130); TAMAGO_DEBUG_LISTEN_STOP_AFTER=<s>
+                // then flips it back, as the owner's "Stop listening" would.
+                Task {
+                    await listening.start()
+                    if let s = ProcessInfo.processInfo.environment["TAMAGO_DEBUG_LISTEN_STOP_AFTER"].flatMap(Double.init) {
+                        try? await Task.sleep(for: .seconds(s))
+                        listening.stop()
+                    }
+                }
             }
         }
         #endif

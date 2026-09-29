@@ -14,15 +14,17 @@
 // - Finished chunks wait in Application Support/listening/queue and go to the Mac oldest first
 //   (POST /v1/listen/chunk, PROTOCOL_V1 §19). A chunk is deleted from the Watch only after the Mac says it stored
 //   it. Offline, they wait (up to QUEUE_CAP_BYTES, about 3 days of audio) and retry with backoff.
-// - Keeps recording with the screen off because the app is genuinely recording: WKBackgroundModes `audio`, the
-//   purpose that mode exists for (AGENTS.md §2 forbids only *fake* background work). watchOS shows its microphone
-//   indicator the whole time.
-// - Interruptions (a call, Siri) close the chunk; recording resumes when the interruption ends. If watchOS ends the
-//   app, the wish to listen is remembered, and listening resumes the next time Tamago is opened. watchOS doesn't let
-//   an app start the microphone from the background, so that one step needs the owner.
+// - Keeps recording after the owner leaves the app or lowers the wrist, because the app is genuinely recording:
+//   UIBackgroundModes `audio` (watchOS takes this key; WKBackgroundModes has no audio value). That is the purpose
+//   the mode exists for; AGENTS.md §2 forbids only *fake* background work. watchOS shows its microphone indicator.
+// - Apple (Frameworks Engineer, developer.apple.com/forums/thread/750432): "Recording cannot be resumed when the
+//   app is in the background on watchOS. It must be a user-initiated event while the app is in the foreground.
+//   (Recording can then continue once the app moves to the background.)" So after an interruption (a call, Siri)
+//   or a restart by watchOS, the chunk is closed and a notification asks the owner to tap; opening Tamago resumes.
 
 import AVFAudio
 import Foundation
+import UserNotifications
 import Observation
 import OSLog
 import TamagoShared
@@ -126,6 +128,9 @@ final class ListeningMode {
         default:
             break
         }
+        // For the one thing that needs the owner: "tap to keep listening" after a call or Siri (header).
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.resumeNote])
         if defaults.string(forKey: Keys.session) == nil {
             defaults.set(UUID().uuidString.lowercased(), forKey: Keys.session)
             defaults.set(0, forKey: Keys.nextSeq)
@@ -168,13 +173,27 @@ final class ListeningMode {
 
     /// Tamago came to the front: pick listening back up if watchOS had ended the app, and send anything waiting.
     func appBecameActive() {
-        if isOn, phase != .listening, phase != .interrupted {
+        if isOn, phase != .listening {
             Task { await start() }
         }
         pump()
     }
 
     // MARK: Recording
+
+    #if DEBUG
+    /// `SIMCTL_CHILD_TAMAGO_DEBUG_LISTEN_FILE=/path/speech.m4a`: simulator runs use this file as every chunk.
+    private static var debugFile: URL? {
+        ProcessInfo.processInfo.environment["TAMAGO_DEBUG_LISTEN_FILE"].map { URL(fileURLWithPath: $0) }
+    }
+    @ObservationIgnored private var debugChunk: URL?
+
+    private func debugClose(_ url: URL) {
+        try? FileManager.default.moveItem(at: url, to: Self.queueDir.appendingPathComponent(url.lastPathComponent))
+        refreshWaiting()
+        pump()
+    }
+    #endif
 
     private func activateSession() async -> Bool {
         await Task.detached(priority: .userInitiated) { () -> Bool in
@@ -204,6 +223,18 @@ final class ListeningMode {
         let startedAt = Date.now
         let name = "\(session)_\(seq)_\(Int64(startedAt.timeIntervalSince1970 * 1000)).m4a"
         let url = Self.recordingDir.appendingPathComponent(name)
+        #if DEBUG
+        if let file = Self.debugFile {
+            // Simulator hook: the Mac mini has no microphone, so each "chunk" is a copy of this file.
+            if let old = debugChunk { debugClose(old) }
+            guard (try? FileManager.default.copyItem(at: file, to: url)) != nil else { return false }
+            debugChunk = url
+            chunkStartedAt = startedAt
+            chunkSeq = seq
+            defaults.set(seq + 1, forKey: Keys.nextSeq)
+            return true
+        }
+        #endif
         guard let next = try? AVAudioRecorder(url: url, settings: Self.settings) else { return false }
         next.isMeteringEnabled = true
         guard next.record() else {
@@ -221,6 +252,9 @@ final class ListeningMode {
 
     /// Ends the current chunk without starting another.
     private func finishChunk() {
+        #if DEBUG
+        if let chunk = debugChunk { debugChunk = nil; chunkStartedAt = nil; debugClose(chunk); return }
+        #endif
         guard let current = recorder else { return }
         recorder = nil
         chunkStartedAt = nil
@@ -252,6 +286,12 @@ final class ListeningMode {
 
     private func tick() {
         guard phase == .listening else { return }
+        #if DEBUG
+        if debugChunk != nil, let startedAt = chunkStartedAt {
+            if Date.now.timeIntervalSince(startedAt) >= Self.minChunk { beginChunk() }
+            return
+        }
+        #endif
         guard let r = recorder, r.isRecording, let startedAt = chunkStartedAt else {
             // The system stopped the recorder without telling us (route change, a crash in media services).
             finishChunk()
@@ -281,8 +321,19 @@ final class ListeningMode {
         }
     }
 
+    private static let resumeNote = "listening.resume"
+
+    private var inForeground: Bool { WKApplication.shared().applicationState == .active }
+
     private func restartSoon(_ why: String) {
         guard isOn else { return }
+        // watchOS won't start the microphone from the background (header): ask the owner, resume on open.
+        guard inForeground else {
+            finishChunk()
+            phase = .interrupted
+            askToResume()
+            return
+        }
         Self.log.info("restarting: \(why, privacy: .public)")
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
@@ -297,6 +348,16 @@ final class ListeningMode {
                 self.restartSoon("retry")
             }
         }
+    }
+
+    private func askToResume() {
+        let content = UNMutableNotificationContent()
+        content.title = "Tamago stopped listening"
+        content.body = "Something else took the microphone. Tap to keep listening."
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: Self.resumeNote, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+        Self.log.info("asked the owner to resume")
     }
 
     // MARK: Sending to the Mac

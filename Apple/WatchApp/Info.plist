@@ -9,7 +9,7 @@
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Tamago listens while you hold it, or all the time in listening mode, and sends what you say to your Mac.</string>
-	<key>WKBackgroundModes</key>
+	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
 	</array>

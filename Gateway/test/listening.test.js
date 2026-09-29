@@ -42,6 +42,10 @@ test('the model only replaces the text when it still carries the words', () => {
   assert.equal(acceptPolished(before, "Here is the cleaned transcript: So I was thinking we could go to the store tomorrow and grab some milk."), null);
   assert.equal(acceptPolished(before, `${before} and also I think you should buy eggs, bread, cheese and butter too`), null, 'additions are refused');
   assert.equal(acceptPolished(before, ''), null);
+  // Real Gemma output, 2026-09-29: right length, but "eggs, milk" gone.
+  const list = 'Okay, so I was thinking about the grocery list for the week, we need eggs, milk, and that bread from the bakery on Queen Street, and I think we should also called the plumber';
+  assert.equal(acceptPolished(list, 'Okay, so I was thinking about the grocery list for the week. We need that bread from the bakery on Queen. Also, I think we should call the plumber.'), null, 'lost words are refused');
+  assert.ok(acceptPolished(list, 'I was thinking about the grocery list for the week. We need eggs, milk, and that bread from the bakery on Queen Street. I think we should also call the plumber.'), 'grammar fixes pass');
 });
 
 test('listening: chunks are kept, transcribed in order, cleaned, and joined into transcript.md', async () => {

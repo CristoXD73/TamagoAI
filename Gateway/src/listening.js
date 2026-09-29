@@ -103,8 +103,19 @@ export function acceptPolished(before, after) {
   const a = words(before), b = words(out);
   if (a === 0) return null;
   if (b < Math.max(1, Math.floor(a * 0.55)) || b > Math.ceil(a * 1.1) + 1) return null;
+  // Every meaningful word must survive. Gemma once dropped "eggs, milk" from a grocery list while the word count
+  // still looked fine (2026-09-29). Compared on the first 4 letters, so "called" → "call" is still a match.
+  const kept = new Set(keys(out));
+  const lost = keys(before).filter((k) => !kept.has(k));
+  if (lost.length > Math.floor(keys(before).length * 0.03)) return null;
   return out;
 }
+
+/** Words that may go in clean-up: fillers and hedges. Everything else of 3+ letters is content. */
+const DROPPABLE = new Set(['like', 'know', 'mean', 'okay', 'well', 'actually', 'just', 'really', 'kind', 'sort',
+  'basically', 'literally', 'yeah', 'right', 'anyway', 'guess', 'stuff', 'thing', 'things', 'the', 'and', 'but', 'you']);
+const keys = (t) => (String(t).toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [])
+  .filter((w) => w.length >= 3 && !DROPPABLE.has(w)).map((w) => w.replace(/'.*$/, '').slice(0, 4));
 
 // ── Sessions ────────────────────────────────────────────────────────────────────────────────────────────────────
 
