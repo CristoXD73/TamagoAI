@@ -8,6 +8,10 @@
 // track, so it never interrupts the owner's music). Transparent, so the octopus
 // floats on the chat's gradient instead of sitting in a black box (the H.264
 // version on black did, 2026-09-28). Stills on Reduce Motion.
+//
+// The colour in IdleLoop.mov is premultiplied by alpha, which is what Core
+// Animation expects; straight colour gave white, speckled edges (owner,
+// 2026-09-28). Re-encode only with scripts/encode-phone-idle.sh.
 
 import AVFoundation
 import SwiftUI

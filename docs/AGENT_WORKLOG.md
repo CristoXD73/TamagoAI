@@ -1429,3 +1429,30 @@ against the live gateway. Found and fixed three issues (D-127 addendum).
 - From the Watch by voice.
 - R3 (inbox/push) and R4 (credit handoff chain) are not built.
 **Signed-by:** Claude Code
+
+### 2026-09-28T23:09:00-04:00: Claude Code — iPhone octopus edges fixed (premultiplied HEVC alpha)
+
+**Agent:** Claude Code (local, owner's Mac, Opus 5.5)
+**Branch:** `claude/great-volta-ogpuw8`
+**Files changed:** `Apple/iPhoneApp/IdleLoop.mov` (re-encoded, 3.0 MB), `Apple/iPhoneApp/IdleLoopPlayer.swift` (comment only),
+new `scripts/encode-phone-idle.sh`.
+**Cause:**
+- The video's colour was stored straight, but Core Animation composites HEVC-alpha as premultiplied.
+- Every half-transparent edge pixel came out too bright.
+- The master's faint alpha noise showed as white specks, and the gaps between tentacles filled white.
+- ffmpeg's own decode looks fine, which is why the earlier check missed it.
+
+**Fix:**
+- Drop alpha below 10/255.
+- Premultiply, then scale.
+- HEVC-alpha at alpha quality 0.8, 1 Mb/s.
+
+**Tests actually performed (by me):**
+- Decoded through Apple's AVAssetReader (BGRA): edges clean, no fringe, no fill. Pixels with colour above alpha fell
+  from 23,454 to 5,876, all encoder rounding at edges.
+- TamagoPhone simulator build: 0 errors.
+- Launched on the iPhone 18 Pro simulator: the edges are clean on the chat gradient (screenshot compared with the
+  owner's).
+
+**Things NOT verified:** on the owner's iPhone (needs a TestFlight build).
+**Signed-by:** Claude Code
