@@ -21,6 +21,7 @@ import { currentSession, recentTurns, appendTurn, forgetTurns } from './session.
 import { runMaintenance } from './maintenance.js';
 import { buildContext } from './context-builder.js';
 import { composeSpeech } from './speech/composer.js';
+import { splitSentences, cutWords } from './speech/text.js';
 import { makeIntent, toV1Result } from './response-schema.js';
 import { createDeterministicReasoner } from './reasoners/deterministic.js';
 import { ProviderError } from '../providers/provider.js';
@@ -43,6 +44,8 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
 
   // D-127: the context each recent model turn used, so its long answer (detail()) knows the same things.
   const recentContexts = new Map();
+  // Live test 2026-10-01 (K6/N9): a helper's full answer read back by the hands, delivered by detail() as-is.
+  const storedDetails = new Map();
 
   async function handle(input, { signal, requestId = randomUUID(), client } = {}) {
     const started = now();
@@ -149,6 +152,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       }
     }
 
+    let escOut = null;
     // A question about Tamago itself ("what can you do?") may name the helpers without asking for one.
     const aboutTamago = cls.isQuestion && /\byou(r|rself)?\b/i.test(text);
     // 6a'. Escalation (owner, 2026-10-01: "a way to speak with Claude, Codex or ChatGPT when it cannot deal with the
@@ -158,6 +162,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       try {
         const esc = await hands.handle(text, { ...cls, kind: 'hands' }, { signal });
         if (esc) {
+          escOut = esc;
           route = 'escalated';
           reasonerUsed = 'hands (escalated)';
           intent = makeIntent({ speech: esc.speech, emotion: esc.emotion ?? 'curious', behavior: esc.behavior ?? 'settle',
@@ -180,6 +185,36 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       const composed = composeSpeech(intent.speech, profile);
       intent = { ...intent, speech: composed.speech, text: composed.text ?? undefined };
       step('compose', { changed: composed.changed });
+    }
+
+    // 7a. Helper facts for the screen and the phone (live test 2026-10-01: K6/N9, K7). `screen` is the tools' full
+    // text (status with every task, the run command); `detail` is a helper's whole answer, sent as a long answer.
+    const extra = handsOut ?? escOut;
+    if (extra?.screen && intent.speech !== null) intent = { ...intent, text: plainScreen(extra.screen) };
+    if (extra?.detail) {
+      storedDetails.set(requestId, String(extra.detail));
+      while (storedDetails.size > 8) storedDetails.delete(storedDetails.keys().next().value);
+      intent = { ...intent, needsDetail: true };
+    }
+
+    // 7b. News from the helpers (K2/N1, RELAY_PLAN R3 without push): an ending the owner hasn't heard yet (a
+    // question, a finish, a limit) is told on their next interaction of any kind, by rule. Spoken only within the
+    // Watch's speech limit; a confirmation waiting for "yes" is never displaced (the news waits a turn).
+    const news = hands && !privateText && intent.speech !== null ? (hands.news?.() ?? null) : null;
+    if (news?.length) {
+      const merged = mergeNews(intent, news, profile.communication.maxSpeechChars);
+      if (merged.told.length) {
+        intent = { ...intent, speech: merged.speech, text: merged.text };
+        hands.announce?.(merged.told);
+        // R5: a read-only helper's whole answer told as news goes to the phone like relay_result's (the long-answer
+        // offer). mergeNews only tells such news on a reply that isn't already waiting for a yes or a long answer.
+        if (merged.detail) {
+          storedDetails.set(requestId, merged.detail);
+          while (storedDetails.size > 8) storedDetails.delete(storedDetails.keys().next().value);
+          intent = { ...intent, needsDetail: true };
+        }
+      }
+      step('news', { told: merged.told, waiting: news.length - merged.told.length });
     }
 
     // 8. memory write gate (rules + any model proposals)
@@ -273,8 +308,15 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
 
   /** D-127: the full answer behind a `needsDetail` reply, written by the reasoner (never spoken as-is). */
   async function detail(request, { gist, signal } = {}) {
+    // K6/N9: a helper's own answer is passed on as it is; no model rewrites it.
+    if (storedDetails.has(request.requestId)) {
+      const d = storedDetails.get(request.requestId);
+      storedDetails.delete(request.requestId);
+      return d;
+    }
     const context = recentContexts.get(request.requestId);
     recentContexts.delete(request.requestId);
+    if (typeof reasoner.detail !== 'function') throw new ProviderError('provider_error', 'No long answer for this reply.');
     return reasoner.detail({ question: request.text, gist, context }, { signal });
   }
 
@@ -289,7 +331,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
           const { v1 } = await handle(request.text, { signal, requestId: request.requestId, client: request.client });
           return v1;
         },
-        ...(typeof reasoner.detail === 'function' ? { detail } : {}),
+        ...(typeof reasoner.detail === 'function' || hands ? { detail } : {}),
       };
     },
     lastTrace() {
@@ -302,4 +344,66 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     reasoner,
     close: () => db.close(),
   };
+}
+
+/** Whole lines within `max` characters, with "…" when some were left out (R9: never cut mid-word or mid-path). */
+function cutLines(s, max) {
+  const lines = String(s).split('\n');
+  if (String(s).length <= max) return String(s);
+  const out = [];
+  for (const l of lines) {
+    if ([...out, l].join('\n').length > max - 2) break;
+    out.push(l);
+  }
+  return out.length ? `${out.join('\n')}\n…` : cutWords(lines[0], max);
+}
+
+/**
+ * Screen text from the hands' tools: plain lines, within the reply limit. R9: only markdown emphasis and heading/quote
+ * markers go, and never from a recorded "Run it:" command (tests/*, 2>/dev/null stay as written).
+ */
+export function plainScreen(s, max = 900) {
+  const plain = (x) => x.replace(/\*\*|__|`/g, '').replace(/^\s*(#+|>+)\s*/, '').replace(/[ \t]+/g, ' ').trim();
+  const lines = String(s).split('\n').map((l) => {
+    const at = l.indexOf('Run it: ');
+    return at < 0 ? plain(l) : `${plain(l.slice(0, at))} ${l.slice(at).trim()}`.trim();
+  });
+  return cutLines(lines.join('\n'), max);
+}
+
+/**
+ * K2/N1: news first (it's what the owner didn't know), then the reply. Items are added while they fit the speech
+ * limit. Review 2026-10-01: a reply waiting for "yes" never carries a helper's question (SM8, G10: the owner's yes
+ * would go to the wrong one), and a reply with a long answer for the phone carries no news (R6: the server adds its
+ * own yes/no offer and replaces the turn's text). If nothing fits next to the reply, one item is spoken (its short
+ * form if needed) with the reply's first sentence, never in place of the reply (R7), or the news waits a turn.
+ * @returns {{ speech: string, text: string, told: string[], detail?: string }}
+ */
+export function mergeNews(intent, news, max) {
+  const reply = intent.speech;
+  const screen = intent.text ?? reply;
+  const none = { speech: reply, text: screen, told: [] };
+  if (intent.needsDetail) return none;
+  const pool = intent.followUpExpected ? news.filter((n) => n.kind !== 'question') : news;
+  const told = [];
+  const spoken = [];
+  for (const n of pool) {
+    if (`${[...spoken, n.speech].join(' ')} ${reply}`.length <= max) { told.push(n); spoken.push(n.speech); } else break;
+  }
+  let speech;
+  if (told.length) {
+    speech = `${spoken.join(' ')} ${reply}`;
+  } else {
+    if (intent.followUpExpected || !pool.length) return none;
+    const n = pool[0];
+    const first = splitSentences(reply)[0] ?? reply;
+    const line = [n.speech, n.short].filter(Boolean).find((x) => `${x} ${first}`.length <= max);
+    if (!line) return none;
+    told.push(n);
+    speech = `${line} ${first}`;
+  }
+  const text = cutLines(`${told.map((n) => n.text).join('\n')}\n${screen}`, 1000);
+  // R5: a whole answer for the phone, only when this reply isn't itself waiting for a yes.
+  const detail = intent.followUpExpected ? null : told.find((n) => n.detail)?.detail;
+  return { speech, text, told: told.map((n) => n.id), ...(detail ? { detail } : {}) };
 }

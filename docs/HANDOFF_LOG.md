@@ -1558,3 +1558,19 @@ Found: helpers offered in words but never queued; "empty the trash"/"email my bo
 Unverified: the real relay end to end (Claude in Sandbox); the test set was written by the same agent that fixed the code (see AGENT_EVAL.md caveats)
 Next recommended task (ONE bounded step): owner tries "build me a terminal agario game" → yes → "how's it going?" on the phone; add any bad answer as an eval case
 Signed-by: Claude Opus 5.5 (2026-10-01T05:28:26-04:00)
+
+### 2026-10-01T06:42:13-04:00: Claude Opus 5.5 workflow implementer: faithful relay between the owner and the helpers (live-test fixes)
+Branch: claude/great-volta-ogpuw8 (starting commit c6de441; not committed, per the workflow)
+Commit(s): none (the owner commits)
+Files changed: Gateway/src/relay/relay.js, Gateway/src/hands/agent.js, Gateway/src/hands/tools.js, Gateway/src/brain/orchestrator.js, Gateway/src/brain/index.js, Gateway/src/brain/routing/intent-router.js, Gateway/src/brain/speech/composer.js, Gateway/src/brain/speech/text.js (new), Gateway/test/relay-fidelity.test.js (new, 31 tests), Gateway/test/relay.test.js (2 expectations updated: past usage windows dropped, commit message = task + summary), docs/relay/LIVE_TEST_2026-10-01.md ("Fixed" table), docs/TAMAGO_HANDS.md §7, docs/RELAY_PLAN.md §11 + status line
+Upstream source reused: None
+What: truthful start (5 s early-ending wait, reset time, offer the other helper); volunteered news on the next interaction (announced flag, deterministic); relay_handoff with the original request + baton on the same branch; answer contract and full answers (≤ 2000 stored, phone ≤ 1500 per Protocol V1 §18); relay_result → spoken gist + long answer on the phone without a model; rule routing for status/result/handoff/stop; safety net only for requests with a real offer, never ChatGPT for build work; Claude-out → Codex with the reason; plausible-answer rules for waiting questions (F1–F5, F10); relay_stop by agent; hygiene (interrupted on restart, base branch, WIP commits, empty worktree removal, Codex not told to commit, resume keeps sandbox, one normalizeAgent, limited only at a limited end); RUN line recorded and shown on screen, never executed; composer keeps "Say yes to go.", safe sentence splitting, numbers and underscores kept; usage report leads with "out until <day time>".
+Tests run (exact commands): cd Gateway && npm test
+Passed: 213 pass, 0 fail, 1 skipped (was 182 pass, 1 skipped; +31 tests in test/relay-fidelity.test.js). Also a local smoke script replaying the live transcript with fake agents (scratchpad only, not committed).
+Failed: none
+Physical-device evidence (+ label): none. UNIT_TESTED_ONLY. The live gateway, Gemma, Claude Code and Codex were not run or contacted.
+Unverified: codex-cli accepting "exec --json -s <sandbox> --skip-git-repo-check resume <id> <msg>" (F18); the model following the new prompt lines (N3, relay_handoff/relay_result routing when the rules don't catch the wording); the 5 s wait's effect on the Watch "yes" reply time; scripts/agent-eval.js still uses its old fake relay (no handoff/news methods; the code treats them as optional)
+Known risks: news is spoken only when the owner talks to Tamago (no push / inbox: R3 APNs and Protocol V1 §17 not built); handoff after a limit is offered, not automatic (R4)
+Next recommended task (ONE bounded step): restart the live gateway and replay the live-test script (build request → yes → limit → "give it to Codex" → answer the question → "What did Codex build?") on the phone; record the results in docs/relay/LIVE_TEST_2026-10-01.md
+Do not redo: the findings audit (docs/relay/LIVE_TEST_2026-10-01.md); the sentence splitter; the baton format
+Signed-by: Claude Opus 5.5 workflow implementer (2026-10-01T06:42:13-04:00)

@@ -1,6 +1,7 @@
 # Relay plan: talk to Tamago, and it runs Claude, Codex or ChatGPT on your projects
 
-**Status:** PLAN (2026-09-27, Claude Code on the owner's Mac). Nothing here is built yet. The owner answered
+**Status:** R0 and R2 built. Parts of R3 and R4 were built without push on 2026-10-01; see §11. The rest of this
+plan is still the plan. The owner answered
 section 9 on 2026-09-27. Phases R0–R6 run in order, and every phase ends
 with tests and a worklog entry.
 
@@ -266,3 +267,59 @@ Through the real gateway (`/v1/request`, as the phone sends it), Gemma 4 12B, re
 - **The owner's answer went to plain conversation**, which claimed to have passed it on: the answer is now passed on
   by rule.
 - A 30-minute answer window was too short: now 12 h.
+
+## 11. Fidelity fixes after the live test (2026-10-01, UNIT_TESTED_ONLY)
+
+The live test ([relay/LIVE_TEST_2026-10-01.md](relay/LIVE_TEST_2026-10-01.md)) showed the plumbing worked but the
+information reaching the owner didn't. These fixes are in `Gateway/src/relay/relay.js`, `src/hands/{agent,tools}.js`
+and `src/brain/orchestrator.js`. The per-finding table is in that report. Hands-side details:
+[TAMAGO_HANDS.md](TAMAGO_HANDS.md) §7.
+
+**What the relay now records per task:**
+- `state`: running, question, done, **unclear**, failed, limited, stopped, **interrupted**. Tasks also get
+  `handedTo` / `handoffFrom`.
+- What the agent said: `result` (clean gist), `answer` (full final message, up to 2,000 characters), `run` (the
+  `RUN:` line, never executed).
+- Where the work is: `base` / `baseSha`, `commits`, `committed` / `uncommitted` / `removed`.
+- `resetsAt` / `resetText` when it hit a limit.
+- `announced`: whether Tamago has told the owner about the ending yet; `heardAt` for a waiting question (when the
+  owner last heard it); `owner`, the pid of the process running it.
+
+**R3 parts covered without push:**
+- `ASK_OWNER` is read anywhere in the final message, markdown-tolerant. The answer resumes the same session with the
+  question attached.
+- The owner hears waiting questions, and every other ending, on their **next interaction** with Tamago. This is the
+  news mechanism, a deterministic rule. Status lists waiting questions first, at any age.
+- Answers are matched to the right helper (named, option match, or "For Claude or Codex?").
+- **Not built:**
+  - `GET /v1/inbox` (Protocol V1 §17 is a wire change, so the Watch would need it too);
+  - APNs push and the Watch entitlement;
+  - trimming questions with the local model (long questions are cut at a word; the options go on screen).
+
+  Without these, Tamago can't reach the owner until the owner talks to it.
+
+**R4 parts covered:**
+- **Failure sorting:** done / question / limited (with reset time) / failed / unclear / interrupted.
+- **A deterministic baton:** the owner's words verbatim, who had the task and why it stopped, the commits so far
+  (uncommitted work committed as WIP first), the open question, and "check before trusting".
+- **Handoff:** `relay_handoff`, on the same branch and worktree, after a spoken yes.
+- **Claude out → Codex:** new coding work goes to Codex while Claude reports `rejected` or 100 % or more with a reset
+  ahead.
+- **Not built:** automatic transfer without a yes (owner decision 2), the whole chain down to ChatGPT, the supervision
+  watchdog, and resuming when credits return.
+
+**Hygiene:**
+- Worktrees branch from the project's base: `main` when it exists, else HEAD, or `base` in `projects.json`. They
+  start from main and never commit on it (§4).
+- Every ending commits leftovers on the task branch.
+- Empty worktrees and branches of failed runs are removed. That's the only branch deletion the relay does, and only
+  for branches it made itself with zero commits counted from a known base (old tasks without `baseSha` use the
+  merge-base with the project's base branch, or are never removed), with nothing just committed and a clean
+  worktree after the commit attempt (review SM1, SM2, G3).
+- Tasks still `running` when the **gateway** starts become `interrupted`, unless their owning process is still
+  alive. The CLI and evals never do this (review SM7).
+- A handoff stops the old helper and waits for it to exit (SIGKILL after 5 s) before committing its leftovers and
+  starting the next one in the same worktree (review SM6).
+- Codex is told not to commit; the relay does it, and the commit message is the task text plus the cleaned summary.
+- A Codex resume keeps its sandbox flag. **UNVERIFIED** against the real CLI; check it on the first real resume.
+

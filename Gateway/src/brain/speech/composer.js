@@ -2,6 +2,7 @@
 // draft; this enforces the Watch's constraints no matter which model ran.
 
 import { TAMAGO_PROFILE } from '../personality/profile.js';
+import { splitSentences, cutWords } from './text.js';
 
 const ASSISTANTISMS = [
   /\bas an ai\b[^.!?]*[.!?]?/gi,
@@ -15,24 +16,57 @@ const ASSISTANTISMS = [
 
 const EMOJI = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu;
 
-function sentences(s) {
-  return s.match(/[^.!?]+[.!?]*/g)?.map((x) => x.trim()).filter(Boolean) ?? [];
-}
+// Live test 2026-10-01 (K8): "Agar.io" was spoken as "Agar. io". Sentences now split only at . ! ? + space.
+const sentences = splitSentences;
+
+// K1: the hands' confirmation ends with this; it is never cut, whatever the request in front of it.
+const CONFIRM_TAIL = /\s*Say yes to go\.?\s*$/i;
+const CONFIRM = 'Say yes to go.';
 
 /**
  * @returns {{speech: string|null, text: string|null, changed: string[]}}
  */
 export function composeSpeech(raw, profile = TAMAGO_PROFILE) {
+  if (raw === null || raw === undefined) return { speech: null, text: null, changed: [] };
+  if (CONFIRM_TAIL.test(String(raw))) {
+    const c = profile.communication;
+    const body = compose(String(raw).replace(CONFIRM_TAIL, ''), {
+      ...profile, communication: { ...c, maxSpeechChars: c.maxSpeechChars - CONFIRM.length - 1, maxTextChars: c.maxTextChars - CONFIRM.length - 1 },
+    }, { keepLast: true });
+    return { speech: body.speech ? `${body.speech} ${CONFIRM}` : CONFIRM, text: body.text ? `${body.text} ${CONFIRM}` : CONFIRM, changed: body.changed };
+  }
+  return compose(raw, profile);
+}
+
+/**
+ * R3 (review 2026-10-01): in front of "Say yes to go." the LAST sentence is what "yes" does ("Give it to Codex?",
+ * "Codex, Sandbox: …"). It is always kept (cut at a word if it alone is too long); earlier sentences fill what is
+ * left, in order, and are dropped rather than pushing it out.
+ */
+function keepingLast(all, max) {
+  const last = all.at(-1) ?? '';
+  if (last.length >= max) return cutWords(last, max);
+  const lead = [];
+  for (const sen of all.slice(0, -1)) {
+    if ([...lead, sen, last].join(' ').length > max) break;
+    lead.push(sen);
+  }
+  return [...lead, last].join(' ');
+}
+
+function compose(raw, profile, { keepLast = false } = {}) {
   const changed = [];
-  if (raw === null || raw === undefined) return { speech: null, text: null, changed };
   let s = String(raw);
   const before = s;
   s = s.replace(/```[\s\S]*?```/g, ' ')              // code blocks never get spoken
     .replace(/`([^`]*)`/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')        // markdown links -> label
     .replace(/https?:\/\/\S+/g, 'a link')
-    .replace(/[*_#>]+/g, ' ')
-    .replace(/^\s*[-•\d]+[.)]?\s+/gm, '')
+    .replace(/[*#>]+/g, ' ')
+    .replace(/(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu, ' ')   // _emphasis_, but snake_case stays on screen (F23)
+    .replace(/^\s*[-•]\s+/gm, '')
+    // F23: a one-line reply keeps its leading number ("3 apps are open."); only in multi-line text is "1. " a list marker.
+    .replace(/^\s*\d+[.)]\s+/gm, (m) => (/\n/.test(before.trim()) ? '' : m))
     .replace(EMOJI, '');
   for (const re of ASSISTANTISMS) s = s.replace(re, ' ');
   s = s.replace(/\s+/g, ' ').trim();
@@ -50,9 +84,16 @@ export function composeSpeech(raw, profile = TAMAGO_PROFILE) {
   s = capped;
 
   const text = truncate(s, profile.communication.maxTextChars);
-  let speech = sentences(s).slice(0, 2).join(' ');
+  // Spoken only: "say_hello" is read as "say hello"; the screen keeps the underscore (F23).
+  const spoken = s.replace(/(?<=[\p{L}\p{N}])_(?=[\p{L}\p{N}])/gu, ' ');
+  if (keepLast) {
+    const speech = keepingLast(sentences(spoken), profile.communication.maxSpeechChars);
+    if (speech !== sentences(spoken).join(' ')) changed.push('shortened');
+    return speech ? { speech, text: text || speech, changed } : { speech: null, text: null, changed: [...changed, 'emptied'] };
+  }
+  let speech = sentences(spoken).slice(0, 2).join(' ');
   if (speech.length > profile.communication.maxSpeechChars) {
-    speech = sentences(s)[0] ?? speech;
+    speech = sentences(spoken)[0] ?? speech;
     changed.push('shortened');
   }
   speech = truncate(speech, profile.communication.maxSpeechChars);

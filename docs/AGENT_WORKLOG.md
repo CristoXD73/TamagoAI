@@ -1486,3 +1486,24 @@ new `scripts/encode-phone-idle.sh`.
 - The live gateway still runs the old code. Restart it after gaming.
 
 **Signed-by:** Claude Code
+
+### 2026-10-01T06:42:13-04:00: Claude Opus 5.5 workflow implementer — relay fidelity fixes (live test 2026-10-01)
+
+**Agent:** Claude Opus 5.5 workflow implementer
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `c6de441`
+**Ending commit SHA:** none (left uncommitted for the owner)
+**Files changed:** Gateway/src/relay/relay.js, Gateway/src/hands/{agent,tools}.js, Gateway/src/brain/{orchestrator,index}.js, Gateway/src/brain/routing/intent-router.js, Gateway/src/brain/speech/{composer,text}.js, Gateway/test/relay-fidelity.test.js (new), Gateway/test/relay.test.js, docs/relay/LIVE_TEST_2026-10-01.md, docs/TAMAGO_HANDS.md, docs/RELAY_PLAN.md, docs/HANDOFF_LOG.md
+**Verification:** `cd Gateway && npm test` → 213 pass, 0 fail, 1 skipped. UNIT_TESTED_ONLY; no live gateway, claude or codex run.
+**Signed-by:** Claude Opus 5.5 workflow implementer
+
+### 2026-10-01T09:19:23-04:00: Claude Opus 5.5 workflow implementer — review of the relay fidelity fixes (SM1–SM9, R1–R11, G1–G10)
+
+**Agent:** Claude Opus 5.5 workflow implementer
+**Branch:** `claude/great-volta-ogpuw8`
+**Starting commit SHA:** `c6de441` (with the uncommitted fixes above)
+**Ending commit SHA:** none (left uncommitted for the owner)
+**Files changed:** Gateway/src/relay/relay.js, Gateway/src/hands/{agent,tools}.js, Gateway/src/brain/{orchestrator,index}.js, Gateway/src/config.js, Gateway/src/brain/routing/intent-router.js, Gateway/src/brain/speech/composer.js, Gateway/test/relay-fidelity.test.js, Gateway/test/brain-gateway.test.js, docs/relay/LIVE_TEST_2026-10-01.md, docs/TAMAGO_HANDS.md, docs/RELAY_PLAN.md
+**What:** all 30 review findings were real and fixed, one test each (table in the live-test report). Notable: tidy() no longer deletes old-format branches or uncommitted work; restart recovery only from the gateway; handoffs wait for the old helper and hand over the confirmed task; stop/handoff and Mac commands never become a helper's answer; helper output is never model data. `brain-gateway.test.js` no longer builds a relay in ~/Library/Application Support/TamagoAI.
+**Verification:** `cd Gateway && npm test` → 238 pass, 0 fail, 1 skipped. UNIT_TESTED_ONLY; no live gateway, claude or codex run.
+**Signed-by:** Claude Opus 5.5 workflow implementer

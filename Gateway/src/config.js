@@ -46,7 +46,7 @@ export function loadConfig(env = process.env, { loadIdentity = () => loadOrCreat
       model: env.OLLAMA_MODEL,
     });
   } else if (providerName === 'brain') {
-    provider = createBrainProvider(brainOptionsFromEnv(env));
+    provider = createBrainProvider(brainOptionsFromEnv(env, { recover: true }));   // the gateway: F14 recovery (SM7)
   } else {
     throw new Error(`Unknown TAMAGO_PROVIDER "${providerName}" (expected mock, ollama or brain).`);
   }

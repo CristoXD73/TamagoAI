@@ -14,7 +14,12 @@ import { join } from 'node:path';
 // D-125: Gemma 4 12B (scripts/tamago-up.sh picks Qwen 3.5 9B while Xcode runs). llama3.2:3b was removed from the Mac.
 export const DEFAULT_MODELS = Object.freeze({ fast: 'gemma4:12b-it-qat', smart: 'gemma4:12b-it-qat' });
 
-export function brainOptionsFromEnv(env = process.env) {
+/**
+ * @param {object} [o]
+ * @param {boolean} [o.recover] true only for the gateway itself: its relay marks tasks left 'running' by a dead
+ *   gateway as interrupted (F14). The CLI and evals never do (review SM7: they shared the live state dir).
+ */
+export function brainOptionsFromEnv(env = process.env, { recover = false } = {}) {
   const kind = env.TAMAGO_REASONER ?? (env.TAMAGO_FAST_MODEL ?? env.OLLAMA_MODEL ? 'ollama' : 'deterministic');
   const fastModel = env.TAMAGO_FAST_MODEL ?? env.OLLAMA_MODEL ?? DEFAULT_MODELS.fast;
   let reasoner;
@@ -34,7 +39,7 @@ export function brainOptionsFromEnv(env = process.env) {
   let hands = null;
   if (kind === 'ollama' && env.TAMAGO_HANDS !== 'off') {
     const relay = env.TAMAGO_RELAY === 'off' ? null
-      : createRelay({ stateDir: defaultStateDir(env), relayDir: env.TAMAGO_RELAY_DIR ?? '/Volumes/Storage/AI/relay' });
+      : createRelay({ stateDir: defaultStateDir(env), relayDir: env.TAMAGO_RELAY_DIR ?? '/Volumes/Storage/AI/relay', recover });
     hands = createHands({ model: fastModel, baseUrl: env.OLLAMA_URL ?? 'http://127.0.0.1:11434', relay,
       tools: createTools({ relay }), auditLog: join(defaultStateDir(env), 'logs', 'hands.log') });
   }
@@ -56,7 +61,8 @@ export function createBrainProvider(options) {
       return brain.asProvider().generate(request, opts);
     },
     // D-127: only a reasoner that can write (Ollama) offers long answers; the deterministic one never flags them.
-    ...(typeof options.reasoner.detail === 'function'
+    // Live test 2026-10-01 (K6): the hands' relay_result hands over a helper's full answer the same way.
+    ...(typeof options.reasoner.detail === 'function' || options.hands
       ? { detail: async (request, opts) => (await brainP).detail(request, opts) }
       : {}),
     close: () => brainP.then((b) => b.close()),

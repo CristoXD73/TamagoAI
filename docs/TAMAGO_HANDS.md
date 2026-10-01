@@ -120,3 +120,99 @@ Filled in as it's verified, with labels from AGENTS.md.
     fact first.
 - **Known:** `system_status`'s "biggest memory users" reads resident memory, which undercounts compressed apps; the
   total used is right.
+
+## 7. Helpers: what passes between the owner and Claude/Codex/ChatGPT (2026-10-01)
+
+These changes followed the relay live test ([relay/LIVE_TEST_2026-10-01.md](relay/LIVE_TEST_2026-10-01.md),
+findings K1–K8, N1–N10, F1–F23). Label: **UNIT_TESTED_ONLY** (`test/relay-fidelity.test.js`).
+
+**Rule first, model second.** When the words are clear, the hands handle helper talk without the model, and the
+reply is the relay tools' own words:
+
+| The owner says | Handled by | Tamago |
+|---|---|---|
+| a reply while a helper waits ("Build here", "Do it with curses", "tell Codex use curses") | rule → `relay.answer` | "Told Codex: Build here." It's forwarded only if it's plausibly the answer (§7.1). |
+| "How are the helpers doing?", "Is Claude done?", "Did Codex build the game yet?" | rule → `relay_status` | every waiting or running task with its age, then recent finished ones |
+| "What did ChatGPT say about…?", "What did Codex build?" | rule → `relay_result` | gist spoken; the helper's full answer lands on the phone (long answer, no model) |
+| "Give it to Codex instead" | rule → `relay_handoff` (confirm) | "Give Claude's task "…" to Codex? Say yes to go." |
+| "Stop Claude" | rule → `relay_stop {agent}` (confirm) | "Stop Claude's task "…"? Say yes to go." |
+| new work ("build me…", "ask ChatGPT why…") | model → `relay_start` (confirm) | "Claude, Sandbox: … Say yes to go." (the owner's words, one clause) |
+
+**Tools added or changed:** `relay_result {agent?}`, `relay_handoff {agent}`, `relay_status {agent?, include_older?}`,
+`relay_stop {agent?}`, `relay_answer {answer, agent?}`. Parameters marked `optional` aren't `required` in the Ollama
+schema. Tool results can carry `screen` (fuller text for the screen and phone, never spoken) and `detail` (a long
+answer, delivered through the existing D-127 path: the orchestrator stores it, and `detail()` returns it).
+
+**Truthful start (K2).** After "yes", `relay_start` waits up to 5 s for an early ending, so the "yes" reply can take
+up to 5 s longer. If the run is already limited or failed, Tamago says so, with the reason and reset time, and offers
+the other coding helper. The next "yes" hands the task over.
+
+**News (K2/N1, R3 without push).** Each ending is stored unannounced. On the owner's next interaction of any kind,
+the orchestrator tells it first: "Codex has a question: …", "Codex finished: …", "Claude ran out of usage on … until
+Fri 12:00 PM.". It's spoken only while it fits the 140-character speech limit, and the fuller text goes on screen.
+A confirmation waiting for "yes" is never pushed aside; the news waits a turn. Status and result mark what they
+reported as told. After the review of these fixes (same day, ids SM/R/G in the live-test report):
+- a reply waiting for "yes" never carries a helper's **question** (the owner's yes would go to the wrong one; SM8,
+  G10), and a reply that has a long answer for the phone carries no news (R6);
+- news never replaces the reply: when the whole line doesn't fit, a short form naming the task is spoken with the
+  reply's first sentence, or the news waits a turn (R7);
+- a question is spoken as the question, cut at a word, with the options on screen (R8);
+- a ChatGPT answer told as news goes to the phone as a long answer, like "what did ChatGPT say?" (R5).
+
+### 7.1 Answers to a waiting helper (F1–F5, F10)
+
+- **Never forwarded:**
+  - forbidden, forget, off-the-record, private, thanks and greeting utterances;
+  - stop and handoff phrasings ("Stop Codex", "Cancel the task", "Give it to Claude instead"): the stop/handoff
+    rule handles them, unless the reply is exactly one of the options (SM3, R2, G1);
+  - Mac commands of any wording ("open Safari", "Volume 30", "Game mode on"), unless they name the waiting helper;
+  - new work: "tell Claude to make a snake game", "build me…", "a new app…" (G2);
+  - status or result questions;
+  - questions: ending in "?" or opening with a wh-word, is/are/can/could/did/does, "do you", "will you" (G2).
+- **Forwarded:**
+  - statements and affirmations, including "Do it with curses", "Have it start small" and build words about the
+    work at hand ("Build the game here");
+  - option matches, as whole words; a short option ("Yes", "No", "Go") only at the start of the reply (SM4);
+  - addressed replies ("Codex: …", "tell Codex …").
+- **A question the owner hasn't heard yet** takes only an option or an addressed reply. Anything else is
+  conversation, and the question is told as news on that same turn.
+- **A heard question takes unaddressed replies for 12 h after the owner last heard it** (news or status record
+  `heardAt`). After that only options and addressed replies reach it (G2: a 3-day-old question captured "Volume
+  30"). It stays listed in status, at any age.
+- **Several questions waiting**, even from one helper: the reply goes to the helper it names (if only one of its
+  tasks waits) or whose option it matches. Otherwise Tamago asks "For Claude or Codex?", or by task when one helper
+  has several ("For Claude's "snake game" or Claude's "widget"?"), and holds the reply for 60 s (SM9).
+- **A pending confirmation** is answered only by a short, plain "no". "No, build here" goes to the helper, but only
+  as an option or addressed reply, and a reply naming a helper that isn't waiting never goes to another one (G6).
+
+### 7.2 Routing and guardrails (K5, F7, F19, F22, N2, N3)
+
+- **"helpers" routes to the hands.**
+- **The safety net** (the model only *offered* a helper) proposes a task only when:
+  - the owner's words open like a request ("build…", "can you…", "tell Claude to…", "I want…"), not a plain
+    statement (G9);
+  - they aren't about work already done or a wish to see it ("Give me the game Codex made", "I want to see the
+    game"; G9);
+  - the model's reply contains a real offer phrase.
+- **Build work never goes to ChatGPT**, but asking ChatGPT *how* to build something stays a read-only ChatGPT
+  question (G5).
+- **Helper output is never data for the model** (G7): `relay_status` gives it Tamago's own words and task ids only,
+  and any action tool the model calls after a relay read in the same turn waits for a yes.
+- **When Claude's own report says it's out** (`rejected`, or 100 % or more with a future reset), new coding work goes
+  to Codex and Tamago says why. The prompt also says never to call `helpers_usage` before giving work.
+- **Building software doesn't trip the send/pay/install guardrails** when the send/pay/install is inside what is
+  built ("a script that sends an email", "an email feature"). In a clause of its own ("…and email my boss", "Email
+  my boss that I will fix the bug") it stays forbidden (G4).
+- **Handoffs carry the confirmed task's id** (SM5): "yes" hands over the task the confirmation named, or says it
+  ended meanwhile. "Give it to X" picks a task that ended unfinished before a running one, never X's own.
+
+### 7.3 Speech (K1, K8, F23, N8)
+
+- **The composer protects a trailing "Say yes to go."** and the sentence before it, which says what "yes" does;
+  earlier sentences are dropped first (R3).
+- **Sentences split only at . ! ? followed by a space** (`src/brain/speech/text.js`).
+- **A one-line reply keeps its leading number.**
+- **Underscores stay on screen** and are spoken as spaces.
+- **The hands prompt forbids inventing next steps.** After a status or result read, the tool's words are used as
+  they are.
+

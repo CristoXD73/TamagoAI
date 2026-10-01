@@ -33,6 +33,8 @@ const HANDS = new RegExp([
   String.raw`\b(battery|plugged in)\b`,
   // D-129: the helpers ("tell Claude to…", "what's Codex doing?", "how much Claude is left?")
   String.raw`\b(claude|clawed|codex|code x|chat ?gpt)\b`,
+  // Live test 2026-10-01 (K5): "How are the helpers doing?" went to the chat model, which invented a status.
+  String.raw`\bhelpers?\b`,
   // Building or changing software is helper work ("can you build me a game that runs in the terminal").
   BUILD.source,
 ].join('|'));
@@ -45,6 +47,18 @@ export const FORBIDDEN = {
   secret: /\bsudo\b|\badmin password\b|\b(my|the) (keychain|passwords?)\b|\bdisable (the )?(firewall|filevault|sip|gatekeeper)\b/,
   install: /\b(install|uninstall|download)\b.{0,30}\b(app|apps|software|program|photoshop|on my mac|it)\b/,
 };
+// F22 / review G4 (2026-10-01): a send/pay/install only inside the thing being built ("a script that sends an email",
+// "an email feature") is helper work; one that is its own clause ("…and email my boss", "Email my boss that I will
+// fix the bug") stays forbidden.
+const INSIDE_BUILD = /\b(that|which|who|to|can|will|should|would)\s+([\w']+\s+){0,2}$/;
+const NOUN_USE = /^\S+\s+(feature|button|form|template|system|function|notifications?|integration|sender|client|bot|page|screen|field|list)\b/;
+function insideBuild(t, k, build) {
+  for (const m of t.matchAll(new RegExp(FORBIDDEN[k].source, 'g'))) {
+    if (m.index < build.index) return false;
+    if (!INSIDE_BUILD.test(t.slice(build.index, m.index)) && !NOUN_USE.test(t.slice(m.index))) return false;
+  }
+  return true;
+}
 // The clock is known locally: answered exactly by rule, never guessed by a model ("06:08" at 07:08, 2026-09-27).
 const TIME = /^(so |hey |tamago,? )?(what('?s| is) the time|what time (of day )?is it|do you (know|have) the time|what'?s the time)\b/;
 
@@ -68,7 +82,10 @@ export function classify(text) {
   if (GREETING.test(t) && wordCount <= 4) return { ...base, kind: 'greeting' };
   if (FORGET.test(t)) return { ...base, kind: 'forget' };
   const howTo = /\bhow (do|to|can|would|should)\b|\bexplain\b|\bwhat happens\b/.test(t);
-  const forbidden = howTo ? null : Object.keys(FORBIDDEN).find((k) => FORBIDDEN[k].test(t));
+  // F22 (live test 2026-10-01): "build my app's email feature" is helper work, not sending an email. A send/pay/install
+  // inside what is being built doesn't trip its rule (G4: only inside it); delete/secret always apply.
+  const build = BUILD.exec(t);
+  const forbidden = howTo ? null : Object.keys(FORBIDDEN).find((k) => FORBIDDEN[k].test(t) && !(build && ['send', 'pay', 'install'].includes(k) && insideBuild(t, k, build)));
   if (forbidden) return { ...base, kind: 'forbidden', forbidden };
   if (HANDS.test(t) && !/\bgame mode\b.*\?$/.test(t)) return { ...base, kind: 'hands' };
   if (TIME.test(t)) return { ...base, kind: 'time' };

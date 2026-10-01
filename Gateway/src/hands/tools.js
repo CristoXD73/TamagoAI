@@ -9,6 +9,8 @@ import { execFile } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
+import { AGENT_NAMES, ACTIVE, FINISHED, RECENT_MS, normalizeAgent } from '../relay/relay.js';
+import { clause, cutWords, endSentence, splitSentences } from '../brain/speech/text.js';
 
 const HOME = homedir();
 const APP_DIRS = ['/Applications', '/System/Applications', '/System/Applications/Utilities', join(HOME, 'Applications'),
@@ -76,23 +78,123 @@ function int(v, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', chatgpt: 'ChatGPT' };
 const ago = (iso, now) => {
   const m = Math.round((now - Date.parse(iso)) / 60000);
   return m < 2 ? 'just now' : m < 90 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
 };
-const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-/** "Claude: 35% of its five-hour window left (full again at 10:00 AM), 42% of the week. As of 2 h ago." */
-export function describeUsage(name, u, now = Date.now()) {
-  if (!u) return `I haven't seen ${name}'s numbers yet.`;
-  const part = (w, label) => w && Number.isFinite(w.usedPct) ? `${Math.max(0, 100 - w.usedPct)}% of ${label} left${w.resetsAt ? ` (resets ${clock(w.resetsAt)})` : ''}` : null;
-  const bits = [part(u.fiveHour, 'its five-hour window'), part(u.weekly, 'the week')].filter(Boolean);
-  const age = Date.parse(u.asOf) < now - 15 * 60000 ? ` As of ${ago(u.asOf, now)}.` : '';
-  return `${name}: ${bits.join(', ') || 'no figures yet'}.${age}`;
+/** "3:00 PM" today, "Fri 12:00 PM" this week, "Oct 9, 3:00 PM" later (F9: reset times had no day). */
+export function when(iso, now = Date.now()) {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === new Date(now).toDateString()) return time;
+  if (Math.abs(d - now) < 6 * 86400_000) return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${time}`;
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
-export function createTools({ exec = defaultExec, apps = installedApps, folders = FOLDERS, relay = null, now = Date.now } = {}) {
+/**
+ * When an agent's own report says it's out (status 'rejected', or a window at ≥ 100 %) with a reset still ahead:
+ * the ISO time it comes back, else null (N2, F9). A reset in the past means it's back. Only a rejection with no
+ * reset time of its own falls back to the windows still ahead (review R1: a passed five-hour reset made Claude
+ * "out until" the weekly reset, at 60 %, for days).
+ */
+export function outUntil(u, now = Date.now()) {
+  if (!u) return null;
+  const ahead = (w) => w && w.resetsAt && Date.parse(w.resetsAt) > now;
+  const times = [u.fiveHour, u.weekly].filter((w) => ahead(w) && w.usedPct >= 100).map((w) => Date.parse(w.resetsAt));
+  if (/rejected|exceeded/i.test(u.status ?? '')) {
+    if (u.resetsAt && Date.parse(u.resetsAt) > now) times.push(Date.parse(u.resetsAt));
+    else if (!u.resetsAt && !times.length) times.push(...[u.fiveHour, u.weekly].filter(ahead).map((w) => Date.parse(w.resetsAt)));
+  }
+  return times.length ? new Date(Math.max(...times)).toISOString() : null;
+}
+
+/** "Claude: 35% of its five-hour window left (resets 10:00 AM), 42% of the week left. As of 2 h ago." */
+export function describeUsage(name, u, now = Date.now()) {
+  if (!u) return `I haven't seen ${name}'s numbers yet.`;
+  const age = Date.parse(u.asOf) < now - 15 * 60000 ? ` As of ${ago(u.asOf, now)}.` : '';
+  // F9/N3: "rejected" or a full window leads, with the day it comes back.
+  const out = outUntil(u, now);
+  if (out) return `${name} is out until ${when(out, now)}.${age}`;
+  const live = (w) => w && Number.isFinite(w.usedPct) && (!w.resetsAt || Date.parse(w.resetsAt) > now);   // past windows dropped
+  const part = (w, label) => live(w) ? `${Math.max(0, 100 - w.usedPct)}% of ${label} left${w.resetsAt ? ` (resets ${when(w.resetsAt, now)})` : ''}` : null;
+  const bits = [part(u.fiveHour, 'its five-hour window'), part(u.weekly, 'the week')].filter(Boolean);
+  const stale = [u.fiveHour, u.weekly].some((w) => w && !live(w));
+  return `${name}: ${bits.join(', ') || (stale ? 'its windows have reset since its last numbers' : 'no figures yet')}.${age}`;
+}
+
+const who = (x) => AGENT_NAMES[x.agent] ?? x.agent;
+const what = (x, max = 50) => `"${clause(x.text, max)}"`;
+// R10: a known reset that has passed is "should be back now", never the old time as if still to come.
+const untilOf = (x, now) => (x.resetsAt ? (Date.parse(x.resetsAt) > now ? ` until ${when(x.resetsAt, now)}` : ' (it should be back now)')
+  : x.resetText ? ` (it says it resets ${x.resetText})` : '');
+const coding = (x) => x.branch && !x.readOnly;
+const where = (x) => (x.commits > 0 || x.committed ? ` It's committed on branch ${x.branch}.`
+  : x.uncommitted ? ` Its changes are on branch ${x.branch}, not committed.` : '');
+const runLine = (x) => (x.run && x.cwd ? ` Run it: cd ${x.cwd} && ${x.run}` : '');
+
+/**
+ * One task in plain words: `say` is spoken (Watch), `screen` adds what's only useful to read (the run command, K7).
+ * Exported for tests.
+ */
+export function describeTask(x, now = Date.now()) {
+  let say;
+  switch (x.state) {
+    case 'running': say = `${who(x)} is working on ${what(x)} (started ${ago(x.startedAt, now)}).`; break;
+    case 'question': say = `${who(x)} asks: ${x.question}${x.options?.length ? ` Options: ${x.options.join(' or ')}` : ''} (asked ${ago(x.updatedAt ?? x.startedAt, now)}).`; break;
+    // K7: what was built and where it is, spoken short (the quoted task goes on the screen).
+    case 'done': say = coding(x) ? `${who(x)} finished: ${endSentence(x.result)}${where(x)}` : `${who(x)} answered: ${endSentence(x.result)}`; break;
+    case 'unclear': say = `${who(x)} ended ${what(x)} without a clear finish: ${endSentence(x.result)}${coding(x) ? where(x) : ''}`; break;
+    case 'limited': say = `${who(x)} ran out of usage on ${what(x)}${untilOf(x, now)}.`; break;
+    case 'failed': say = `${who(x)}'s task ${what(x)} failed: ${endSentence(x.result ?? 'no reason given')}${coding(x) ? where(x) : ''}`; break;
+    case 'stopped': say = `${who(x)}'s task ${what(x)} was stopped.${coding(x) ? where(x) : ''}`; break;
+    case 'interrupted': say = `${who(x)}'s task ${what(x)} was cut off when the gateway restarted.`; break;
+    default: say = `${who(x)}'s task ${what(x)}: ${x.state}.`;
+  }
+  const extra = coding(x) && ['done', 'unclear'].includes(x.state) ? runLine(x) : '';
+  const screen = x.state === 'done' && coding(x) ? `${who(x)} finished ${what(x)}: ${endSentence(x.result)}${where(x)}` : say;
+  return { say, screen: `${screen}${extra}` };
+}
+
+/** A read-only helper's whole answer, for the phone (K6/N9), when it says more than the spoken line (R4, R5). */
+function answerDetail(x, spoken) {
+  if (!['done', 'unclear'].includes(x.state) || !x.answer || x.answer.length <= String(spoken ?? '').length + 20) return null;
+  return `${who(x)}'s answer to "${x.text}":\n\n${x.answer}`;
+}
+
+/**
+ * The short volunteered line about an ending the owner hasn't heard yet (K2/N1), its fuller screen text, its kind
+ * (the task state: a question never rides on a reply waiting for "yes", SM8/G10), a `short` form that names the
+ * task (R7: spoken with the reply's first sentence when the whole line doesn't fit) and, for a read-only answer,
+ * the whole answer for the phone (R5).
+ */
+export function describeNews(x, now = Date.now()) {
+  const full = describeTask(x, now).screen;
+  const other = x.agent === 'claude' ? 'Codex' : x.agent === 'codex' ? 'Claude' : null;
+  const base = { kind: x.state };
+  switch (x.state) {
+    case 'question': {
+      // R8: the question itself, cut at a word; the options stay on screen (never "yes or no?" alone).
+      const q = String(x.question ?? '');
+      return { ...base, speech: `${who(x)} has a question: ${endSentence(cutWords(q, 100))}`, text: `${who(x)} asks: ${q}${x.options?.length ? ` Options: ${x.options.join(' | ')}.` : ''} Just say your answer.` };
+    }
+    case 'done': {
+      const line = coding(x) ? `${who(x)} finished: ${endSentence(x.result)}` : `${who(x)} answered: ${endSentence(x.result)}`;
+      const short = coding(x) ? `${who(x)} finished ${what(x, 40)}.` : `${who(x)} has an answer for ${what(x, 40)}.`;
+      const detail = coding(x) ? null : answerDetail(x, line);
+      return { ...base, speech: line.length <= 110 ? line : short, short, text: full, ...(detail ? { detail } : {}) };
+    }
+    case 'limited': return { ...base, speech: `${who(x)} ran out of usage on ${what(x, 40)}${untilOf(x, now)}.`, short: `${who(x)} ran out of usage on ${what(x, 30)}.`, text: `${full}${other ? ` Say "give it to ${other}" to hand it over.` : ''}` };
+    case 'unclear': {
+      const detail = coding(x) ? null : answerDetail(x, '');
+      return { ...base, speech: `${who(x)} stopped on ${what(x, 40)} without a clear finish.`, short: `${who(x)} stopped on ${what(x, 30)}.`, text: full, ...(detail ? { detail } : {}) };
+    }
+    case 'failed': return { ...base, speech: `${who(x)}'s task ${what(x, 40)} failed.`, short: `${who(x)}'s task ${what(x, 30)} failed.`, text: full };
+    default: return { ...base, speech: describeTask(x, now).say, short: `${who(x)}'s task ${what(x, 30)}: ${x.state}.`, text: full };
+  }
+}
+
+export function createTools({ exec = defaultExec, apps = installedApps, folders = FOLDERS, relay = null, now = Date.now, startWaitMs = 5000 } = {}) {
   const T = {};
   const def = (name, description, params, risk, run, confirmText) => {
     T[name] = { name, description, params, risk, run, confirmText };
@@ -230,44 +332,124 @@ export function createTools({ exec = defaultExec, apps = installedApps, folders 
     }, ({ name }) => `Run your ${name} Shortcut?`);
 
   // ---- D-129: the helpers (Claude Code, Codex, ChatGPT chat) through the relay.
+  // Live test 2026-10-01 (docs/relay/LIVE_TEST_2026-10-01.md): every helper fact Tamago repeats comes from these
+  // tools, in these words; the hands speak them as-is (agent.js), so nothing is invented on the way.
   if (relay) {
-    def('helpers_usage', 'Can Tamago reach Claude, Codex and ChatGPT, and how much of their usage is left.', {}, 'safe', async () => {
+    const settle = async (t) => (relay.settle && t?.id ? (await relay.settle(t.id, startWaitMs)) ?? t : t);
+    const otherCoder = (a) => (a === 'claude' ? 'codex' : a === 'codex' ? 'claude' : null);
+    /**
+     * R11: when a helper is known to be out (its own usage report, or it just handed this very task over because it
+     * ran out): the ISO time it comes back, '' when unknown, null when it isn't known to be out.
+     */
+    const outOf = (agent, s) => {
+      const u = relay.usage?.() ?? {};
+      const back = outUntil(agent === 'claude' ? u.claude : u.codex, now());
+      if (back) return back;
+      const from = s.handoffFrom ? relay.tasks(50).find((x) => x.id === s.handoffFrom) : null;
+      if (from?.agent === agent && from.state === 'limited' && !(from.resetsAt && Date.parse(from.resetsAt) <= now())) return from.resetsAt ?? '';
+      return null;
+    };
+    /** K2: what to say about a run a few seconds in; an early limit/failure offers the other coding helper. */
+    const started = (s, lead) => {
+      if (!s || s.state === 'running') return { ok: true, say: lead };
+      relay.markAnnounced?.([s.id]);
+      const other = otherCoder(s.agent);
+      if (s.state === 'limited' || s.state === 'failed') {
+        const back = s.agent === 'claude' ? outUntil(relay.usage?.()?.claude, now()) : null;   // F11: the reset time is kept
+        const until = untilOf(s, now()) || (back ? ` until ${when(back, now())}` : '');
+        // R3: one sentence of the reason, so the offer that "yes" answers is never pushed out of the spoken reply.
+        const reason = endSentence(cutWords(splitSentences(s.result ?? '')[0] || 'no reason given', 80));
+        const why = s.state === 'limited' ? `${who(s)} is out of usage${until}, so it didn't start.` : `${who(s)} stopped right away: ${reason}`;
+        const otherBack = other ? outOf(other, s) : null;
+        if (other && otherBack !== null) {
+          return { ok: false, say: `${why} ${AGENT_NAMES[other]} is out too${otherBack ? ` until ${when(otherBack, now())}` : ''}.` };
+        }
+        return other ? { ok: false, say: `${why} Give it to ${AGENT_NAMES[other]}?`, propose: { tool: 'relay_handoff', args: { agent: other, id: s.id } } } : { ok: false, say: why };
+      }
+      const d = describeTask(s, now());
+      const detail = s.readOnly ? answerDetail(s, d.say) : null;   // R5: ChatGPT finished within the wait
+      return { ok: true, ...d, ...(detail ? { detail } : {}) };
+    };
+    const target = (agent) => relay.tasks(50).filter((x) => ACTIVE.includes(x.state) && !x.handedTo && (!agent || x.agent === agent)).at(-1);
+
+    def('helpers_usage', 'Can Tamago reach Claude, Codex and ChatGPT, and how much of their usage is left. Only when the owner asks.', {}, 'safe', async () => {
       const u = relay.usage();
       const say = `I can hand work to Claude and Codex, and ask ChatGPT. ${describeUsage('Claude', u.claude, now())} ${describeUsage('Codex (and ChatGPT)', u.codex, now())}`;
       return { ok: true, say, data: u };
     });
-    def('relay_start', `Give a task to a helper: claude or codex change code, chatgpt only answers. Projects: ${relay.projects().join(', ')}.`,
+    def('relay_start', `Give a NEW task to a helper: claude or codex change code, chatgpt only answers. Projects: ${relay.projects().join(', ')}.`,
       { agent: { type: 'string', description: 'claude | codex | chatgpt' }, project: { type: 'string', description: relay.projects().join(' | ') },
         task: { type: 'string', description: "the owner's request, in their words" },
         question_only: { type: 'boolean', description: 'true when the owner only wants an answer, no changes' } },
       'confirm', async ({ agent, project, task, question_only }) => {
-        const a = String(agent ?? 'claude').toLowerCase().replace(/[^a-z]/g, '').replace(/^clawed|^cloud/, 'claude');
+        const a = normalizeAgent(agent, 'claude');
         try {
           const t = relay.start({ agent: a, project, text: String(task ?? '').slice(0, 500), readOnly: question_only === true || question_only === 'true' });
-          return { ok: true, say: `${AGENT_NAMES[a] ?? a} is on it${t.branch ? `, on its own branch of ${t.project}` : ''}. Ask me how it's going anytime.` };
+          return started(await settle(t), `${AGENT_NAMES[a] ?? a} is on it${t.branch ? `, on its own branch of ${t.project}` : ''}. Ask me how it's going anytime.`);
         } catch (err) { return { ok: false, say: err.message }; }
-      }, ({ agent, project, task }) => `${AGENT_NAMES[String(agent).toLowerCase()] ?? 'Claude'}, ${project}: ${String(task).slice(0, 80).replace(/[.!?\s]+$/, '')}.`);
-    def('relay_status', "What the helpers are doing: running, waiting for the owner's answer, finished.", {}, 'safe', async () => {
-      const t = relay.tasks(3).reverse();
-      if (!t.length) return { ok: true, say: 'No helper tasks yet.' };
-      const line = (x) => {
-        const who = AGENT_NAMES[x.agent] ?? x.agent;
-        if (x.state === 'running') return `${who} is working on "${x.text.slice(0, 60)}" (started ${ago(x.startedAt, now())}).`;
-        if (x.state === 'question') return `${who} asks: ${x.question}${x.options?.length ? ` Options: ${x.options.join(' or ')}.` : ''}`;
-        if (x.state === 'done') return `${who} finished: ${x.result}`;
-        if (x.state === 'limited') return `${who} ran out of usage on "${x.text.slice(0, 40)}".`;
-        return `${who}'s task "${x.text.slice(0, 40)}" ${x.state}${x.result ? `: ${x.result}` : ''}.`;
-      };
-      return { ok: true, say: t.map(line).join(' '), data: t };
+      }, ({ agent, project, task }) => `${AGENT_NAMES[normalizeAgent(agent, 'claude')]}, ${project}: ${clause(task, 80)}.`);
+    def('relay_status', "What the helpers are doing: every running or waiting task, then the ones finished in the last 12 hours.",
+      { agent: { type: 'string', description: 'claude | codex | chatgpt, or empty for all', optional: true },
+        include_older: { type: 'boolean', description: 'true only when the owner asks about older tasks', optional: true } },
+      'safe', async ({ agent, include_older } = {}) => {
+        const a = normalizeAgent(agent);
+        const all = relay.tasks(50).filter((x) => !x.handedTo && (!a || x.agent === a));
+        // N4/F10/F13: every waiting or running task (any age) first, then recent finished ones, newest first.
+        const active = all.filter((x) => ACTIVE.includes(x.state)).sort((x, y) => (x.state === 'question' ? 0 : 1) - (y.state === 'question' ? 0 : 1));
+        const recent = all.filter((x) => FINISHED.includes(x.state) && (include_older === true || now() - Date.parse(x.updatedAt ?? x.startedAt) < RECENT_MS)).reverse().slice(0, 3);
+        const shown = [...active, ...recent];
+        if (!shown.length) return { ok: true, say: all.length ? `Nothing from ${a ? AGENT_NAMES[a] : 'the helpers'} in the last 12 hours.` : 'No helper tasks yet.' };
+        relay.markAnnounced?.(shown.map((x) => x.id));
+        const d = shown.map((x) => describeTask(x, now()));
+        // G7: the model gets Tamago's own words and ids only, never a helper's answer, question text or run command
+        // as data (a helper's output must not be able to steer Tamago's next tool call).
+        return { ok: true, say: d.map((x) => x.say).join(' '), screen: d.map((x) => x.screen).join('\n'),
+          data: shown.map((x) => ({ id: x.id, agent: x.agent, state: x.state })) };
+      });
+    // K6/N9: "What did ChatGPT say?" started a new task (reworded as "What did you say…"); it reads the answer now.
+    def('relay_result', "Read back what a helper answered or built (its latest finished task). The gist is spoken; the full answer goes to the phone.",
+      { agent: { type: 'string', description: 'claude | codex | chatgpt', optional: true } }, 'safe', async ({ agent } = {}) => {
+        const a = normalizeAgent(agent);
+        const x = relay.tasks(50).filter((t) => FINISHED.includes(t.state) && !t.handedTo && (!a || t.agent === a)).at(-1);
+        if (!x) return { ok: false, say: a ? `${AGENT_NAMES[a]} hasn't finished anything yet.` : 'No helper has finished anything yet.' };
+        relay.markAnnounced?.([x.id]);
+        const d = describeTask(x, now());
+        // R4: a long answer for the phone only when there is one (done/unclear, longer than what is spoken); a limited
+        // or failed run's last words are never presented as its answer, and a removed worktree is never a folder.
+        const real = ['done', 'unclear'].includes(x.state) && x.answer && x.answer.length > d.say.length + 20;
+        const head = coding(x)
+          ? [`${who(x)}: "${x.text}"`, endSentence(x.result ?? ''), x.branch && (x.commits > 0 || x.committed) ? `Committed on branch ${x.branch}.` : null,
+            x.cwd && !x.removed ? `Folder: ${x.cwd}` : null, x.run && !x.removed ? `Run it: cd ${x.cwd} && ${x.run}` : null].filter(Boolean).join('\n')
+          : `${who(x)}'s answer to "${x.text}":`;
+        return { ok: true, say: d.say, screen: d.screen, ...(real ? { detail: `${head}\n\n${x.answer}` } : {}), data: { id: x.id, state: x.state } };
+      });
+    // K3/N6: "give it to Codex instead" sent Codex only those words. It now carries the original request.
+    // SM5: the task named in the confirmation is the task handed over (`id`, filled in when the yes is held).
+    def('relay_handoff', 'Hand the latest unfinished helper task (out of usage, failed, stopped, unclear or waiting) to another helper, with the original request and what was done so far.',
+      { agent: { type: 'string', description: 'claude | codex (chatgpt only for question tasks)' },
+        id: { type: 'string', description: 'the task id, when known', optional: true } }, 'confirm', async ({ agent, id }) => {
+        try {
+          const { task, from } = await relay.handoff({ agent: normalizeAgent(agent, String(agent ?? '')), id: id ?? null });
+          return started(await settle(task), `${AGENT_NAMES[task.agent]} has ${who(from)}'s task ${what(from, 50)} now${task.branch && task.branch === from.branch ? `, on the same branch` : ''}.`);
+        } catch (err) { return { ok: false, say: err.message }; }
+      }, ({ agent, id }) => {
+        const prev = id ? relay.tasks(50).find((x) => x.id === id) : relay.handable?.({ to: normalizeAgent(agent) });
+        const to = AGENT_NAMES[normalizeAgent(agent)] ?? agent;
+        return prev ? `Give ${who(prev)}'s task ${what(prev, 80)} to ${to}?` : `Hand the last task to ${to}?`;
+      });
+    def('relay_answer', "Pass the owner's answer to the helper that asked a question.",
+      { answer: { type: 'string' }, agent: { type: 'string', description: 'the helper that asked, if several are waiting', optional: true } }, 'safe', async ({ answer, agent }) => {
+        try { const t = relay.answer(String(answer ?? ''), { agent: normalizeAgent(agent) }); return { ok: true, say: `Told ${AGENT_NAMES[t.agent]}: ${answer}.` }; }
+        catch (err) { return { ok: false, say: err.message }; }
+      });
+    // F6: "Stop Claude" stopped the newest task, whichever helper had it.
+    def('relay_stop', "Stop a helper's running or waiting task.", { agent: { type: 'string', description: 'claude | codex | chatgpt', optional: true } }, 'confirm', async ({ agent } = {}) => {
+      const t = relay.stop({ agent: normalizeAgent(agent) });
+      return t ? { ok: true, say: `Stopped ${who(t)}'s task ${what(t)}.` } : { ok: false, say: `${normalizeAgent(agent) ? AGENT_NAMES[normalizeAgent(agent)] : 'No helper'} has nothing running.` };
+    }, ({ agent } = {}) => {
+      const t = target(normalizeAgent(agent));
+      return t ? `Stop ${who(t)}'s task ${what(t)}?` : `Stop ${AGENT_NAMES[normalizeAgent(agent)] ?? 'the helper'}'s task?`;
     });
-    def('relay_answer', "Pass the owner's answer to the helper that asked a question.", { answer: { type: 'string' } }, 'safe', async ({ answer }) => {
-      try { const t = relay.answer(String(answer ?? '')); return { ok: true, say: `Told ${AGENT_NAMES[t.agent]}: ${answer}.` }; }
-      catch (err) { return { ok: false, say: err.message }; }
-    });
-    def('relay_stop', "Stop the helper's current task.", {}, 'confirm', async () => {
-      const t = relay.stop();
-      return t ? { ok: true, say: `Stopped ${AGENT_NAMES[t.agent]}.` } : { ok: false, say: 'Nothing is running.' };
-    }, () => 'Stop the helper\'s task?');
   }
 
   return T;
@@ -279,7 +461,11 @@ export function toolSchemas(tools) {
     type: 'function',
     function: {
       name: t.name, description: t.description + (t.risk === 'confirm' ? ' (Tamago asks the owner first.)' : ''),
-      parameters: { type: 'object', properties: t.params, required: Object.keys(t.params) },
+      parameters: {
+        type: 'object',
+        properties: Object.fromEntries(Object.entries(t.params).map(([k, { optional, ...p }]) => [k, p])),
+        required: Object.keys(t.params).filter((k) => !t.params[k].optional),
+      },
     },
   }));
 }

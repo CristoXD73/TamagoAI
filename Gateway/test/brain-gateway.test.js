@@ -46,8 +46,11 @@ test('config: TAMAGO_PROVIDER=brain selects the brain; reasoner follows OLLAMA_M
   const identity = () => ({ gatewayId: 'g', token: 'x'.repeat(40) });
   const c1 = loadConfig({ TAMAGO_PROVIDER: 'brain', TAMAGO_BRAIN_DB: ':memory:' }, { loadIdentity: identity });
   assert.equal(c1.provider.name, 'brain(deterministic)');
-  const c2 = loadConfig({ TAMAGO_PROVIDER: 'brain', TAMAGO_BRAIN_DB: ':memory:', OLLAMA_MODEL: 'llama3.2' }, { loadIdentity: identity });
+  // Review SM7 (2026-10-01): the gateway's config runs the relay's restart recovery, so never on the real state dir.
+  const stateDir = mkdtempSync(join(tmpdir(), 'brain-config-'));
+  const c2 = loadConfig({ TAMAGO_PROVIDER: 'brain', TAMAGO_BRAIN_DB: ':memory:', OLLAMA_MODEL: 'llama3.2', TAMAGO_STATE_DIR: stateDir,
+    TAMAGO_RELAY_DIR: join(stateDir, 'relay-work') }, { loadIdentity: identity });
   assert.equal(c2.provider.name, 'brain(ollama)');
   assert.throws(() => brainOptionsFromEnv({ TAMAGO_REASONER: 'gpt' }), /Unknown TAMAGO_REASONER/);
-  return Promise.all([c1.provider.close(), c2.provider.close()]);
+  return Promise.all([c1.provider.close(), c2.provider.close()]).finally(() => rmSync(stateDir, { recursive: true, force: true }));
 });

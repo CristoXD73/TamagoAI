@@ -52,7 +52,8 @@ test('relay: a Claude task runs on its own branch in a worktree, records usage, 
       { type: 'rate_limit_event', rate_limit_info: { status: 'allowed_warning', unifiedWindows: { five_hour: { utilization: 0.65, resetsAt: 1790517600 }, seven_day: { utilization: 0.58, resetsAt: 1790956800 } } } },
       { type: 'result', subtype: 'success', result: 'Fixed.\nDONE: Fixed add() so the test passes.' },
     ]]);
-    const relay = createRelay({ stateDir: join(root, 'state'), relayDir: join(root, 'relay'), projects: { Sandbox: proj }, spawn: f.spawn });
+    // A clock before both resets (live test 2026-10-01, F9: windows whose reset has passed are no longer reported).
+    const relay = createRelay({ stateDir: join(root, 'state'), relayDir: join(root, 'relay'), projects: { Sandbox: proj }, spawn: f.spawn, now: () => 1790510000_000 });
     const t = relay.start({ agent: 'claude', project: 'sandbox', text: 'fix the failing test' });
     assert.match(t.branch, /^tamago\/fix-the-failing-test-/);
     assert.ok(t.cwd.startsWith(join(root, 'relay', 'worktrees')), 'never the project checkout itself');
@@ -111,7 +112,8 @@ test('relay: Codex runs sandboxed and its work is committed by the relay; ChatGP
     writeFileSync(join(t.cwd, 'README.md'), 'hello\n');   // what Codex "did"
     await settle();
     assert.equal(relay.tasks(1)[0].state, 'done');
-    assert.match(execFileSync('git', ['log', '--oneline', '-1'], { cwd: t.cwd, encoding: 'utf8' }), /Added a README line/);
+    // K7/N7 (live test 2026-10-01): the relay's commit says what the owner asked for, then what was done.
+    assert.match(execFileSync('git', ['log', '-1', '--format=%B'], { cwd: t.cwd, encoding: 'utf8' }), /^add a readme line\n\nAdded a README line\./);
 
     const q = relay.start({ agent: 'chatgpt', project: 'Sandbox', text: 'which module name is clearer?' });
     assert.equal(q.branch, null, 'answer-only: no branch');
