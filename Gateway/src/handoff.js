@@ -3,11 +3,15 @@
 // says "say it all", the Watch reads it. Provider-agnostic: any provider can
 // set `needsDetail` and implement `detail()` (the brain does, D-127).
 
+import { splitSentences, cutWords } from './brain/speech/text.js';
+
 /**
  * Spoken after the gist on the Watch. The owner's idea ("you might wanna check your phone for this… or would you
  * like me to say it all?"), kept short: gist + offer must stay one quick Mac synthesis (~2.5 s Watch wait, D-121).
  */
 export const OFFER = "That one's long. Check your phone, or should I say it all?";
+/** Review round 2 (L4): the offer when the long answer is a helper's, told as news next to another reply. */
+export const helperOffer = (name) => `${name}'s answer is long. Check your phone, or should I say it all?`;
 export const PHONE_OK = "Okay. It's on your phone.";
 export const PHONE_SOON = "Okay. I'll put it on your phone.";
 export const STILL_WRITING = "It's still coming. I'll put it on your phone.";
@@ -40,6 +44,38 @@ export function detailToSpeech(detail) {
     .replace(/\s*\n+\s*/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+const REST = 'The rest is on your phone.';
+
+/**
+ * Review round 2 (L12): "say it all" reads whole sentences within `max` (the protocol's text limit), then says where
+ * the rest is, never stopping mid-word.
+ */
+export function readAloud(detail, max = 1000) {
+  const all = detailToSpeech(detail);
+  if (all.length <= max) return all;
+  let out = '';
+  for (const sen of splitSentences(all)) {
+    const next = out ? `${out} ${sen}` : sen;
+    if (next.length > max - REST.length - 1) break;
+    out = next;
+  }
+  return `${out || cutWords(all, max - REST.length - 1)} ${REST}`;
+}
+
+/**
+ * Review round 2 (L1): a helper's answer for the phone, within the long-answer limit. When it must be cut, it is cut at
+ * a line or sentence and says where the whole text is (the task log), instead of ending in a bare "…".
+ */
+export function fitDetail(text, where = null, max = HANDOFF_LIMITS.maxDetailChars) {
+  const s = String(text ?? '').replace(/\n{3,}/g, '\n\n').trim();
+  if (s.length <= max) return s;
+  const tail = `\n\n(Cut short here. The whole answer is in the task log${where ? `: ${where}` : ''}.)`;
+  const room = max - tail.length - 1;
+  const cut = s.slice(0, room);
+  const at = Math.max(cut.lastIndexOf('\n'), cut.lastIndexOf('. '));
+  return `${(at > room * 0.6 ? cut.slice(0, at + 1) : cutWords(cut, room)).trim()}${tail}`;
 }
 
 /** Light clean-up for the phone: keep markdown, drop emoji and runaway length. */

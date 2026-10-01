@@ -24,18 +24,21 @@ const CONFIRM_TAIL = /\s*Say yes to go\.?\s*$/i;
 const CONFIRM = 'Say yes to go.';
 
 /**
+ * Review round 3 (R2T-R3-H6): `verbatim` is Tamago's own rule text (the hands' confirmations, the helpers' status and
+ * results), which quotes the owner's request: the assistant-phrase filters, meant for a model's wording, never cut it
+ * ("Ask ChatGPT how can I help my dog…" lost everything after "how can I help").
  * @returns {{speech: string|null, text: string|null, changed: string[]}}
  */
-export function composeSpeech(raw, profile = TAMAGO_PROFILE) {
+export function composeSpeech(raw, profile = TAMAGO_PROFILE, { verbatim = false } = {}) {
   if (raw === null || raw === undefined) return { speech: null, text: null, changed: [] };
   if (CONFIRM_TAIL.test(String(raw))) {
     const c = profile.communication;
     const body = compose(String(raw).replace(CONFIRM_TAIL, ''), {
       ...profile, communication: { ...c, maxSpeechChars: c.maxSpeechChars - CONFIRM.length - 1, maxTextChars: c.maxTextChars - CONFIRM.length - 1 },
-    }, { keepLast: true });
+    }, { keepLast: true, verbatim });
     return { speech: body.speech ? `${body.speech} ${CONFIRM}` : CONFIRM, text: body.text ? `${body.text} ${CONFIRM}` : CONFIRM, changed: body.changed };
   }
-  return compose(raw, profile);
+  return compose(raw, profile, { verbatim });
 }
 
 /**
@@ -54,7 +57,7 @@ function keepingLast(all, max) {
   return [...lead, last].join(' ');
 }
 
-function compose(raw, profile, { keepLast = false } = {}) {
+function compose(raw, profile, { keepLast = false, verbatim = false } = {}) {
   const changed = [];
   let s = String(raw);
   const before = s;
@@ -68,7 +71,7 @@ function compose(raw, profile, { keepLast = false } = {}) {
     // F23: a one-line reply keeps its leading number ("3 apps are open."); only in multi-line text is "1. " a list marker.
     .replace(/^\s*\d+[.)]\s+/gm, (m) => (/\n/.test(before.trim()) ? '' : m))
     .replace(EMOJI, '');
-  for (const re of ASSISTANTISMS) s = s.replace(re, ' ');
+  if (!verbatim) for (const re of ASSISTANTISMS) s = s.replace(re, ' ');
   s = s.replace(/\s+/g, ' ').trim();
   if (s !== before.trim()) changed.push('cleaned');
   // The model reads "Owner's X" in its context; Tamago speaks to the owner as "you".

@@ -107,7 +107,9 @@ test('hands: risky tools wait for a spoken yes; no, or a new request, drops them
   await hands.handle('quit safari', classify('quit safari'));
   t += 61_000;
   assert.equal(hands.pending, null, 'a confirmation expires after 60 s');
-  assert.equal(await hands.handle('yes', classify('yes')), null, 'a late yes does nothing');
+  // Review round 2 (X3): a late yes is still about that confirmation: it runs nothing and says it timed out.
+  assert.equal((await hands.handle('yes', classify('yes'))).speech, "That one timed out, so I didn't do it. Ask me again.");
+  assert.equal(calls.filter((c) => c[1] === '-e' && c[2].startsWith('quit')).length, 1, 'a late yes runs nothing');
 });
 
 test('hands: unknown tools are refused; a runaway loop stops after 4 steps; conversation passes through', async () => {

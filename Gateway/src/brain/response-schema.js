@@ -137,6 +137,10 @@ export function toV1Result(intent) {
     followUpExpected: intent.followUpExpected,
     // D-127: the gateway writes the full answer for the phone in the background (provider.detail()).
     ...(intent.needsDetail ? { needsDetail: true } : {}),
+    // Review round 2 (L4): a long answer that is a helper's, told next to another reply, names whose it is.
+    ...(intent.needsDetail && typeof intent.offer === 'string' ? { offer: intent.offer } : {}),
+    // Review round 3 (R2T-R3-H3): the phone shows the long answer under the reply's own text instead of in its place.
+    ...(intent.needsDetail && intent.detailUnder === true ? { detailUnder: true } : {}),
   };
 }
 

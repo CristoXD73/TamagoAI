@@ -38,12 +38,18 @@ export const CODEX_RULES = `${BASE_RULES}
 ${FINISH}`;
 // K4/N5: ChatGPT got no contract, so only its last line (cut at 200 characters, markdown left in) was kept.
 export const ANSWER_RULES = `You are answering the owner through Tamago, a voice relay. The owner reads your full answer on the phone.
-- Answer fully in plain text, at most 250 words. Change no files.
+- Answer fully in plain text, at most 200 words. Change no files.
 - When you truly need the owner, end with exactly one line: ASK_OWNER: <question> | <option A> | <option B>
 - Otherwise end with one line: DONE: <the answer in one sentence, at most 25 words>`;
 
 const CLAUDE_TOOLS = ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash(git status*)', 'Bash(git diff*)', 'Bash(git log*)',
   'Bash(git add *)', 'Bash(git commit *)', 'Bash(ls*)', 'Bash(npm test*)', 'Bash(node --test*)', 'Bash(python3 *)'];
+// Review round 3 (R2S-R3G-5): a question task runs in the project's real checkout, so plan mode is not its only
+// barrier: it is allowed reading tools only, and the writing ones are refused outright.
+const CLAUDE_READ_TOOLS = ['Read', 'Grep', 'Glob', 'Bash(git status*)', 'Bash(git diff*)', 'Bash(git log*)', 'Bash(ls*)'];
+const CLAUDE_WRITE_TOOLS = ['Edit', 'Write', 'NotebookEdit', 'Bash(git add *)', 'Bash(git commit *)', 'Bash(npm test*)', 'Bash(node --test*)', 'Bash(python3 *)'];
+// Claude's error results carry no text of their own (review round 3, R2T-R3-H7).
+const ERROR_KINDS = { error_max_turns: 'It hit its turn limit.', error_during_execution: 'It hit an error while working.' };
 const TASK_LIMIT_MS = 30 * 60 * 1000;
 export const AGENTS = ['claude', 'codex', 'chatgpt'];
 export const AGENT_NAMES = { claude: 'Claude', codex: 'Codex', chatgpt: 'ChatGPT' };
@@ -51,11 +57,17 @@ export const ACTIVE = ['running', 'question'];
 export const FINISHED = ['done', 'unclear', 'failed', 'limited', 'stopped', 'interrupted'];
 const NEWS = ['question', 'done', 'unclear', 'failed', 'limited', 'interrupted'];
 const HANDABLE = ['limited', 'failed', 'stopped', 'unclear', 'interrupted', 'question', 'running'];
-const ENDED = ['limited', 'failed', 'stopped', 'unclear', 'interrupted'];
+// Review round 2 (X6): a task the owner stopped never hides the helper's current one.
+const ENDED = ['limited', 'failed', 'unclear', 'interrupted'];
 const TIDY_REMOVES = ['limited', 'failed', 'stopped', 'interrupted'];
 export const RECENT_MS = 12 * 3600_000;   // status and handoff look back this far for finished tasks (N4, F13)
 const ANSWER_MAX = 2000;
+const KEEP_FINISHED = 50;   // finished tasks kept in tasks.json; running and waiting ones are never dropped (X10)
+// Regenerable caches a run may leave in ignored folders; any other ignored file is work (X8).
+const CACHES = /(^|\/)(node_modules|__pycache__|\.pytest_cache|\.mypy_cache|\.DS_Store)(\/|$)/;
 
+// Words of a handoff request that never name a task (X6).
+const HANDOFF_TALK = /^(give|hand|pass|move|switch|transfer|send|over|instead|claude|clawed|codex|chatgpt|chat|that|this|task|then|them|have|take|finish|continue|handle|please|tamago|rest|with|from|let's|lets)$/;
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'task';
 const cleanEnv = () => ({ HOME: homedir(), USER: process.env.USER ?? '', PATH: process.env.PATH ?? '/usr/bin:/bin', TERM: 'dumb', LANG: 'en_US.UTF-8' });
 
@@ -115,14 +127,17 @@ export function answerOf(text, max = ANSWER_MAX) {
 }
 
 // K7/N7: Codex's "but the commit was blocked by filesystem permissions" was passed on, and became the commit
-// message, after the relay had committed it. Clauses about the agent's own failed commit are dropped.
-const COMMIT_TROUBLE = /\bcommit(?:ted|ting|s)?\b.*\b(blocked|fail(?:ed|s)?|couldn'?t|could not|unable|denied|permissions?|not allowed|read-only)\b|\b(blocked|fail(?:ed)?|couldn'?t|could not|unable to)\b.*\bcommit/i;
+// message, after the relay had committed it. Clauses about the agent's own failed commit are dropped. Review round 2
+// (L10): only a clause that IS that trouble ("the commit was blocked by …", "I couldn't commit because …"); work about
+// commits ("so a failed commit keeps the worktree") stays.
+const COMMIT_TROUBLE = /^(?:and |though )?(?:(?:i|we) )?(?:could ?n['o]?t|was unable to|were unable to|am unable to|unable to|failed to|can'?t|cannot|was ?n['o]?t able to) (?:git )?commit\b|^(?:and |though )?(?:the |my |our )?(?:git )?commit(?:ting)?\b.{0,30}\b(?:was|is|got|were|has been) (?:blocked|denied|refused|rejected|not allowed|prevented|not possible)\b|^(?:and |though )?(?:the |my |our )?(?:git )?commit (?:failed|did ?n['o]?t work)\b/i;
+const TROUBLE_SPLIT = /,?\s+but\s+|;\s+|,\s+(?:though|however|although)\s+|,?\s+and\s+(?=(?:i |we )?(?:could ?n|was unable|unable|failed to|can'?t|cannot)\S*\s+(?:to\s+)?(?:git\s+)?commit\b|the commit\b)/i;
 
 /** A DONE summary as Tamago may repeat it: markdown-free, sentence-bounded, without stale commit trouble. */
 export function cleanSummary(s, max = 200) {
   const kept = splitSentences(stripMarkdown(s)).map((sen) => {
-    const parts = sen.split(/,?\s+but\s+|;\s+|,\s+(?:though|however|although)\s+/i);
-    const ok = parts.filter((part) => !COMMIT_TROUBLE.test(part));
+    const parts = sen.split(TROUBLE_SPLIT);
+    const ok = parts.filter((part) => !COMMIT_TROUBLE.test(part.trim()));
     return ok.length === parts.length ? sen : ok.join(', ');
   }).filter(Boolean).map(endSentence);
   return gist(kept.join(' '), max);
@@ -202,7 +217,14 @@ export function createRelay({
   // whole gateway down with it.
   const note = (file, data) => { try { appendFileSync(file, data); } catch { /* the task state still updates */ } };
   const load = () => { try { return JSON.parse(readFileSync(tasksFile, 'utf8')); } catch { return []; } };
-  const save = (tasks) => { try { writeFileSync(tasksFile, JSON.stringify(tasks.slice(-50), null, 1), { mode: 0o600 }); } catch { /* see note() */ } };
+  // Review round 2 (X10): only finished tasks are trimmed; a waiting question (kept "at any age", F10/N4), a running task
+  // and a handoff in progress are never dropped, so their lock, worktree and question stay known.
+  const trim = (tasks) => {
+    const old = tasks.filter((t) => !ACTIVE.includes(t.state) && t.handedTo !== 'pending');
+    const drop = new Set(old.slice(0, Math.max(0, old.length - KEEP_FINISHED)));
+    return tasks.filter((t) => !drop.has(t));
+  };
+  const save = (tasks) => { try { writeFileSync(tasksFile, JSON.stringify(trim(tasks), null, 1), { mode: 0o600 }); } catch { /* see note() */ } };
   const update = (id, patch, { touch = true } = {}) => {
     const t = load(); const i = t.findIndex((x) => x.id === id);
     if (i < 0) return null;
@@ -223,7 +245,8 @@ export function createRelay({
     const rules = readOnly ? ANSWER_RULES : agent === 'codex' ? CODEX_RULES : RULES;
     if (agent === 'claude') {
       const args = ['-p', message, '--output-format', 'stream-json', '--verbose', '--append-system-prompt', rules,
-        '--permission-mode', readOnly ? 'plan' : 'acceptEdits', '--allowedTools', ...CLAUDE_TOOLS];
+        '--permission-mode', readOnly ? 'plan' : 'acceptEdits', '--allowedTools', ...(readOnly ? CLAUDE_READ_TOOLS : CLAUDE_TOOLS),
+        ...(readOnly ? ['--disallowedTools', ...CLAUDE_WRITE_TOOLS] : [])];
       if (resume) args.push('--resume', resume);
       return [claudeBin, args];
     }
@@ -250,22 +273,30 @@ export function createRelay({
    * After a run ends: leftover changes are committed on the task branch (F16), and a limited/failed/stopped/
    * interrupted run that left no commits has its worktree and empty branch removed (N10). Removal needs a known base,
    * a count of 0, nothing just committed, and a clean worktree after the commit attempt (SM1, SM2, G3: a failed
-   * commit — index.lock, a pre-commit hook — must never be followed by `worktree remove --force`).
+   * commit — index.lock, a pre-commit hook — must never be followed by `worktree remove --force`). Review round 2:
+   * ignored files other than caches count as work (X8), and the count is of the task branch itself, with HEAD still on
+   * it (X9: a detached HEAD at the base counted 0 while the branch held commits).
    */
   function tidy(t, message) {
     if (!t.branch || t.removed || !t.cwd || !existsSync(t.cwd)) return {};
     const out = {};
-    const changes = g(t.cwd, ['status', '--porcelain']);
+    // Review round 3 (R2S-R3S-1): the owner's status.showUntrackedFiles=no (or a submodule setting) must never hide a
+    // run's new files from this check, or they would be removed with the worktree without ever being committed.
+    const status = ['status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'];
+    const changes = g(t.cwd, status);
     if (changes?.trim()) {
       const msg = message ?? `WIP (${AGENT_NAMES[t.agent] ?? t.agent}, ${t.state}): ${clause(t.text, 60)}`;
       if (g(t.cwd, ['add', '-A']) !== null && g(t.cwd, ['commit', '-q', '-m', msg]) !== null) out.committed = true;
       else out.uncommitted = true;
     }
     const base = baseFor(t);
-    const count = base ? Number(g(t.cwd, ['rev-list', '--count', `${base}..HEAD`])?.trim()) : NaN;
+    const ref = `refs/heads/${t.branch}`;
+    const count = base ? Number(g(t.cwd, ['rev-list', '--count', `${base}..${ref}`])?.trim()) : NaN;
     out.commits = Number.isFinite(count) ? count : null;
-    const clean = changes !== null && g(t.cwd, ['status', '--porcelain'])?.trim() === '';
-    if (out.commits === 0 && clean && !out.committed && !out.uncommitted && TIDY_REMOVES.includes(t.state) && !t.handedTo) {
+    const onBranch = g(t.cwd, ['symbolic-ref', '-q', 'HEAD'])?.trim() === ref;
+    const left = g(t.cwd, [...status, '--ignored']);
+    const clean = changes !== null && left !== null && left.split('\n').filter(Boolean).every((l) => l.startsWith('!! ') && CACHES.test(l.slice(3)));
+    if (out.commits === 0 && clean && onBranch && !out.committed && !out.uncommitted && TIDY_REMOVES.includes(t.state) && !t.handedTo) {
       const home = pathOf(t.project) ?? t.cwd;
       if (g(home, ['worktree', 'remove', '--force', t.cwd]) !== null) {
         g(home, ['branch', '-D', t.branch]);
@@ -285,11 +316,25 @@ export function createRelay({
   // F14: after a gateway restart no child is ours any more; a task left 'running' would hold the project lock forever.
   // Review SM7: only when this is the gateway starting (`recover`), and never for a task whose owning process is
   // still alive (another gateway or CLI on the same state dir). Past the 30-min watchdog nothing can still own it.
+  // Review round 2 (X7): a handoff cut off between "pending" and the next helper's start (the gateway died while it
+  // waited for the old helper) is repaired the same way, so its leftovers are committed and it is announced.
+  const elsewhere = (pid) => Boolean(pid && pid !== process.pid && alive(pid));
+  // Review round 3 (R2S-R3S-6): a live owner pid counts only within the watchdog's window; past it the pid may well be
+  // reused, and nothing can still be running the task.
+  const ownedElsewhere = (t) => elsewhere(t.owner) && now() - Date.parse(t.updatedAt ?? t.startedAt) < TASK_LIMIT_MS + 5 * 60_000;
   if (recover) {
-    for (const t of load().filter((x) => x.state === 'running')) {
-      const owned = t.owner && t.owner !== process.pid && alive(t.owner)
-        && now() - Date.parse(t.updatedAt ?? t.startedAt) < TASK_LIMIT_MS + 5 * 60_000;
-      if (!owned) finish(t, { state: 'interrupted', result: 'The gateway restarted while it was working.' });
+    const all = load();
+    for (const t of all) {
+      if (t.state === 'running' && !t.handedTo) {
+        if (!ownedElsewhere(t)) finish(t, { state: 'interrupted', result: 'The gateway restarted while it was working.' });
+      } else if (t.handedTo === 'pending' && !elsewhere(t.handoffBy)) {
+        const next = all.find((x) => x.handoffFrom === t.id);   // it died after the next task was saved
+        if (next) update(t.id, { handedTo: next.id }, { touch: false });
+        else {
+          finish({ ...t, handedTo: null }, { handedTo: null, handoffBy: null, ...(t.state === 'stopped'
+            ? { state: 'interrupted', result: 'The gateway stopped while handing it over.' } : { announced: false }) });
+        }
+      }
     }
   }
 
@@ -300,8 +345,11 @@ export function createRelay({
     const child = spawn(bin, args, { cwd: task.cwd, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
     running.set(task.id, child);
     closing.set(task.id, new Promise((resolve) => child.once('close', resolve)));
-    let buf = '', lastText = '', session = task.session ?? null, lastErr = '';
-    let rejected = false, limitSaid = false, isError = false, resetsAt = null, resetText = null;
+    let buf = '', lastText = '', session = task.session ?? null, lastErr = '', errText = '';
+    // Review round 2 (X5): a spawn failure (helper not installed, task folder gone) is an 'error' event; unhandled, it
+    // would take the gateway down. Handled, Node follows it with 'close' (code -2) and the run ends as failed.
+    child.on('error', (err) => { lastErr = err.message; note(log, `${err.message}\n`); });
+    let rejected = false, limitSaid = false, isError = false, resetsAt = null, resetText = null, errKind = null;
     const timer = setTimeout(() => { update(task.id, { state: 'failed', result: 'Took longer than 30 minutes; stopped.', announced: false }); child.kill('SIGTERM'); }, TASK_LIMIT_MS);
     timer.unref();   // a watchdog, not a reason to keep the gateway (or a test run) alive
     const limitWords = (s) => {
@@ -341,10 +389,13 @@ export function createRelay({
           }
         }
         if (e.type === 'result') { lastText = e.result ?? lastText; if (e.is_error) isError = true; }
+        if (e.is_error && /^error/.test(e.subtype ?? '')) errKind = e.subtype;
         if (e.type === 'assistant') for (const c of e.message?.content ?? []) if (c.type === 'text') lastText = c.text;
         if (e.type === 'item.completed' && e.item?.type === 'agent_message') lastText = e.item.text;
         if (e.type === 'error' || e.type === 'turn.failed' || e.is_error) {
           isError = true;
+          const said = [e.error, e.error?.message, e.message, e.result].find((x) => typeof x === 'string' && x.trim());
+          if (said) errText = said;
           if (limitWords(JSON.stringify(e.error ?? e.message ?? e.result ?? ''))) limitSaid = true;
         }
       }
@@ -361,17 +412,29 @@ export function createRelay({
       if (end.kind === 'unclear' && (limitSaid || (rejected && (code !== 0 || isError)))) {
         return finish(cur, { state: 'limited', session, resetsAt, resetText, answer, result: 'Out of usage for now.' });
       }
+      // Review round 2 (L7): a run that ended normally means Claude isn't out, whatever a transient event said.
+      if (end.kind !== 'unclear' && task.agent === 'claude') {
+        try {
+          const u = JSON.parse(readFileSync(usageFile, 'utf8'));
+          if (/rejected|exceeded/i.test(u.status ?? '')) writeFileSync(usageFile, JSON.stringify({ ...u, status: 'allowed', asOf: iso() }));
+        } catch { /* never seen, or see note() */ }
+      }
       if (end.kind === 'question') {
         return update(task.id, { state: 'question', session, question: end.question, options: end.options, answer, announced: false });
       }
       if (end.kind === 'done') {
-        const summary = cleanSummary(end.summary) || clause(cur.text, 80);
+        // L10: never the owner's own request as what was done.
+        const summary = cleanSummary(end.summary) || 'It gave no summary.';
         // K7/N7: the commit says what the owner asked for and what was done, never the agent's stale trouble.
         return finish(cur, { state: 'done', session, result: summary, run: end.run ?? null, answer }, `${clause(cur.text, 72)}\n\n${summary}`);
       }
+      // L3: a failure's reason is the error (its error event, else stderr), never the agent's last narration. Review
+      // round 3 (R2T-R3-H7): not even when the error has no text (Claude's error_max_turns): its kind, else the exit.
       const failed = code !== 0 || isError;
+      const why = failed ? gist(errText, 160) || gist(lastErr, 160) || ERROR_KINDS[errKind] || (errKind ? 'It ended with an error.' : '')
+        : end.summary || gist(lastErr, 160);
       return finish(cur, { state: failed ? 'failed' : 'unclear', session, run: end.run ?? null, answer,
-        result: end.summary || gist(lastErr, 160) || `It exited with code ${code}.` });
+        result: why || (code !== 0 ? `It exited with code ${code}.` : 'It ended with an error.') });
     });
   }
 
@@ -398,22 +461,37 @@ export function createRelay({
       git(cwd, ['worktree', 'add', '-q', '-b', branch, wt, baseSha ?? base]);
       cwd = wt;
     }
-    const task = { id, agent, project: name, text, readOnly: ro, branch, base, baseSha, cwd, state: 'running', owner: process.pid,
+    const task = { id, agent, project: name, text, readOnly: ro, branch, base, baseSha, cwd, state: 'running', owner: process.pid, log: join(dir, `${id}.log`),
       startedAt: iso(), updatedAt: iso(), ...(handoffFrom ? { handoffFrom } : {}) };
     save([...tasks, task]);
     return task;
   }
 
   /**
-   * The task "give it to Codex instead" means (K3): of the last 12 h, not already the target's, the newest one that
-   * ended without finishing (limited, failed, …), else the newest running or waiting one (review SM5: a newer
+   * The task "give it to Codex instead" means (K3): of the last 12 h, not already the target's, the one the owner's
+   * words name ("give the agario game to Codex", review round 2 X6), else the newest one that ended without finishing
+   * (limited, failed, …; never one the owner stopped), else the newest running or waiting one (review SM5: a newer
    * ChatGPT question, or Codex's own work elsewhere, no longer hides Claude's limited game).
    */
-  function handable({ to = null } = {}) {
+  function handable({ to = null, words = '' } = {}) {
+    // Review round 3 (R2S-R3S-5): the 12-h window is for ended tasks; a waiting question (listed at any age) and a
+    // running task (bounded by the watchdog) can always be handed over.
     const open = load().filter((t) => HANDABLE.includes(t.state) && !t.handedTo && (!to || t.agent !== to)
-      && now() - Date.parse(t.updatedAt ?? t.startedAt) < RECENT_MS);
+      && (ACTIVE.includes(t.state) || now() - Date.parse(t.updatedAt ?? t.startedAt) < RECENT_MS));
+    const want = String(words).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(' ').filter((w) => w.length > 3 && !HANDOFF_TALK.test(w));
+    if (want.length && open.length) {
+      const score = open.map((t) => want.filter((w) => String(t.text).toLowerCase().includes(w)).length);
+      const best = Math.max(...score);
+      if (best > 0 && score.filter((n) => n === best).length === 1) return open[score.indexOf(best)];
+    }
     return open.filter((t) => ENDED.includes(t.state)).at(-1) ?? open.at(-1) ?? null;
   }
+
+  /** "… finished in the meantime, so I didn't …" for a confirmed task that is no longer active (SM5, X2). */
+  const endedSince = (t, didnt) => `${AGENT_NAMES[t.agent] ?? t.agent}'s task "${clause(t.text, 50)}" ${t.handedTo ? 'was handed over'
+    : t.state === 'done' ? 'finished' : `ended (${t.state})`} in the meantime, so I didn't ${didnt}.`;
+  /** X1: a running task whose helper belongs to another live Tamago process (gateway or CLI on the same state dir). */
+  const runsElsewhere = (t) => t.state === 'running' && !running.has(t.id) && ownedElsewhere(t);
 
   /** SM6: stops a helper and waits for it to exit (SIGKILL after killWaitMs), so two never share a worktree. */
   async function stopAndWait(id) {
@@ -483,6 +561,12 @@ export function createRelay({
       const waiting = load().filter((x) => x.state === 'question' && !x.handedTo);
       const t = id ? waiting.find((x) => x.id === id) : (agent ? waiting.filter((x) => x.agent === agent) : waiting).at(-1);
       if (!t) throw new Error(agent ? `${AGENT_NAMES[agent] ?? agent} isn't waiting for an answer` : 'no question is waiting');
+      // X5: a resume in a folder that is gone (Storage unmounted, removed by hand) fails the task cleanly instead.
+      if (!t.cwd || !existsSync(t.cwd)) {
+        finish(t, { state: 'failed', result: `Its folder is gone (${t.cwd}).` });
+        update(t.id, { announced: true }, { touch: false });
+        throw new Error(`${AGENT_NAMES[t.agent] ?? t.agent}'s folder for "${clause(t.text, 50)}" is gone, so I couldn't pass that on.`);
+      }
       update(t.id, { state: 'running', owner: process.pid, question: null, options: null, asked: [...(t.asked ?? []), { q: t.question, a: text }] });
       run({ ...t, state: 'running' }, `Owner answered by voice: ${text}\n(Your question was: ${t.question})`, t.session);
       return t;
@@ -498,13 +582,13 @@ export function createRelay({
       if (!to) throw new Error(`I don't know a helper called ${agent}.`);
       const prev = id ? find(id) : handable({ to });
       if (!prev || prev.handedTo) throw new Error('There is no unfinished helper task to hand over.');
-      if (!HANDABLE.includes(prev.state)) {
-        throw new Error(`${AGENT_NAMES[prev.agent] ?? prev.agent}'s task "${clause(prev.text, 50)}" ${prev.state === 'done' ? 'finished' : `ended (${prev.state})`} in the meantime, so I didn't hand it over.`);
-      }
+      if (!HANDABLE.includes(prev.state)) throw new Error(endedSince(prev, 'hand it over'));
       if (prev.agent === to) throw new Error(`${AGENT_NAMES[to]} already has that task.`);
       if (to === 'chatgpt' && !prev.readOnly) throw new Error("ChatGPT only answers questions; it can't take build work. Codex or Claude can.");
+      // X1: never start a second helper in a worktree whose helper another Tamago process is still running.
+      if (runsElsewhere(prev)) throw new Error(`${AGENT_NAMES[prev.agent]}'s task "${clause(prev.text, 50)}" is running in another Tamago process, so I can't hand it over from here.`);
       const wasActive = ACTIVE.includes(prev.state);
-      update(prev.id, { handedTo: 'pending', ...(wasActive ? { state: 'stopped', endedAt: iso() } : {}), announced: true });
+      update(prev.id, { handedTo: 'pending', handoffBy: process.pid, handoffTo: to, ...(wasActive ? { state: 'stopped', endedAt: iso() } : {}), announced: true });
       await stopAndWait(prev.id);
       const reused = Boolean(prev.branch && !prev.removed && prev.cwd && existsSync(prev.cwd));
       let log = '';
@@ -518,16 +602,21 @@ export function createRelay({
       try {
         task = newTask({ agent: to, project: prev.project, text: prev.text, readOnly: prev.readOnly, handoffFrom: prev.id, ignoreLock: prev.id,
           reuse: reused ? { cwd: prev.cwd, branch: prev.branch, base: prev.base ?? null, baseSha } : null });
-      } catch (err) { update(prev.id, { handedTo: null }); throw err; }
+      } catch (err) { update(prev.id, { handedTo: null, handoffTo: null }); throw err; }
       update(prev.id, { handedTo: task.id });
       run(task, baton(prev, log, reused), null);
       return { task, from: prev };
     },
 
-    /** Stops the newest running/waiting task, of one helper when named (F6). */
-    stop({ agent = null } = {}) {
-      const t = load().filter((x) => ACTIVE.includes(x.state) && !x.handedTo && (!agent || x.agent === agent)).at(-1);
+    /**
+     * Stops the task the owner confirmed (`id`, review round 2 X2: refused if it has ended since), else the newest
+     * running/waiting task, of one helper when named (F6). Never a task another live Tamago process is running (X1).
+     */
+    stop({ agent = null, id = null } = {}) {
+      const t = id ? find(id) : load().filter((x) => ACTIVE.includes(x.state) && !x.handedTo && (!agent || x.agent === agent)).at(-1);
       if (!t) return null;
+      if (!ACTIVE.includes(t.state) || t.handedTo) throw new Error(endedSince(t, 'stop anything'));
+      if (runsElsewhere(t)) throw new Error(`${AGENT_NAMES[t.agent]}'s task "${clause(t.text, 50)}" is running in another Tamago process; stop it there.`);
       const u = update(t.id, { state: 'stopped', announced: true, endedAt: iso() });
       const child = running.get(t.id);
       if (child) child.kill('SIGTERM');

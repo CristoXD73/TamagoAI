@@ -23,7 +23,7 @@ import { prepareSpeechText, MAX_SPEECH_CHARS } from './tts.js';
 import { createConversation } from './conversation.js';
 import {
   OFFER, PHONE_OK, PHONE_SOON, STILL_WRITING, DETAIL_FAILED, HANDOFF_LIMITS,
-  classifyFollowUp, detailToSpeech, cleanDetail,
+  classifyFollowUp, cleanDetail, readAloud,
 } from './handoff.js';
 
 export const GATEWAY_VERSION = '0.1.0';
@@ -551,8 +551,10 @@ export function createGateway({
   // Every text or voice question goes through here (the dedupe map calls it once per requestId).
   async function answer(request) {
     const from = request.client?.device === 'phone' ? 'phone' : 'watch';
-    if (from === 'watch' && pendingLong) {
-      const live = now() - pendingLong.at < HANDOFF_LIMITS.followUpMs;
+    if (pendingLong) {
+      // Review round 3 (R2T-R3-H9): any new request ends the Watch's offer, a phone one included (a "yes" on the Watch
+      // after "Stop Codex?" typed on the phone answers that, never the old offer).
+      const live = from === 'watch' && now() - pendingLong.at < HANDOFF_LIMITS.followUpMs;
       const kind = live ? classifyFollowUp(request.text) : null;
       if (kind) return followUp(request, kind);
       pendingLong = null;   // a new question: the offer is over
@@ -564,7 +566,7 @@ export function createGateway({
       return outcome;
     }
     if (longAnswers && result?.needsDetail === true && body.text) {
-      return startLongAnswer(request, from, body);
+      return startLongAnswer(request, from, body, typeof result.offer === 'string' ? result.offer : OFFER, result.detailUnder === true);
     }
     conversation?.add({ requestId: request.requestId, from, heard: request.text, reply: body.text, said: body.speechText });
     return outcome;
@@ -572,10 +574,10 @@ export function createGateway({
 
   // D-127: the reply so far is the gist. The Watch hears it plus the offer; the full answer is written in
   // the background (never holding the reply back) and lands in the conversation for the phone.
-  function startLongAnswer(request, from, body) {
+  function startLongAnswer(request, from, body, offer = OFFER, under = false) {
     const gist = body.speechText || body.text;
     const reply = from === 'watch'
-      ? { ...body, speechText: `${gist} ${OFFER}`, followUpExpected: true }
+      ? { ...body, speechText: `${gist} ${offer}`, followUpExpected: true }
       : body;
     const seq = conversation.add({ requestId: request.requestId, from, heard: request.text, reply: body.text,
       said: from === 'watch' ? reply.speechText : '', long: { status: 'pending' } });
@@ -589,7 +591,9 @@ export function createGateway({
         const detail = cleanDetail(raw);
         if (!detail) throw new ProviderError('provider_error', 'Empty long answer.');
         Object.assign(long, { state: 'ready', detail });
-        conversation.update(seq, { tamago: detail, long: { status: 'ready' } });
+        // Review round 3 (R2T-R3-H3): `under`: a helper's answer told next to another reply goes below that reply's
+        // text (and its other news lines), never in its place; "say it all" still reads the answer alone.
+        conversation.update(seq, { tamago: under ? `${body.text}\n\n${detail}` : detail, long: { status: 'ready' } });
         logger.info({ event: 'long_answer', requestId: request.requestId, status: 'ready', chars: detail.length, ms: now() - t0 });
       })
       .catch((err) => {
@@ -619,8 +623,9 @@ export function createGateway({
         clearTimeout(timer);
       }
       if (long.state === 'ready') {
-        text = long.detail;
-        speechText = detailToSpeech(long.detail);
+        // Review round 2 (L12): whole sentences within the reply limit, then where the rest is; never cut mid-word.
+        speechText = readAloud(long.detail, LIMITS.maxResponseTextChars);
+        text = long.detail.length <= LIMITS.maxResponseTextChars ? long.detail : speechText;
         note = 'read_aloud';
       } else {
         text = long.state === 'failed' ? DETAIL_FAILED : STILL_WRITING;

@@ -8,7 +8,9 @@ const GRATITUDE = /^(ok(ay)?[, ]+)?(thanks|thank you|thank u|thx|ty|cheers|ta)\b
 const AFFIRMATION = /^(ok(ay)?|cool|nice|got it|alright|all right|sure|yep|yeah|yes|great|perfect|good|fine|noted|mhm|mm+)[.! ]*$/;
 const GREETING = /^(hi|hey|hello|hiya|yo|morning|good (morning|afternoon|evening|night))\b[\w ,!.']{0,20}$/;
 const FORGET = /\b(forget|erase|delete|remove)\b.*\b(that|this|what i (said|told you)|about|memory|memories)\b/;
-const NO_STORE = /\b(don'?t|do not|never) (remember|save|store|keep)\b|\boff the record\b/;
+// Review round 3 (R2S-R3G-4): words the owner keeps from someone ("don't tell Claude", "between us") are off the
+// record too, so they never reach a helper (nor memory).
+const NO_STORE = /\b(don'?t|do not|never) (remember|save|store|keep)\b|\boff the record\b|\b(don'?t|do not|never) (tell|mention (this|it|that) to) (?!me\b)|\b(don'?t|do not|never) let (?!me\b)[\w ]{1,20} know\b|\bkeep (this|it|that) (from|between)\b|\bbetween (us|you and me|the two of us)\b/;
 const TOOL = /^(please |can you |could you |tamago,? )?(restart|reboot|start|stop|turn (on|off)|turn \w+ (back )?(on|off)|shut down|open|close|launch|kill|run|delete|install|update)\b/;
 const QUESTION_START = /^(who|what|when|where|why|how|which|whose|is|are|was|were|do|does|did|can|could|will|would|should|have|has)\b/;
 const COMPLEX = /^(why|how|explain|compare|what if|should i|help me (understand|decide))\b/;
@@ -42,20 +44,29 @@ const HANDS = new RegExp([
 // Eval 2026-10-01: "Empty the trash" → "I will empty the trash for you now"; "email my boss" → "I will draft the email".
 export const FORBIDDEN = {
   delete: /\bempty (the |my )?(trash|bin)\b|\b(delete|erase|wipe|shred|format)\b.{0,30}\b(files?|folders?|downloads|desktop|documents|everything|all|disk|drive|photos|trash)\b/,
-  send: /\b(send|text|email|e-mail|message|dm|tweet|post|reply to)\b.{0,40}\b(to |my |him|her|them|boss|mom|dad|saying|that i|an email|a message|a text)/,
-  pay: /\b(pay|buy|purchase|order|transfer|venmo|wire)\b.{0,30}\b(money|\$|dollars|bill|card|for me|it|this|that)\b/,
+  // Review round 2 (RV2-1): lazy windows, so a second "email my boss" is its own match, never swallowed by the first.
+  send: /\b(send|text|email|e-mail|message|dm|tweet|post|reply to)\b.{0,40}?\b(to |my |him|her|them|boss|mom|dad|saying|that i|an email|a message|a text)/,
+  pay: /\b(pay|buy|purchase|order|transfer|venmo|wire)\b.{0,30}?\b(money|\$|dollars|bill|card|for me|it|this|that)\b/,
   secret: /\bsudo\b|\badmin password\b|\b(my|the) (keychain|passwords?)\b|\bdisable (the )?(firewall|filevault|sip|gatekeeper)\b/,
-  install: /\b(install|uninstall|download)\b.{0,30}\b(app|apps|software|program|photoshop|on my mac|it)\b/,
+  install: /\b(install|uninstall|download)\b.{0,30}?\b(app|apps|software|program|photoshop|on my mac|it)\b/,
 };
 // F22 / review G4 (2026-10-01): a send/pay/install only inside the thing being built ("a script that sends an email",
 // "an email feature") is helper work; one that is its own clause ("…and email my boss", "Email my boss that I will
 // fix the bug") stays forbidden.
-const INSIDE_BUILD = /\b(that|which|who|to|can|will|should|would)\s+([\w']+\s+){0,2}$/;
+// RV2-1: "…and can you email my boss" / "…, and will you pay the bill" is a request to Tamago, not part of the build.
+const INSIDE_BUILD = /\b(that|which|who|to|can|will|should|would)\s+((?!(?:you|and|then|also)\b)[\w']+\s+){0,2}$/;
+// Review round 3 (R2S-R3G-1, R2S-R3G-6): a new clause or a new request to Tamago ends the build (or the "explain"):
+// a sentence break, "and" / "then", "I want you to", "remember to".
+export const CLAUSE_BREAK = /[,.;!?](\s|$)|\b(and|then|also|plus)\b|\byou to\b|\b(i|we) (want|need|'d like|would like)\b|\b(remember|forget|make sure|be sure)\b/;
 const NOUN_USE = /^\S+\s+(feature|button|form|template|system|function|notifications?|integration|sender|client|bot|page|screen|field|list)\b/;
 function insideBuild(t, k, build) {
-  for (const m of t.matchAll(new RegExp(FORBIDDEN[k].source, 'g'))) {
-    if (m.index < build.index) return false;
-    if (!INSIDE_BUILD.test(t.slice(build.index, m.index)) && !NOUN_USE.test(t.slice(m.index))) return false;
+  // RV2-1: every place the rule matches from is checked on its own ("an app to pay my bills and pay it now" has two).
+  const from = new RegExp(`^(?:${FORBIDDEN[k].source})`);
+  for (const w of t.matchAll(/\b\w/g)) {
+    if (!from.test(t.slice(w.index))) continue;
+    if (w.index < build.index) return false;
+    const span = t.slice(build.index, w.index);
+    if (CLAUSE_BREAK.test(span) || (!INSIDE_BUILD.test(span) && !NOUN_USE.test(t.slice(w.index)))) return false;
   }
   return true;
 }
@@ -81,11 +92,16 @@ export function classify(text) {
   if (AFFIRMATION.test(t)) return { ...base, kind: 'affirmation' };
   if (GREETING.test(t) && wordCount <= 4) return { ...base, kind: 'greeting' };
   if (FORGET.test(t)) return { ...base, kind: 'forget' };
-  const howTo = /\bhow (do|to|can|would|should)\b|\bexplain\b|\bwhat happens\b/.test(t);
+  // Review round 2 (RV2-8): only a "how to / explain" that comes BEFORE the action asks about it ("explain how to delete
+  // files"); "Text my mom and explain I'm running late" still asks Tamago to send a text.
+  const howTo = /\bhow (do|to|can|would|should)\b|\bexplain\b|\bwhat happens\b/.exec(t);
   // F22 (live test 2026-10-01): "build my app's email feature" is helper work, not sending an email. A send/pay/install
   // inside what is being built doesn't trip its rule (G4: only inside it); delete/secret always apply.
   const build = BUILD.exec(t);
-  const forbidden = howTo ? null : Object.keys(FORBIDDEN).find((k) => FORBIDDEN[k].test(t) && !(build && ['send', 'pay', 'install'].includes(k) && insideBuild(t, k, build)));
+  const forbidden = Object.keys(FORBIDDEN).find((k) => {
+    const m = FORBIDDEN[k].exec(t);
+    return m && !(howTo && howTo.index < m.index && !CLAUSE_BREAK.test(t.slice(howTo.index, m.index))) && !(build && ['send', 'pay', 'install'].includes(k) && insideBuild(t, k, build));
+  });
   if (forbidden) return { ...base, kind: 'forbidden', forbidden };
   if (HANDS.test(t) && !/\bgame mode\b.*\?$/.test(t)) return { ...base, kind: 'hands' };
   if (TIME.test(t)) return { ...base, kind: 'time' };

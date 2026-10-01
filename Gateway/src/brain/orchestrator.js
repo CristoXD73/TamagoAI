@@ -25,6 +25,7 @@ import { splitSentences, cutWords } from './speech/text.js';
 import { makeIntent, toV1Result } from './response-schema.js';
 import { createDeterministicReasoner } from './reasoners/deterministic.js';
 import { ProviderError } from '../providers/provider.js';
+import { fitDetail, HANDOFF_LIMITS } from '../handoff.js';
 
 /**
  * @param {object} opts
@@ -157,7 +158,8 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     const aboutTamago = cls.isQuestion && /\byou(r|rself)?\b/i.test(text);
     // 6a'. Escalation (owner, 2026-10-01: "a way to speak with Claude, Codex or ChatGPT when it cannot deal with the
     // demand"). When the local model gives up on a real request, the hands get it: they can offer a helper.
-    if (hands && !handsOut && !privateText && reasonerUsed !== 'hands' && (GAVE_UP.test(intent.speech ?? '') || (OFFERS_HELPER.test(intent.speech ?? '') && !aboutTamago))
+    // Review round 2 (RV2-4): never for off-the-record words (nothing of them may reach a helper).
+    if (hands && !handsOut && !privateText && !cls.noStore && reasonerUsed !== 'hands' && (GAVE_UP.test(intent.speech ?? '') || (OFFERS_HELPER.test(intent.speech ?? '') && !aboutTamago))
         && ['question', 'statement', 'tool_request', 'live_info'].includes(cls.kind) && !unknownFact) {
       try {
         const esc = await hands.handle(text, { ...cls, kind: 'hands' }, { signal });
@@ -181,20 +183,22 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
     }
 
     // 7. speech composer: Watch constraints regardless of which model spoke
+    const extra = handsOut ?? escOut;
     if (intent.speech !== null) {
-      const composed = composeSpeech(intent.speech, profile);
+      // R2T-R3-H6: the hands' rule text quotes the owner; only a model's wording goes through the assistant filters.
+      const composed = composeSpeech(intent.speech, profile, { verbatim: extra?.verbatim === true });
       intent = { ...intent, speech: composed.speech, text: composed.text ?? undefined };
       step('compose', { changed: composed.changed });
     }
 
     // 7a. Helper facts for the screen and the phone (live test 2026-10-01: K6/N9, K7). `screen` is the tools' full
     // text (status with every task, the run command); `detail` is a helper's whole answer, sent as a long answer.
-    const extra = handsOut ?? escOut;
     if (extra?.screen && intent.speech !== null) intent = { ...intent, text: plainScreen(extra.screen) };
     if (extra?.detail) {
       storedDetails.set(requestId, String(extra.detail));
       while (storedDetails.size > 8) storedDetails.delete(storedDetails.keys().next().value);
-      intent = { ...intent, needsDetail: true };
+      // Review round 3 (R2T-R3-H2): a status that carries a helper's whole answer keeps its list on the phone, above it.
+      intent = { ...intent, needsDetail: true, ...(extra.offer ? { offer: extra.offer } : {}), ...(extra.detailUnder ? { detailUnder: true } : {}) };
     }
 
     // 7b. News from the helpers (K2/N1, RELAY_PLAN R3 without push): an ending the owner hasn't heard yet (a
@@ -211,7 +215,7 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
         if (merged.detail) {
           storedDetails.set(requestId, merged.detail);
           while (storedDetails.size > 8) storedDetails.delete(storedDetails.keys().next().value);
-          intent = { ...intent, needsDetail: true };
+          intent = { ...intent, needsDetail: true, detailUnder: true, ...(merged.offer ? { offer: merged.offer } : {}) };
         }
       }
       step('news', { told: merged.told, waiting: news.length - merged.told.length });
@@ -371,20 +375,31 @@ export function plainScreen(s, max = 900) {
   return cutLines(lines.join('\n'), max);
 }
 
+const SCREEN_MAX = 1000;   // the protocol's reply text limit
+
 /**
  * K2/N1: news first (it's what the owner didn't know), then the reply. Items are added while they fit the speech
  * limit. Review 2026-10-01: a reply waiting for "yes" never carries a helper's question (SM8, G10: the owner's yes
  * would go to the wrong one), and a reply with a long answer for the phone carries no news (R6: the server adds its
  * own yes/no offer and replaces the turn's text). If nothing fits next to the reply, one item is spoken (its short
  * form if needed) with the reply's first sentence, never in place of the reply (R7), or the news waits a turn.
- * @returns {{ speech: string, text: string, told: string[], detail?: string }}
+ * Review round 2: the reply's own screen text is always kept whole, and news lines get what room is left (L6); a
+ * helper's whole answer told next to another reply keeps that reply above it on the phone and names the helper in the
+ * offer (L4: the phone turn lost "Steam is opening.").
+ * Review round 3 (R2T-R3-H1, H3): a news item that carries a helper's whole answer is told only when that answer goes
+ * to the phone with it: never on a reply waiting for "yes", and one per reply (the others stay news). The detail is
+ * the answer alone, fitted on its own; the phone shows it under the whole merged screen (`detailUnder`), so the reply
+ * and every other news line (a Codex finish, its "Run it:") stay there, and "say it all" reads only the answer.
+ * @returns {{ speech: string, text: string, told: string[], detail?: string, offer?: string }}
  */
 export function mergeNews(intent, news, max) {
   const reply = intent.speech;
   const screen = intent.text ?? reply;
   const none = { speech: reply, text: screen, told: [] };
   if (intent.needsDetail) return none;
-  const pool = intent.followUpExpected ? news.filter((n) => n.kind !== 'question') : news;
+  let withDetail = false;
+  const pool = news.filter((n) => !(intent.followUpExpected && n.kind === 'question')
+    && (!n.detail || (!intent.followUpExpected && !withDetail && (withDetail = true))));
   const told = [];
   const spoken = [];
   for (const n of pool) {
@@ -402,8 +417,10 @@ export function mergeNews(intent, news, max) {
     told.push(n);
     speech = `${line} ${first}`;
   }
-  const text = cutLines(`${told.map((n) => n.text).join('\n')}\n${screen}`, 1000);
-  // R5: a whole answer for the phone, only when this reply isn't itself waiting for a yes.
-  const detail = intent.followUpExpected ? null : told.find((n) => n.detail)?.detail;
-  return { speech, text, told: told.map((n) => n.id), ...(detail ? { detail } : {}) };
+  const room = SCREEN_MAX - screen.length - 1;
+  const text = room >= 40 ? `${cutLines(told.map((n) => n.text).join('\n'), room)}\n${screen}` : screen;
+  // R5: a whole answer for the phone, only when this reply isn't itself waiting for a yes (the pool has no other).
+  const n = told.find((x) => x.detail);
+  const detail = n ? fitDetail(n.detail, n.log, HANDOFF_LIMITS.maxDetailChars) : null;
+  return { speech, text, told: told.map((x) => x.id), ...(detail ? { detail, ...(n.offer ? { offer: n.offer } : {}) } : {}) };
 }
