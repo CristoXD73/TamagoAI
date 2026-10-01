@@ -1516,3 +1516,18 @@ Sandbox project.
 4. Then ship to TestFlight for the owner's Watch.
 
 **Do not redo:** the chunk and queue design; the privacy stance (saved only while listening mode is on).
+
+### 2026-10-01T04:29:56-04:00: Claude (Sonnet 5.5, Claude Code desktop): startup sequence v3 prototype
+Branch: claude/great-volta-ogpuw8
+Commit(s): see git log (this entry lands with the v3 prototype commit)
+Files changed: tools/brand/startup_fit.py (new), tools/brand/startup_sequence_v3.py (new), Assets/Brand/universes/fitted/ (new), docs/prototypes/startup-v3/ (new), docs/VISUAL_APPROVAL_GATE.md (#19)
+Upstream source reused: None
+Tests run (exact commands): python3 tools/brand/startup_fit.py ALIGNED IDLE_FRAME OUT; python3 tools/brand/startup_sequence_v3.py FITTED IDLE OUT [--app] (idle frames: ffmpeg fps=30,scale=768:1024 from octopus-idle-10s-alpha.mov)
+Passed: both render; onion-check shows the eight silhouettes stacked on the hero; keyframes and mid-fight frames inspected (brackets gone, Wormhole reads as a tunnel on mostly black)
+Failed: none known
+Physical-device evidence (+ label): none. PROTOTYPE_READY_FOR_REVIEW only; sound not listened to by an agent (unchanged from v2).
+Unverified: how it looks and sounds on the owner's phone; fine details stretch slightly where the width warp is large
+Known risks: the app still ships v1 (build 9); v3 is not in the app
+Next recommended task (ONE bounded step): owner reviews docs/prototypes/startup-v3/startup-v3.mp4; on "ship it", swap startup-v3-app.mp4 into Apple/iPhoneApp/StartupSequence.mp4 and cut TestFlight build 10
+Do not redo: the silhouette fit (startup_fit.py); v2's beats and sound
+Signed-by: Claude Sonnet 5.5 (2026-10-01T04:29:56-04:00)
