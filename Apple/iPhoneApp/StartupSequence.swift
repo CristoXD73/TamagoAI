@@ -1,10 +1,11 @@
 // StartupSequence.swift
 //
-// VERIFICATION: builds; not checked on a device. VISUAL_APPROVAL_GATE #17 (owner, 2026-09-29: "Sure ship that").
+// VERIFICATION: builds; not checked on a device. VISUAL_APPROVAL_GATE #17 (owner, 2026-09-29: "Sure ship that"), v3 per
+// #19 (owner, 2026-10-01: "sure change it to that").
 //
-// The startup sequence: Tamago's eight universes flick past, faster and faster, land on the hero and start to
-// float (docs/prototypes/startup-v1). Plays once per launch over the app, then fades away; a tap skips it.
-// StartupSequence.mp4 is the prototype trimmed to 5.6 s with a fade.
+// The startup sequence: Tamago's eight universes fight for the spot, overload, cut to black, and the hero lands and
+// starts to float (docs/prototypes/startup-v3). Plays once per launch over the app, then fades away; a tap skips it.
+// StartupSequence.mp4 is the v3 app cut: 6.3 s, ending on the hero, with a fade.
 // Sound follows the ringer switch (.ambient): a launch shouldn't make noise when the phone is on silent, and it
 // never stops the owner's music.
 

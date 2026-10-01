@@ -1531,3 +1531,11 @@ Known risks: the app still ships v1 (build 9); v3 is not in the app
 Next recommended task (ONE bounded step): owner reviews docs/prototypes/startup-v3/startup-v3.mp4; on "ship it", swap startup-v3-app.mp4 into Apple/iPhoneApp/StartupSequence.mp4 and cut TestFlight build 10
 Do not redo: the silhouette fit (startup_fit.py); v2's beats and sound
 Signed-by: Claude Sonnet 5.5 (2026-10-01T04:29:56-04:00)
+
+### 2026-10-01T04:44:57-04:00: Claude (Sonnet 5.5, Claude Code desktop): ship startup v3 to the iPhone app
+Branch: claude/great-volta-ogpuw8 → main
+Files changed: Apple/iPhoneApp/StartupSequence.mp4 (v3 app cut, 6.3 s), Apple/iPhoneApp/StartupSequence.swift (comments only), docs/VISUAL_APPROVAL_GATE.md (#19 APPROVED)
+Tests run: none (resource swap + comments); Xcode Cloud archives on push to main
+Physical-device evidence (+ label): none; UNVERIFIED on device until the owner installs the TestFlight build
+Next recommended task (ONE bounded step): owner installs the new build and confirms the intro; then the AI side (docs/BRAIN_ARCHITECTURE.md)
+Signed-by: Claude Sonnet 5.5 (2026-10-01T04:44:57-04:00)
