@@ -28,6 +28,8 @@ const HANDS = new RegExp([
   String.raw`\b(battery|plugged in)\b`,
   // D-129: the helpers ("tell Claude to…", "what's Codex doing?", "how much Claude is left?")
   String.raw`\b(claude|clawed|codex|code x|chat ?gpt)\b`,
+  // Building or changing software is helper work ("can you build me a game that runs in the terminal").
+  String.raw`\b(build|make|create|write|code|program|develop|fix|debug|refactor)\b.{0,40}\b(app|apps|game|script|website|site|program|tool|bot|code|function|feature|bug|cli|terminal|extension|plugin|api|server)\b`,
 ].join('|'));
 // The clock is known locally: answered exactly by rule, never guessed by a model ("06:08" at 07:08, 2026-09-27).
 const TIME = /^(so |hey |tamago,? )?(what('?s| is) the time|what time (of day )?is it|do you (know|have) the time|what'?s the time)\b/;

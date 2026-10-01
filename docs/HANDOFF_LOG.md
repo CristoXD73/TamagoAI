@@ -1539,3 +1539,13 @@ Tests run: none (resource swap + comments); Xcode Cloud archives on push to main
 Physical-device evidence (+ label): none; UNVERIFIED on device until the owner installs the TestFlight build
 Next recommended task (ONE bounded step): owner installs the new build and confirms the intro; then the AI side (docs/BRAIN_ARCHITECTURE.md)
 Signed-by: Claude Sonnet 5.5 (2026-10-01T04:44:57-04:00)
+
+### 2026-10-01T04:54:01-04:00: Claude (Opus 5.5, Claude Code desktop): Tamago stops playing dumb: capabilities, build routing, escalation
+Branch: claude/great-volta-ogpuw8
+Files changed: Gateway/src/brain/personality/profile.js, Gateway/src/brain/routing/intent-router.js, Gateway/src/hands/agent.js, Gateway/src/brain/orchestrator.js, Gateway/test/brain.test.js, Gateway/test/relay.test.js
+Why: owner's first spin (phone, Gemma 4 12B): "What can you do?" → "I can share small facts"; "build me a terminal game" → "I cannot build software". The prompt said "a creature, not an assistant: you do not manage schedules, files or devices" and "give one short curious thing"; building requests never matched the hands patterns; nothing escalated.
+Changes: prompt names its real abilities (hands, Claude/Codex build, ChatGPT answers, long answers to the phone via needsDetail; never offers the phone itself); router sends build/make/write/fix + app/game/script/... to the hands; hands prompt says which helper and project (Sandbox for new things); orchestrator escalates to the hands when the local model gives up ("I can't…").
+Tests run: cd Gateway && npm test → 181 pass, 0 fail, 1 skipped. Live against gemma4:12b-it-qat: "What can you do?" → "I can manage your Mac files and apps. I can also have helpers build software for you."; "Explain how black holes form" → gist + phone offer.
+Unverified: the full build path (relay_start → owner "yes" → Claude in Sandbox) end to end with the real model
+Next recommended task (ONE bounded step): owner asks for the terminal game, says yes, then "how's it going?"
+Signed-by: Claude Opus 5.5 (2026-10-01T04:54:01-04:00)

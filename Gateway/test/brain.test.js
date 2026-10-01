@@ -473,7 +473,7 @@ test('context builder stays within budget and system prompt is compact', () => {
     relationship: { stage: 'familiar', daysKnown: 6, lastSeenAgoSec: 30 }, world: { timeOfDay: 'evening', localTime: '20:00', energy: 0.5 },
   });
   assert.ok(ctx.prompt.length <= CONTEXT_BUDGET_CHARS + 700);
-  assert.ok(renderSystemPrompt().length < 1400);   // 1200 → 1300 (D-127 needsDetail) → 1400 (general knowledge line, 2026-09-28)
+  assert.ok(renderSystemPrompt().length < 2000);   // 1200 → 1300 (D-127 needsDetail) → 1400 (general knowledge line, 2026-09-28) → 2000 (capabilities, owner 2026-10-01)
 });
 
 test('D-125 defaults: ollama without a named model uses gemma4:12b-it-qat; nothing set stays deterministic', async () => {

@@ -136,6 +136,13 @@ test('relay tools: start waits for a yes; status, answer and usage speak plainly
   for (const t of ['Tell Claude to fix the widget on TamaWatch', 'can you talk to claude for me?', "what's codex doing?", 'ask chat gpt why the sky is blue', 'how much claude do I have left?']) {
     assert.equal(classify(t).kind, 'hands', t);
   }
+  // Owner, 2026-10-01: "Can you build me a game that runs on terminal" got "I cannot build software".
+  for (const t of ['Can you build me a game that runs on terminal. Agario like', 'write me a python script that renames photos', 'fix the bug in my app']) {
+    assert.equal(classify(t).kind, 'hands', t);
+  }
+  for (const t of ['how do I make pasta', 'What can you do?', 'What is the capital of France?']) {
+    assert.notEqual(classify(t).kind, 'hands', t);
+  }
 });
 
 test('codex usage is read from its session files without running anything', () => {

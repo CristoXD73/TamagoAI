@@ -32,6 +32,9 @@ import { ProviderError } from '../providers/provider.js';
  * @param {() => number} [opts.now]
  * @param {object} [opts.profile]
  */
+// The local model giving up ("I can't build software", "I'm not able to", "I don't know how").
+const GAVE_UP = /\b(i (can'?t|cannot|can not|am not able to|'m not able to|am unable to|'m unable to|don'?t know how)|beyond (me|my))\b/i;
+
 export async function createBrain({ dbPath, reasoner = createDeterministicReasoner(), now = Date.now, profile = TAMAGO_PROFILE, hands = null } = {}) {
   const db = await openBrainDb(dbPath);
   const fallback = createDeterministicReasoner();
@@ -141,6 +144,24 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
         } else {
           throw err;
         }
+      }
+    }
+
+    // 6a'. Escalation (owner, 2026-10-01: "a way to speak with Claude, Codex or ChatGPT when it cannot deal with the
+    // demand"). When the local model gives up on a real request, the hands get it: they can offer a helper.
+    if (hands && !handsOut && !privateText && reasonerUsed !== 'hands' && GAVE_UP.test(intent.speech ?? '')
+        && ['question', 'statement', 'tool_request', 'live_info'].includes(cls.kind) && !unknownFact) {
+      try {
+        const esc = await hands.handle(text, { ...cls, kind: 'hands' }, { signal });
+        if (esc) {
+          route = 'escalated';
+          reasonerUsed = 'hands (escalated)';
+          intent = makeIntent({ speech: esc.speech, emotion: esc.emotion ?? 'curious', behavior: esc.behavior ?? 'settle',
+            haptic: 'click', followUpExpected: esc.followUpExpected === true, thought: `Local model gave up; ${esc.thought ?? ''}` });
+          step('escalate', { steps: esc.steps ?? [], pending: hands.pending });
+        }
+      } catch (err) {
+        step('escalate', { error: err.message });
       }
     }
 
