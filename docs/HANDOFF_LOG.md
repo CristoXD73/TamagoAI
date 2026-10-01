@@ -1574,3 +1574,14 @@ Known risks: news is spoken only when the owner talks to Tamago (no push / inbox
 Next recommended task (ONE bounded step): restart the live gateway and replay the live-test script (build request → yes → limit → "give it to Codex" → answer the question → "What did Codex build?") on the phone; record the results in docs/relay/LIVE_TEST_2026-10-01.md
 Do not redo: the findings audit (docs/relay/LIVE_TEST_2026-10-01.md); the sentence splitter; the baton format
 Signed-by: Claude Opus 5.5 workflow implementer (2026-10-01T06:42:13-04:00)
+
+### 2026-10-01T14:49:59-04:00: Claude (Opus 5.5, Claude Code desktop): relay live test, fixes, 3 review rounds, live retest
+Branch: claude/great-volta-ogpuw8
+Commit(s): c6de441 (live test report), 227f482 (fixes + review 1), cf79fd5 (reviews 2–3), this commit (retest notes)
+Tests run: cd Gateway && npm test → 282 pass, 0 fail, 1 skipped. npm run eval -- --reps 3 → 42 cases (10 relay, real relay code + fake helpers) 100 % at 227f482 and cf79fd5. CLI checks: codex exec -s … resume parses (F18); claude --disallowedTools exists.
+Live: retest with real Codex and ChatGPT (above in docs/relay/LIVE_TEST_2026-10-01.md); Claude out of weekly usage until 2026-10-02 12:00.
+Backups: /Volumes/Storage/AI/relay/backups/sandbox-all-2026-10-01.bundle (every relay branch), tasks-2026-10-01.json.
+Unverified live: ASK_OWNER round trip on the new code, handoff, stop, a read-only Claude run with --disallowedTools.
+Open question for the owner: answer routing is heuristic and the review rounds didn't converge (30/34/28). Simpler and safer: confirm before forwarding anything that isn't an exact option or addressed ("Tell Codex 'use curses'? Say yes.").
+Next recommended task (ONE bounded step): after Claude's reset, run a Claude task with a deliberate question and a stop, live.
+Signed-by: Claude Opus 5.5 (2026-10-01T14:49:59-04:00)
