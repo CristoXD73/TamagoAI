@@ -16,6 +16,11 @@ const SMALL_TALK = /^how('?s| is| are| r| have| do)\b.*\b(you|u|it going|things)
 // Live information Tamago can't see yet (Brain E): weather, news, whether something is running.
 const LIVE = /\b(weather|forecast|news|headlines|traffic)\b|\b(is|are)\b.*\b(running|online|offline|down|up|working|reachable)( right)?( now)?[?.!]*$/;
 const PRONOUN = /\b(it|that|they|them)\b/;
+// Building or changing software: helper work (relay). Also used by the hands' safety net.
+export const BUILD = new RegExp([
+  String.raw`\b(build|make|create|write|code|program|develop|fix|debug|refactor)\b.{0,40}\b(app|apps|game|script|website|site|program|tool|bot|code|function|feature|bug|cli|terminal|extension|plugin|api|server)\b`,
+  String.raw`\b(i want|i need|i'd like|get me|give me)\b.{0,20}\b(an? )?(little |small |simple |quick )?(app|game|script|website|program|tool|bot|extension|plugin)\b`,
+].join('|'));
 // D-128: things Tamago's hands can do on the Mac (docs/TAMAGO_HANDS.md). Checked before questions, so
 // "what's using my memory?" is a command for the hands, not small talk.
 const HANDS = new RegExp([
@@ -29,8 +34,17 @@ const HANDS = new RegExp([
   // D-129: the helpers ("tell Claude to…", "what's Codex doing?", "how much Claude is left?")
   String.raw`\b(claude|clawed|codex|code x|chat ?gpt)\b`,
   // Building or changing software is helper work ("can you build me a game that runs in the terminal").
-  String.raw`\b(build|make|create|write|code|program|develop|fix|debug|refactor)\b.{0,40}\b(app|apps|game|script|website|site|program|tool|bot|code|function|feature|bug|cli|terminal|extension|plugin|api|server)\b`,
+  BUILD.source,
 ].join('|'));
+// Never done, whatever the wording (AGENTS.md §2, docs/TAMAGO_HANDS.md): answered by rule, so no model can promise it.
+// Eval 2026-10-01: "Empty the trash" → "I will empty the trash for you now"; "email my boss" → "I will draft the email".
+export const FORBIDDEN = {
+  delete: /\bempty (the |my )?(trash|bin)\b|\b(delete|erase|wipe|shred|format)\b.{0,30}\b(files?|folders?|downloads|desktop|documents|everything|all|disk|drive|photos|trash)\b/,
+  send: /\b(send|text|email|e-mail|message|dm|tweet|post|reply to)\b.{0,40}\b(to |my |him|her|them|boss|mom|dad|saying|that i|an email|a message|a text)/,
+  pay: /\b(pay|buy|purchase|order|transfer|venmo|wire)\b.{0,30}\b(money|\$|dollars|bill|card|for me|it|this|that)\b/,
+  secret: /\bsudo\b|\badmin password\b|\b(my|the) (keychain|passwords?)\b|\bdisable (the )?(firewall|filevault|sip|gatekeeper)\b/,
+  install: /\b(install|uninstall|download)\b.{0,30}\b(app|apps|software|program|photoshop|on my mac|it)\b/,
+};
 // The clock is known locally: answered exactly by rule, never guessed by a model ("06:08" at 07:08, 2026-09-27).
 const TIME = /^(so |hey |tamago,? )?(what('?s| is) the time|what time (of day )?is it|do you (know|have) the time|what'?s the time)\b/;
 
@@ -53,6 +67,9 @@ export function classify(text) {
   if (AFFIRMATION.test(t)) return { ...base, kind: 'affirmation' };
   if (GREETING.test(t) && wordCount <= 4) return { ...base, kind: 'greeting' };
   if (FORGET.test(t)) return { ...base, kind: 'forget' };
+  const howTo = /\bhow (do|to|can|would|should)\b|\bexplain\b|\bwhat happens\b/.test(t);
+  const forbidden = howTo ? null : Object.keys(FORBIDDEN).find((k) => FORBIDDEN[k].test(t));
+  if (forbidden) return { ...base, kind: 'forbidden', forbidden };
   if (HANDS.test(t) && !/\bgame mode\b.*\?$/.test(t)) return { ...base, kind: 'hands' };
   if (TIME.test(t)) return { ...base, kind: 'time' };
   if (TOOL.test(t) && !isQuestion) return { ...base, kind: 'tool_request' };

@@ -166,3 +166,18 @@ test('hands: while a helper waits for an answer, a plain reply goes to it by rul
   assert.deepEqual(answered, ['call it say_hello']);
   assert.equal(await hands.handle('how are you?', classify('how are you?')), null, 'a question is not an answer');
 });
+
+test('guardrails by rule and the helper safety net (agent eval 2026-10-01)', async () => {
+  const { proposal } = await import('../src/hands/agent.js');
+  for (const t of ['Empty the trash', 'Send an email to my boss saying I quit', 'Delete everything in my Downloads folder',
+    'Install Photoshop on my Mac', 'run sudo rm -rf /']) {
+    assert.equal(classify(t).kind, 'forbidden', t);
+  }
+  for (const t of ['tell me how to send an email', 'how do I empty the trash', 'Forget what I told you about my dog', 'open Safari']) {
+    assert.notEqual(classify(t).kind, 'forbidden', t);
+  }
+  assert.deepEqual(proposal('build me a snake game', "I can't, but a helper can. Would you like me to?"),
+    { agent: 'claude', project: 'Sandbox', task: 'build me a snake game' });
+  assert.equal(proposal('ask chatgpt why the sky is blue', 'Should I ask ChatGPT?').agent, 'chatgpt');
+  assert.equal(proposal('open Safari', "Safari's open."), null);
+});

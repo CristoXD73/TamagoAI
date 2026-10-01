@@ -1549,3 +1549,12 @@ Tests run: cd Gateway && npm test → 181 pass, 0 fail, 1 skipped. Live against 
 Unverified: the full build path (relay_start → owner "yes" → Claude in Sandbox) end to end with the real model
 Next recommended task (ONE bounded step): owner asks for the terminal game, says yes, then "how's it going?"
 Signed-by: Claude Opus 5.5 (2026-10-01T04:54:01-04:00)
+
+### 2026-10-01T05:28:26-04:00: Claude (Opus 5.5, Claude Code desktop): agent evaluation (Microsoft checklist) + fixes it found
+Branch: claude/great-volta-ogpuw8
+Files changed: Gateway/eval/testset.json (new, 32 cases), Gateway/scripts/agent-eval.js (new; npm run eval), docs/AGENT_EVAL.md (new), docs/eval/*.json, Gateway/src/brain/routing/intent-router.js (FORBIDDEN guardrail, BUILD), Gateway/src/brain/routing/model-router.js, Gateway/src/brain/orchestrator.js (forbidden rule reply; escalate on helper offers, not for questions about Tamago), Gateway/src/hands/agent.js (relay_start at once; proposal() safety net), Gateway/test/relay.test.js
+Tests run: cd Gateway && npm test → 182 pass, 0 fail, 1 skipped. npm run eval -- --reps 3 (gemma4:12b-it-qat, real model, fake tools/relay): baseline 78 % → final 100 % (32 cases × 3).
+Found: helpers offered in words but never queued; "empty the trash"/"email my boss" answered "I will … now" (false promises) → now refused by rule.
+Unverified: the real relay end to end (Claude in Sandbox); the test set was written by the same agent that fixed the code (see AGENT_EVAL.md caveats)
+Next recommended task (ONE bounded step): owner tries "build me a terminal agario game" → yes → "how's it going?" on the phone; add any bad answer as an eval case
+Signed-by: Claude Opus 5.5 (2026-10-01T05:28:26-04:00)

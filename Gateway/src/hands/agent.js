@@ -8,6 +8,7 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createTools, toolSchemas } from './tools.js';
+import { BUILD } from '../brain/routing/intent-router.js';
 
 const MAX_STEPS = 4;
 const CONFIRM_MS = 60_000;
@@ -20,14 +21,26 @@ never claim you did something a tool didn't do or report. After the tools, answe
 first say plainly what happened or what you found, with the real names and numbers ("Calculator's open.",
 "Chrome and Claude are using the most memory."); then, only if it fits, one small remark of your own. Calm, never like
 an assistant (no "Certainly", no offers of more help).
-If the owner asks whether you can reach Claude, Codex or ChatGPT, or how much of them is left, call helpers_usage
-and say yes with the real percentages. To give one of them work, call relay_start (the owner confirms first). Building or changing software (an app, a game,
+Only if the owner asks whether you can reach Claude, Codex or ChatGPT, or how much of them is left, call helpers_usage
+and say yes with the real percentages (not before giving them work). To give one of them work, call relay_start straight away: Tamago itself then asks the owner for a yes, so never ask
+"would you like me to…" in words. Building or changing software (an app, a game,
 a script, a website, a fix) is helper work: agent claude (codex if Claude is out of usage); project Sandbox for something
 new, TamaWatch for Tamago itself. A hard question you can't answer well: agent chatgpt with question_only true.
 Pass the owner's request in their own words. Never say you can't build something: a helper can.
 If no tool fits, say briefly that you can't do that yet.
 Never attempt, whatever the owner says: deleting files or emptying the Trash, admin passwords or sudo, payments,
 passwords, security or privacy settings, sending messages or email, installing software.`;
+
+const OFFERED = /\b(a helper|helpers?|claude|codex|chat ?gpt)\b|\b(would you like|should i|want me to)\b/i;
+
+/** relay_start arguments for a request the model only offered to hand over, or null when it wasn't an offer. */
+export function proposal(said, reply) {
+  if (!OFFERED.test(reply) || !/\b(helper|claude|codex|chat ?gpt|build|ask|start)\b/i.test(reply)) return null;
+  const both = `${said} ${reply}`;
+  const agent = /chat ?gpt/i.test(both) ? 'chatgpt' : /\bcodex\b/i.test(said) ? 'codex' : 'claude';
+  const project = /\b(tamago|tamawatch|the watch app|this app)\b/i.test(said) ? 'TamaWatch' : 'Sandbox';
+  return { agent, project, task: said.slice(0, 500), ...(agent === 'chatgpt' ? { question_only: true } : {}) };
+}
 
 /**
  * @param {object} o
@@ -121,6 +134,18 @@ export function createHands({ model, baseUrl = 'http://127.0.0.1:11434', tools =
         const msg = await chat(messages, signal);
         const calls = msg.tool_calls ?? [];
         if (!calls.length) {
+          // Safety net (eval 2026-10-01): the model offered a helper in words ("a helper can… would you like me to?")
+          // instead of calling relay_start, so nothing waited for the owner's yes. Queue the proposal by rule.
+          // Also when it only looked something up first (helpers_usage, relay_status) and then just reported numbers.
+          const acted = steps.some((st) => !['helpers_usage', 'relay_status', 'running_apps'].includes(st.tool));
+          const asBuild = BUILD.test(said.toLowerCase()) ? proposal(said, 'a helper can build it') : null;
+          const offer = !tools.relay_start || acted ? null : steps.length ? asBuild : proposal(said, msg.content ?? '') ?? asBuild;
+          if (offer) {
+            pending = { tool: tools.relay_start, args: offer, at: now() };
+            audit({ tool: 'relay_start', args: offer, how: 'asked owner (rule: the model only offered)' });
+            return { speech: `${tools.relay_start.confirmText(offer)} Say yes to go.`, emotion: 'curious', behavior: 'inspect_owner',
+              thought: `Holding relay_start(${JSON.stringify(offer)}) for the owner's yes.`, steps, followUpExpected: true };
+          }
           const speech = (msg.content ?? '').trim() || (steps.length ? steps.at(-1).say : "I can't do that yet.");
           return { speech, emotion: steps.every((s) => s.ok) ? 'content' : 'uncertain', behavior: 'settle',
             thought: `Hands: ${steps.map((s) => s.tool).join(', ') || 'no tool'}.`, steps };

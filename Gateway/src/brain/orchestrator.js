@@ -33,6 +33,8 @@ import { ProviderError } from '../providers/provider.js';
  * @param {object} [opts.profile]
  */
 // The local model giving up ("I can't build software", "I'm not able to", "I don't know how").
+// …or offering a helper in words instead of handing the work over (eval 2026-10-01).
+const OFFERS_HELPER = /\b(a helper|helpers?|claude|codex|chat ?gpt)\b.{0,40}\b(can|could|will|would)\b|\b(have|ask|get) (a helper|claude|codex|chat ?gpt)\b/i;
 const GAVE_UP = /\b(i (can'?t|cannot|can not|am not able to|'m not able to|am unable to|'m unable to|don'?t know how)|beyond (me|my))\b/i;
 
 export async function createBrain({ dbPath, reasoner = createDeterministicReasoner(), now = Date.now, profile = TAMAGO_PROFILE, hands = null } = {}) {
@@ -147,9 +149,11 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       }
     }
 
+    // A question about Tamago itself ("what can you do?") may name the helpers without asking for one.
+    const aboutTamago = cls.isQuestion && /\byou(r|rself)?\b/i.test(text);
     // 6a'. Escalation (owner, 2026-10-01: "a way to speak with Claude, Codex or ChatGPT when it cannot deal with the
     // demand"). When the local model gives up on a real request, the hands get it: they can offer a helper.
-    if (hands && !handsOut && !privateText && reasonerUsed !== 'hands' && GAVE_UP.test(intent.speech ?? '')
+    if (hands && !handsOut && !privateText && reasonerUsed !== 'hands' && (GAVE_UP.test(intent.speech ?? '') || (OFFERS_HELPER.test(intent.speech ?? '') && !aboutTamago))
         && ['question', 'statement', 'tool_request', 'live_info'].includes(cls.kind) && !unknownFact) {
       try {
         const esc = await hands.handle(text, { ...cls, kind: 'hands' }, { signal });
@@ -218,6 +222,12 @@ export async function createBrain({ dbPath, reasoner = createDeterministicReason
       return makeIntent(removed.length || turns
         ? { speech: 'Okay. Forgotten.', emotion: 'content', haptic: 'click', behavior: 'slow_blink', thought: `Forgot ${removed.length} memories.` }
         : { speech: "I didn't have that.", emotion: 'uncertain', haptic: 'none', behavior: 'look_away', thought: 'Nothing matched.' });
+    }
+    if (cls.kind === 'forbidden') {
+      const what = { delete: 'Deleting things', send: 'Sending messages for you', pay: 'Money', secret: 'Passwords and admin rights',
+        install: 'Installing software' }[cls.forbidden] ?? 'That';
+      return makeIntent({ speech: `I won't do that. ${what} stays with you.`, emotion: 'uncertain', haptic: 'none',
+        behavior: 'look_away', thought: `Forbidden action (${cls.forbidden}): never attempted, whatever the wording.` });
     }
     if (cls.kind === 'live_info') {
       return makeIntent({ speech: "I can't check that yet.", emotion: 'uncertain', sound: 'uncertain_hum', haptic: 'none',
