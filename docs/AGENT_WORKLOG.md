@@ -1155,3 +1155,32 @@ Pro simulator shows the new screen.
   untracked 3D work untouched. No third-party art/code added. TestFlight workflow preparation by delegated Codex agent
   was independently inspected: Archive iOS / TamagoPhone / Owner internal-testing post-action, main trigger.
 - Signed-by: Codex
+
+---
+
+### 2026-09-27T08:56:45-04:00: Codex: transparent frontal idle animation prototype
+Agent: Codex; branch codex/widget-rendering-fix; starting/ending source SHA 22b5d68f86f94d2a4fa1c276c44461a6c6c832c9
+(no source commit in this prototype pass). Files: docs/prototypes/idle-front-v1, worklog/handoff/device log.
+Created RGBA frontal source using built-in imagegen from owner's attachment; Swift analytic 2D renderer;
+300 frames/30 fps/10 seconds; transparent ProRes4444 and WebM plus looping GIF preview. Did not touch production animation.
+Verification: swiftc -O compile/render passed; exact periodic endpoint assertion; all 300 frames checked for transparent
+margins/no clipping; ffprobe MOV/WebM 10.0s; GIF 200 frames totaling 10000ms. Delegate independently decoded alpha and
+inspected four frames; this is attributed, not my own decoded-video check. Visual status PROTOTYPE_READY_FOR_REVIEW.
+Not verified: in-app/hardware animation. Minor source alpha edge noise; native file browser preview was blocked by browser
+URL policy, and no workaround was attempted. Existing app release 0.1.2 cloud Build 3 archive and TestFlight post-action
+succeeded after registering the new extension bundle identifier in the existing developer account. No credentials changed.
+Cross-agent impact: only read existing 3D/previz files; original 3D work untouched. Signed-by: Codex
+
+---
+
+### 2026-09-27T09:16:16-04:00: Codex: swim-out / return / parachute-braking prototype
+Agent: Codex; branch codex/widget-rendering-fix; starting/ending SHA 22b5d68 (no commit this pass).
+Files: docs/prototypes/swim-up-return-v1 and append-only worklog/handoff. Existing source image copied unchanged;
+new Swift renderer Hermite body motion and continuous arm gathering/stretch/fan fields. No production code touched.
+Commands: swiftc -O -module-cache-path .build/swift-module-cache docs/prototypes/swim-up-return-v1/render_swim.swift
+-o .build/render-swim; .build/render-swim docs/prototypes/swim-up-return-v1. FFmpeg ProRes4444/VP9/GIF/H264 exports.
+Passed: 300 frames; exact 10s/0s equality; initial frame matches previous idle; hidden reset; no accidental side/bottom
+clipping; all exports duration10s; actual MOV/WebM alpha decoded with ffmpeg and checked. Visual frames inspected at
+1.4s,5.5s,6s. No app/device test; prototype only (UNVERIFIED for production). Source has minor inherited edge alpha noise.
+Cross-agent impact: none; preserved previous prototype and pending logs. Upstream reuse: none.
+Signed-by: Codex

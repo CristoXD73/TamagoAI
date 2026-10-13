@@ -90,3 +90,10 @@ The 0.1.2 fix removes the opaque circular foreground background and uses the app
 iPhone widgets are now embedded and include the new portrait XL family. New physical appearance/tap results:
 `UNVERIFIED` until the owner tests the TestFlight update. No device erasure, unpairing, settings reset or updates performed.
 Signed-by: Codex
+
+
+## 2026-09-27T08:56:45-04:00 — owner's latest widget update
+`DEVICE_VERIFIED` owner report: “i got all widgets working currently on ios, only thing missing is all complications icons
+for lil round or long rectangle”. Build number and Watch face not supplied. Do not infer that 0.1.2 (3) was installed.
+Owner requested front-facing 10-second transparent idle animation first; prototype is not yet an on-device change.
+Signed-by: Codex
