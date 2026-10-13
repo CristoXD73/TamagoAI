@@ -1,0 +1,64 @@
+{
+  "objects": 22,
+  "geometry_objects": 11,
+  "tentacles": 8,
+  "polygons": 18164,
+  "triangles": 35976,
+  "details": [
+    {
+      "name": "Tentacle 01",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Tentacle 02",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Tentacle 03",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Tentacle 04",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Tentacle 05",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Tentacle 06",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Tentacle 07",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Tentacle 08",
+      "polygons": 1028,
+      "triangles": 2036
+    },
+    {
+      "name": "Mantle and underside - unified blockout",
+      "polygons": 6868,
+      "triangles": 13736
+    },
+    {
+      "name": "Eye L",
+      "polygons": 1536,
+      "triangles": 2976
+    },
+    {
+      "name": "Eye R",
+      "polygons": 1536,
+      "triangles": 2976
+    }
+  ]
+}
